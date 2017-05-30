@@ -1,0 +1,22 @@
+================
+
+SELECT ?a
+WHERE {
+  ?a <http://test.com> ?b , ?c .
+}
+
+================
+
+SELECT ?a
+WHERE {
+  ?a <http://test.com> ?b , ?c ; ?d ?e .
+}
+
+================
+
+SELECT ?x
+WHERE {
+  ?x <http://test.com> ?y .
+}
+
+================

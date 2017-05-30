@@ -1,0 +1,71 @@
+@prefix : <http://users.dcc.uchile.cl/~dhernand/cursos/2026/web-datos/lab-03/datos.ttl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> . 
+
+
+# Los siguientes datos indican las clases de algunos individuos.
+
+:Claudio a :FullProfessor .
+:Jorge a :AssociateProfessor .
+:Aidan a :AssistantProfessor .
+:Daniel a :PostgradStudent .
+:Jaime a :UndergradStudent .
+
+# Los siguientes datos indican los roles de los integrantes de
+# este curso (el código de pregrado).
+
+:Aidan :professorOf :CC6202 .
+:Daniel :auxiliarOf :CC6202 .
+:Jaime :ayudanteOf :CC6202 .
+
+:Agustin :studentOf :CC6202 .
+:Braulio :studentOf :CC6202 .
+:Camilo :studentOf :CC6202 .
+:DiegoM :studentOf :CC6202 .
+:DiegoS :studentOf :CC6202 .
+:Enzo :studentOf :CC6202 .
+:Fabian :studentOf :CC6202 .
+:Felipe :studentOf :CC6202 .
+:Francisco :studentOf :CC6202 .
+:Gonzalo :studentOf :CC6202 .
+:Ignacio :studentOf :CC6202 .
+:JaimeI :studentOf :CC6202 .
+:JorgeA :studentOf :CC6202 .
+:JuanJ :studentOf :CC6202 .
+:JuanP :studentOf :CC6202 .
+:Manuel :studentOf :CC6202 .
+:Maximiliano :studentOf :CC6202 .
+:Michel :studentOf :CC6202 .
+:Ricardo :studentOf :CC6202 .
+:Simon :studentOf :CC6202 .
+:Tomas :studentOf :CC6202 .
+
+:Aidan :professorOf :CC71X .
+:Daniel :auxiliarOf :CC71X .
+:Jaime :ayudanteOf :CC71X .
+
+:Larry :studentOf :CC71X .
+:Marcos :studentOf :CC71X .
+:Victor :studentOf :CC71X .
+
+# Daniel es tiene como profesor guía a Claudio.
+
+:Daniel :hasAdvisor :Claudio .
+
+# El curso CC71X es similar al curso CC6202.
+
+:CC71X :similarCourse :CC6202 .
+
+# El DCC es parte de la FCFM y la FCFM es parte de la Universidad
+# de Chile.
+
+:DCC :partOf :FCFM .
+:FCFM :partOf :UniversidadDeChile .
+
+# Los cursos CC71X y CC6202 son dictados en el DCC.
+
+:CC71X :isTaughtIn :DCC .
+:CC6202 :isTaughtIn :DCC .
+

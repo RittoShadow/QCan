@@ -1,0 +1,73 @@
+=========================================
+
+SELECT ?a
+WHERE {
+ { ?a <http://example.org/p> ?b  }
+   UNION
+ { ?a <http://example.org/q> ?b  }
+   UNION
+ { ?a <http://example.org/r> ?b  }
+}
+
+=========================================
+
+SELECT ?a
+WHERE {
+ { ?a <http://example.org/q> ?b  }
+   UNION
+ { ?a <http://example.org/p> ?b  }
+   UNION
+ { ?a <http://example.org/r> ?b  }
+}
+
+=========================================
+
+SELECT ?a
+WHERE {
+ { ?a <http://example.org/q> ?b  }
+   UNION
+ { ?a <http://example.org/p> ?b  }
+   UNION
+ { ?a <http://example.org/r> ?b , ?c  }
+}
+
+=========================================
+
+SELECT ?a
+WHERE {
+ { ?a <http://example.org/q> ?b  }
+   UNION
+ { ?a <http://example.org/p> ?b  }
+   UNION
+ { ?a <http://example.org/r> ?b }
+   UNION
+ { ?a <http://example.org/s> ?b }
+}
+
+=========================================
+
+SELECT ?a
+WHERE {
+ { { ?a <http://example.org/q> ?b  }
+   UNION
+ { ?a <http://example.org/p> ?b  } }
+   UNION
+ { { ?a <http://example.org/r> ?b }
+   UNION
+ { ?a <http://example.org/s> ?b } }
+}
+
+=========================================
+
+SELECT ?a
+WHERE {
+ { { ?a <http://example.org/r> ?b }
+   UNION
+ { ?a <http://example.org/q> ?b } }
+   UNION
+ { { ?a <http://example.org/s> ?b  }
+   UNION
+ { ?a <http://example.org/p> ?b  } }
+}
+
+==========================================
