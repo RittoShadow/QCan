@@ -1,0 +1,7 @@
+SELECT * WHERE { ?a <p> ?b . ?a <p> ?b .}
+SELECT DISTINCT * WHERE { ?a <p> ?b . ?a <p> ?b .}
+SELECT DISTINCT * WHERE {  ?a <p> ?b .}
+SELECT * FROM <http://a.com> FROM <http://b.com> FROM NAMED <http://b.com> FROM NAMED <http://c.com> WHERE { GRAPH ?c { ?a <p> ?b . } ?a <p> ?b .}
+SELECT * FROM <http://b.com> FROM <http://a.com> FROM NAMED <http://c.com> FROM NAMED <http://b.com> WHERE { ?x <p> ?b . GRAPH ?g { ?x <p> ?b . }}
+SELECT * FROM <http://a.com> FROM <http://b.com> FROM <http://a.com> FROM NAMED <http://b.com> FROM NAMED <http://c.com> WHERE { ?x <p> ?b . GRAPH ?g { ?x <p> ?b . }}
+SELECT * FROM <http://a.com> FROM <http://b.com> FROM <http://a.com> FROM NAMED <http://b.com> FROM NAMED <http://c.com> WHERE { ?x <p> ?b . GRAPH ?g { ?x <p> ?b . ?x <q> ?b .}}

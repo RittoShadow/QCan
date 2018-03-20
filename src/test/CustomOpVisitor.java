@@ -3,7 +3,7 @@ package test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
-
+import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.OpVisitor;
 import org.apache.jena.sparql.algebra.op.OpAssign;
@@ -46,44 +46,58 @@ public class CustomOpVisitor implements OpVisitor {
 	private Stack<ExpandedGraph> graphStack = new Stack<ExpandedGraph>();
 	private Stack<ExpandedGraph> unionStack = new Stack<ExpandedGraph>();
 	private Stack<ExpandedGraph> joinStack = new Stack<ExpandedGraph>();
+	private Stack<ExpandedGraph> optionalStack = new Stack<ExpandedGraph>();
 	private List<Var> projectionVars;
+	private List<String> graphURI;
+	private List<String> namedGraphURI;
+	public int nTriples = 0;
 	private int bgpId = 0;
 	private int unionId = 0;
+	private int optionalId = 0;
+	private int filterId = 0;
+	private boolean enableFilter = true;
+	private boolean enableOptional = true;
+	private boolean isDistinct = false;
+	private boolean containsUnion = false;
+	private boolean containsJoin = false;
+	private boolean containsOptional = false;
+	private boolean containsFilter = false;
+	private boolean containsSolutionMods = false;
+	private boolean containsNamedGraphs = false;
 	
 	public CustomOpVisitor(){
 		
 	}
 	
-	public CustomOpVisitor(List<Var> pVars){
-		this.projectionVars = pVars;
+	public CustomOpVisitor(Query query){
+		this.projectionVars = query.getProjectVars();
+		graphURI = query.getGraphURIs();
+		namedGraphURI = query.getNamedGraphURIs();
 	}
 
 	@Override
 	public void visit(OpBGP arg0) {
+		nTriples += arg0.getPattern().size();
 		graphStack.add(new ExpandedGraph(arg0.getPattern().getList(), bgpId++));
 	}
 
 	@Override
 	public void visit(OpQuadPattern arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
 		
 	}
 
 	@Override
 	public void visit(OpQuadBlock arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
 		
 	}
 
 	@Override
 	public void visit(OpTriple arg0) {
-		System.out.println(arg0.getTriple());
 		
 	}
 
 	@Override
 	public void visit(OpQuad arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
 		
 	}
 
@@ -119,14 +133,20 @@ public class CustomOpVisitor implements OpVisitor {
 
 	@Override
 	public void visit(OpFilter arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
-		
+		containsFilter = true;
+		if (enableFilter){
+			FilterParser fp = new FilterParser(graphStack.peek(), filterId++);
+			fp.parse(arg0.toString().replace("exprlist", "&&").split("\n")[0].substring(8));
+		}
+		else{
+			throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
+		}
 	}
 
 	@Override
 	public void visit(OpGraph arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
-		
+		containsNamedGraphs = true;
+		graphStack.peek().graphOp(arg0.getNode());
 	}
 
 	@Override
@@ -162,46 +182,114 @@ public class CustomOpVisitor implements OpVisitor {
 	@Override
 	public void visit(OpJoin arg0) {
 		ExpandedGraph e1, e2;
-		if (arg0.getLeft() instanceof OpBGP){
-			e1 = new ExpandedGraph(((OpBGP)arg0.getLeft()).getPattern().getList(), bgpId++);
-		}
-		else if (arg0.getLeft() instanceof OpUnion){
-			e1 = unionStack.pop();
-		}
-		else{
-			e1 = joinStack.pop();
-		}
+		containsJoin = true;
 		if (arg0.getRight() instanceof OpBGP){
 			e2 = new ExpandedGraph(((OpBGP)arg0.getRight()).getPattern().getList(), bgpId++);
 		}
 		else if (arg0.getRight() instanceof OpUnion){
 			e2 = unionStack.pop();
 		}
-		else{
+		else if (arg0.getRight() instanceof OpLeftJoin){
+			if (enableOptional){
+				e2 = optionalStack.pop();
+			}
+			else{
+				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+			}
+		}
+		else if (arg0.getRight() instanceof OpJoin){
 			e2 = joinStack.pop();
 		}
-		e2.join(e1,bgpId++);
-		joinStack.add(e2);
-		graphStack.add(e2);		
+		else{
+			e2 = graphStack.pop();
+		}
+		if (arg0.getLeft() instanceof OpBGP){
+			e1 = new ExpandedGraph(((OpBGP)arg0.getLeft()).getPattern().getList(), bgpId++);
+		}
+		else if (arg0.getLeft() instanceof OpUnion){
+			e1 = unionStack.pop();
+		}
+		else if (arg0.getLeft() instanceof OpLeftJoin){
+			if (enableOptional){
+				e1 = optionalStack.pop();
+			}
+			else{
+				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+			}
+		}
+		else if (arg0.getLeft() instanceof OpJoin){
+			e1 = joinStack.pop();
+		}
+		else{
+			e1 = graphStack.pop();
+		}
+		e1.join(e2,bgpId++);
+		joinStack.add(e1);
+		graphStack.add(e1);		
 	}
 
 	@Override
 	public void visit(OpLeftJoin arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
+		ExpandedGraph e1, e2;
+		containsOptional = true;
+		if (enableOptional){
+			if (arg0.getRight() instanceof OpBGP){
+				e2 = new ExpandedGraph(((OpBGP)arg0.getRight()).getPattern().getList(), bgpId++);
+			}
+			else if (arg0.getRight() instanceof OpUnion){
+				e2 = unionStack.pop();
+			}
+			else if (arg0.getRight() instanceof OpLeftJoin){
+				e2 = optionalStack.pop();
+			}
+			else{
+				e2 = joinStack.pop();
+			}
+			if (arg0.getLeft() instanceof OpBGP){
+				e1 = new ExpandedGraph(((OpBGP)arg0.getLeft()).getPattern().getList(), bgpId++);
+			}
+			else if (arg0.getLeft() instanceof OpUnion){
+				e1 = unionStack.pop();
+			}
+			else if (arg0.getLeft() instanceof OpLeftJoin){
+				e1 = optionalStack.pop();
+			}
+			else{
+				e1 = joinStack.pop();
+			}
+			e1.optional(e2, optionalId++);
+			optionalStack.add(e1);
+			graphStack.add(e1);
+		}
+		else{
+			throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
+		}
 		
 	}
 
 	@Override
 	public void visit(OpUnion arg0) {
 		ExpandedGraph e1, e2;
+		containsUnion = true;
 		if (arg0.getLeft() instanceof OpBGP){
 			e1 = new ExpandedGraph(((OpBGP)arg0.getLeft()).getPattern().getList(), bgpId++);
 		}
 		else if (arg0.getLeft() instanceof OpUnion){
 			e1 = unionStack.pop();
 		}
-		else{
+		else if (arg0.getLeft() instanceof OpLeftJoin){
+			if (enableOptional){
+				e1 = optionalStack.pop();
+			}
+			else{
+				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+			}
+		}
+		else if (arg0.getLeft() instanceof OpJoin){
 			e1 = joinStack.pop();
+		}
+		else{
+			e1 = graphStack.pop();
 		}
 		if (arg0.getRight() instanceof OpBGP){
 			e2 = new ExpandedGraph(((OpBGP)arg0.getRight()).getPattern().getList(), bgpId++);
@@ -209,8 +297,19 @@ public class CustomOpVisitor implements OpVisitor {
 		else if (arg0.getRight() instanceof OpUnion){
 			e2 = unionStack.pop();
 		}
-		else{
+		else if (arg0.getRight() instanceof OpLeftJoin){
+			if (enableOptional){
+				e2 = optionalStack.pop();
+			}
+			else{
+				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+			}
+		}
+		else if (arg0.getRight() instanceof OpJoin){
 			e2 = joinStack.pop();
+		}
+		else{
+			e2 = graphStack.pop();
 		}
 		e2.union(e1, unionId++);
 		unionStack.add(e2);
@@ -255,6 +354,7 @@ public class CustomOpVisitor implements OpVisitor {
 
 	@Override
 	public void visit(OpOrder arg0) {
+		containsSolutionMods = true;
 		List<SortCondition> cond = arg0.getConditions();
 		List<Var> vars = new ArrayList<Var>();
 		List<Integer> dir = new ArrayList<Integer>();
@@ -286,12 +386,13 @@ public class CustomOpVisitor implements OpVisitor {
 
 	@Override
 	public void visit(OpDistinct arg0) {
-		// TODO Auto-generated method stub
+		isDistinct = true;
 		
 	}
 
 	@Override
 	public void visit(OpSlice arg0) {
+		containsSolutionMods = true;
 		long offset = arg0.getStart() < 0 ? 0 : arg0.getStart();
 		long limit = arg0.getLength();
 		if (!graphStack.peek().containsProjection()){
@@ -313,11 +414,52 @@ public class CustomOpVisitor implements OpVisitor {
 		
 	}
 	
+	public void setEnableFilter(boolean b){
+		this.enableFilter = b;
+	}
+	
+	public void setEnableOptional(boolean b){
+		this.enableOptional = b;
+	}
+	
 	public ExpandedGraph getResult(){
 		if (!graphStack.peek().containsProjection()){
 			graphStack.peek().project(projectionVars);
 		}
+		if (!this.graphURI.isEmpty()){
+			containsNamedGraphs = true;
+			graphStack.peek().fromGraph(graphURI);
+		}
+		if (!this.namedGraphURI.isEmpty()){
+			containsNamedGraphs = true;
+			graphStack.peek().fromNamedGraph(namedGraphURI);
+		}
+		graphStack.peek().setDistinctNode(isDistinct);
 		return graphStack.peek();
+	}
+	
+	public boolean getContainsUnion(){
+		return this.containsUnion;
+	}
+	
+	public boolean getContainsJoin(){
+		return this.containsJoin;
+	}
+	
+	public boolean getContainsOptional(){
+		return this.containsOptional;
+	}
+	
+	public boolean getContainsFilter(){
+		return this.containsFilter;
+	}
+	
+	public boolean getContainsSolutionMods(){
+		return this.containsSolutionMods;
+	}
+	
+	public boolean getContainsNamedGraphs(){
+		return this.containsNamedGraphs;
 	}
 
 }

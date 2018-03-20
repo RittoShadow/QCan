@@ -1,0 +1,8 @@
+SELECT * WHERE { ?a <p> ?b . OPTIONAL { { ?b <q> ?c . } UNION  { ?b <r> ?c . } } }
+SELECT * WHERE { ?x <p> ?y . OPTIONAL {  { ?y <r> ?z . } UNION  { ?y <q> ?z . } } }
+SELECT DISTINCT * WHERE { ?a <p> ?b . OPTIONAL  { ?b <q> ?c . } ?a <p> ?b . OPTIONAL  { ?b <q> ?c . } }
+SELECT DISTINCT * WHERE { ?a <p> ?b . OPTIONAL  { ?b <q> ?c . } }
+SELECT DISTINCT * WHERE { { ?a <p> ?b } UNION  { ?b <q> ?c . } . { ?a <p> ?b } UNION  { ?b <q> ?c . }}
+SELECT DISTINCT * WHERE { { ?a <p> ?b } UNION  { ?b <q> ?c . } }
+SELECT * WHERE { ?a <p> ?b . OPTIONAL {  { ?b <q> ?c . } UNION  { ?b <r> ?c . }  { ?b <s> ?c . }    UNION  { ?b <t> ?c . } } }
+SELECT * WHERE { ?a <p> ?b . OPTIONAL {  { ?b <s> ?c . } UNION  { ?b <t> ?c . }  { ?b <r> ?c . }    UNION  { ?b <q> ?c . } } }

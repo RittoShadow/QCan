@@ -1,0 +1,9 @@
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> ?o2 . FILTER((?o1 < 500 && ?o2 != 1000 && REGEX(?o1,"^a"))) }
+SELECT * WHERE { ?s <http://ex.org/q> ?a . ?s <http://ex.org/p> ?b . FILTER(REGEX(?b,"^a") && ?a != 1000 && ?b < 500) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> ?o2 . FILTER(1000 != ?o2) FILTER(?o1 < 500 && REGEX(?o1,"^a")) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/p> ?o2 . FILTER((?o1 < 500 && ?o2 != 1000) || REGEX(?o1,"^a")) }
+SELECT * WHERE { ?s <http://ex.org/p> ?a . ?s <http://ex.org/p> ?b . FILTER(REGEX(?b,"^a") || (?a != 1000 && ?b < 500)) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> 1 . }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> ?o2 . FILTER(?o2 = 1) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> ?o2 . FILTER(!(?o2 = 1)) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1  FILTER(!(?o1 = 1)) }

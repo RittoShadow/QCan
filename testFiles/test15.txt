@@ -1,0 +1,5 @@
+SELECT DISTINCT ?s WHERE { { ?s <p> ?o } UNION { ?s <q> ?o } FILTER(?o < 15)}
+SELECT DISTINCT ?x WHERE { { ?x <p> ?o } UNION { ?x <q> ?o } FILTER(?o < 15)}
+SELECT DISTINCT ?x WHERE { { ?x <p> ?w } UNION { ?x <q> ?y } FILTER(?z < 15)}
+SELECT DISTINCT ?s WHERE { { ?s <p> ?o } UNION { ?s <q> ?o }} ORDER BY ?o
+SELECT DISTINCT ?x WHERE { { ?x <p> ?w } UNION { ?x <q> ?y }} ORDER BY ?z

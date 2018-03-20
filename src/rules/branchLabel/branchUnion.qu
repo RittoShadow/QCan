@@ -1,0 +1,20 @@
+PREFIX ex: <http://example.org/> 
+SELECT *
+WHERE {
+ {
+ 	{
+	 	SELECT DISTINCT ?vname ?x
+	 	WHERE
+	 	{
+		 {
+		 SELECT DISTINCT ?vname
+		 WHERE{
+		 	?v ex:value ?vname .
+		 	}
+		 }
+		 BIND(BNODE(?vname) AS ?x)
+		}
+	}
+ }
+ ?n ex:value ?vname .
+}

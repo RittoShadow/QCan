@@ -1,22 +1,3 @@
-================
-
-SELECT ?a
-WHERE {
-  ?a <http://test.com> ?b , ?c .
-}
-
-================
-
-SELECT ?a
-WHERE {
-  ?a <http://test.com> ?b , ?c ; ?d ?e .
-}
-
-================
-
-SELECT ?x
-WHERE {
-  ?x <http://test.com> ?y .
-}
-
-================
+SELECT ?a WHERE {  ?a <http://test.com> ?b , ?c .}
+SELECT ?a WHERE {  ?a <http://test.com> ?b , ?c ; <http://test.com> ?e .}
+SELECT ?x WHERE {  ?x <http://test.com> ?y .}

@@ -1,13 +1,2 @@
-=======================
-
-SELECT ?s ?p ?o
-WHERE { ?s ?p ?o }
-
-=======================
-
-SELECT $x $y $z
-WHERE { 
- $x $y $z . 
-}
-
-=======================
+SELECT ?s ?p ?o WHERE { ?s ?p ?o }
+SELECT $x $y $z WHERE {  $x $y $z . }

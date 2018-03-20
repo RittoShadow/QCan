@@ -1,0 +1,3 @@
+SELECT * WHERE { ?s <http://ex.org/p> ?a . OPTIONAL { ?s <http://ex.org/q> ?b . ?s <http://ex.org/r> ?c .} . ?s <http://ex.org/u> ?d . OPTIONAL { ?s <http://ex.org/s> ?e . ?s <http://ex.org/t> ?f .} }
+SELECT * WHERE { ?s <http://ex.org/p> ?a . OPTIONAL { ?s <http://ex.org/q> ?b . ?s <http://ex.org/r> ?c .} . { ?s <http://ex.org/u> ?d . OPTIONAL { ?s <http://ex.org/s> ?e . ?s <http://ex.org/t> ?f .} } }
+SELECT * WHERE { ?s <http://ex.org/p> ?a . ?s <http://ex.org/u> ?d . OPTIONAL { ?s <http://ex.org/q> ?b . ?s <http://ex.org/r> ?c . } OPTIONAL { ?s <http://ex.org/s> ?e . ?s <http://ex.org/t> ?f . } }
