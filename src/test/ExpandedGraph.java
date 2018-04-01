@@ -673,15 +673,28 @@ public class ExpandedGraph {
 		// Delete empty unions.
 		UpdateAction.execute(unionRule,this.graph);
 		// Distribute union over conjunction Case: (A U B) * C
+//		System.out.println("Distribution 1\n"+executeQuery("rules/distribution.qu"));
 		UpdateAction.execute(distributionRule1, this.graph);
 		// Distribute union over conjunction Case: (A U B) * (C U D)
+//		System.out.println("Distribution 2\n"+executeQuery("rules/distribution2.qu"));
 		UpdateAction.execute(distributionRule2, this.graph);
 		UpdateAction.execute(conjunctionRule,this.graph);
 		UpdateAction.execute(disjunctionRule,this.graph);
 		UpdateAction.execute(joinTripleRule,this.graph);
 	}
 	
+	public void iterativeUpdate(UpdateRequest request){
+		Graph before = GraphFactory.createPlainGraph();
+		while (!before.isIsomorphicWith(graph)){
+			before = GraphFactory.createPlainGraph();
+			GraphUtil.addInto(before, graph);
+			UpdateAction.execute(request, graph);
+		}
+	}
+	
 	public void branchRelabelling(){
+		iterativeUpdate(redundancyRule);
+		iterativeUpdate(joinRule);
 		UpdateAction.execute(joinLabelRule,this.graph);
 	}
 	
@@ -692,21 +705,36 @@ public class ExpandedGraph {
 	
 	public ExpandedGraph getCanonicalForm(boolean verbose) throws InterruptedException, HashCollisionException{
 		Graph before = GraphFactory.createPlainGraph();
+		if (verbose){
+			System.out.println("CQ Normalisation");
+		}
 		while(!before.isIsomorphicWith(graph)){
 			before = GraphFactory.createPlainGraph();
 			GraphUtil.addInto(before, graph);
 			this.update();
 		}
+		if (verbose){
+			print();
+		}
 		boolean distinct = this.graph.contains(this.root, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
 		if (leaning && distinct){
+			if (verbose){
+				System.out.println("Branch relabelling");
+			}
 			try{
 				branchRelabelling();
 			}
 			catch (Exception e){
 				e.printStackTrace();
 			}
-			print();
+			if (verbose){
+				print();
+				System.out.println("UCQs");
+			}
 			ExpandedGraph e = getConjunctiveQueries();
+			if (verbose){
+				System.out.println("Beginning leaning.");
+			}
 			GraphLeaningResult glResult = this.DFSLeaning(e.getTriples());
 			if (verbose){
 				System.out.println("DFS Leaning results: \n");
@@ -718,6 +746,9 @@ public class ExpandedGraph {
 			ExpandedGraph ans = new ExpandedGraph(glResult.getLeanData());
 			UpdateAction.execute(duplicatesRule,ans.graph);
 			ans.update();
+			if (verbose){
+				System.out.println("Beginning labelling");
+			}
 			GraphLabellingResult glr = this.label(ans.getTriples());
 			
 			if (verbose){
@@ -1182,7 +1213,6 @@ public class ExpandedGraph {
 	public ExpandedGraph getConjunctiveQueries() throws InterruptedException, HashCollisionException{
 		ArrayList<ExpandedGraph> result = new ArrayList<ExpandedGraph>();
 		ArrayList<ExpandedGraph> redundant = new ArrayList<ExpandedGraph>();
-		UpdateAction.execute(redundancyRule,this.graph);
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
 		Node union = GraphUtil.listObjects(this.graph, this.root, opNode).next();
 		if (graph.contains(union, typeNode, unionNode)){ //Make sure it's a union of conjunctive queries.

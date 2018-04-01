@@ -116,9 +116,10 @@ public class UCQGenerator {
 	}
 	
 	public static void main(String[] args) throws IOException, InterruptedException, HashCollisionException{
-		UCQGenerator g = new UCQGenerator(new File("eval/k/k-6"));
+		UCQGenerator g = new UCQGenerator(new File("eval/k/k-8"));
 		g.generateTriples();
-		ExpandedGraph e = g.generateGraph(2,4);
+		ExpandedGraph e = g.generateGraph(4,4);
+		e.print();
 		ExpandedGraph a = e.getCanonicalForm(false);
 		a.print();
 		System.out.println("");

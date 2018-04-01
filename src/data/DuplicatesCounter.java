@@ -27,7 +27,7 @@ public class DuplicatesCounter {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		DuplicatesCounter dc = new DuplicatesCounter(new File("resultFiles/dist20171023_204141.log"));
+		DuplicatesCounter dc = new DuplicatesCounter(new File("resultFiles/dist20180321_224749.log"));
 		for (int i : dc.duplicates){
 			System.out.println(i);
 		}

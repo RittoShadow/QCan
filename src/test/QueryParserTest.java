@@ -109,6 +109,6 @@ public class QueryParserTest {
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException{
-		QueryParserTest qp = new QueryParserTest(new File("testFiles/test18.txt"));
+		QueryParserTest qp = new QueryParserTest(new File("testFiles/test16.txt"));
 	}
 }

@@ -264,8 +264,8 @@ public class Analysis {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		Analysis a = new Analysis("resultFiles/labelOnly_results20171228_144946.log");
-		a.shortDisplayInfo();
+		Analysis a = new Analysis("resultFiles/results20180321_154432.log");
+		a.displayInfo();
 	}
 
 }

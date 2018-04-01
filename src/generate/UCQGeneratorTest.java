@@ -70,14 +70,13 @@ public class UCQGeneratorTest {
 			line += "\t"+e1.getNumberOfTriples();
 			bw.append(line);
 			bw.newLine();
-			System.out.println(line);
 		}
 	}
 	
 	public void testAll(int a, int b) throws IOException, InterruptedException, HashCollisionException{
 		for (int x = 0; x < a; x++){
 			for (int y = 0; y < b; y++){
-				setup((int)Math.pow(2, x+4),(int)Math.pow(2, y));
+				setup((int)Math.pow(2, x+2),(int)Math.pow(2, y+2));
 				try{
 					execute();
 				}

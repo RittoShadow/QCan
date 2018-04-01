@@ -18,23 +18,22 @@ INSERT{
 }
 WHERE
   { 
-	
 	{
 	SELECT DISTINCT ?b0 ?b1 (BNODE() AS ?x) ?q1 ?b2
 	WHERE{
 		{
-		SELECT ?b0 ?b1
+			SELECT ?b0 ?b1
 		  	WHERE{
 			  	?b0 ex:type ex:join .
 			  	?b0 ex:arg ?b1 .
 			  	?b1 ex:type ex:union .
+			  	?b0 ex:arg ?b2 .
+			  	FILTER(?b1 != ?b2)
 			  	FILTER NOT EXISTS{
-			  		?b0 ex:arg ?v .
-			  		?v ex:type ex:union .
-			  		FILTER(?v != ?b1)
+			  		?b2 ex:type ex:union .
+			  		FILTER(?b2 != ?b1)
 			  	}
-			  	}
-			  	LIMIT 1
+			  	} LIMIT 1
 			}
 	  	?b1 ex:arg ?q1 .
 	  	?b0 ex:arg ?b2 .
