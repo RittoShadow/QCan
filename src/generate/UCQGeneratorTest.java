@@ -76,7 +76,7 @@ public class UCQGeneratorTest {
 	public void testAll(int a, int b) throws IOException, InterruptedException, HashCollisionException{
 		for (int x = 0; x < a; x++){
 			for (int y = 0; y < b; y++){
-				setup((int)Math.pow(2, x+2),(int)Math.pow(2, y+2));
+				setup((int)Math.pow(2, x),(int)Math.pow(2, y));
 				try{
 					execute();
 				}
