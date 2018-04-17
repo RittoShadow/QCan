@@ -26,6 +26,9 @@ These queries contain n conjunctions of patterns containing m disjunctions.
 
 > java UCQGeneratorTest conjunctions unions
 
+# Demo
+
+Live demo [here](qcan.dcc.uchile.cl)
 
 # License
 
