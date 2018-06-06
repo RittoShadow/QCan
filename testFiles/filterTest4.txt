@@ -1,0 +1,1 @@
+SELECT DISTINCT ?v1 WHERE { { ?v2 <http://ex.org/a> ?v4 . ?v4 <http://ex.org/c> ?v1 } UNION { ?v3 <http://ex.org/b> ?v0 . ?v0 <http://ex.org/c> ?v1 . FILTER(?v0 != ?v3) } FILTER ( ?v4 = ?v0 )  }ORDER BY ASC(?v1)

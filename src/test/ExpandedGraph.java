@@ -82,11 +82,13 @@ public class ExpandedGraph {
 	private final Node graphNode = NodeFactory.createURI(this.URI+"graph");
 	private final Node distinctNode = NodeFactory.createURI(this.URI+"distinct");
 	private final Node tempNode = NodeFactory.createURI(this.URI+"temp");
-	private final UpdateRequest conjunctionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/conjunction.ru"));
-	private final UpdateRequest disjunctionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/disjunction.ru"));
-	private final UpdateRequest distributionRule1 = UpdateFactory.read(getClass().getResourceAsStream("/rules/distribution.ru"));
-	private final UpdateRequest distributionRule2 = UpdateFactory.read(getClass().getResourceAsStream("/rules/distribution2.ru"));
-	private final UpdateRequest duplicatesRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/distribution2.ru"));
+	@SuppressWarnings("unused")
+	private final Node leafNode = NodeFactory.createURI(this.URI+"leaf");
+	private final UpdateRequest conjunctionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/conjunction.ru"));
+	private final UpdateRequest disjunctionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/disjunction.ru"));
+	private final UpdateRequest distributionRule1 = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/distribution.ru"));
+	private final UpdateRequest distributionRule2 = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/distribution2.ru"));
+	private final UpdateRequest duplicatesRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/duplicates.ru"));
 	private final UpdateRequest joinRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/join.ru"));
 	private final UpdateRequest joinTripleRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/joinTriple.ru"));
 	private final UpdateRequest redundancyRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/redundancy.ru"));
@@ -98,7 +100,13 @@ public class ExpandedGraph {
 	private final UpdateRequest filterVarsRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/filterVars.ru"));
 	private final UpdateRequest joinLabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/joinLabel.ru"));
 	private final UpdateRequest tripleRelabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/tripleRelabel.ru"));
-	
+	private final UpdateRequest askRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/ask.ru"));
+	private final UpdateRequest leafRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/leaf.ru"));
+	private final UpdateRequest newLeafRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/newLeaf.ru"));
+	private final UpdateRequest leafRule0 = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/leaf0.ru"));
+	private final UpdateRequest leafCleanUpRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/leafCleanup.ru"));
+
+
 	public ExpandedGraph(List<Triple> triples, List<Var> vars, int id){
 		if (vars != null){
 			this.vars.addAll(vars);
@@ -360,7 +368,7 @@ public class ExpandedGraph {
 	
 	public Node filterFunction(String op, String arg1){
 		Node n = NodeFactory.createBlankNode();
-		Node o = NodeFactory.createLiteral(op);
+		Node o = filterOperator(op);
 		Node a = NodeFactory.createBlankNode();
 		if (arg1.startsWith("?")){
 			graph.add(Triple.create(a, valueNode, NodeFactory.createBlankNode(arg1.substring(1))));
@@ -380,7 +388,7 @@ public class ExpandedGraph {
 	
 	public Node filterFunction(String op, Node arg1){
 		Node n = NodeFactory.createBlankNode();
-		Node o = NodeFactory.createLiteral(op);
+		Node o = filterOperator(op);
 		Node a = NodeFactory.createBlankNode();
 		if (!GraphUtil.listObjects(graph, arg1, functionNode).hasNext()){
 			graph.add(Triple.create(a, valueNode, arg1));
@@ -395,7 +403,7 @@ public class ExpandedGraph {
 	
 	public Node filterFunction(String op, String arg1, String arg2){
 		Node n = NodeFactory.createBlankNode();
-		Node o = NodeFactory.createLiteral(op);
+		Node o = filterOperator(op);
 		Node a = NodeFactory.createBlankNode();
 		Node b = NodeFactory.createBlankNode();
 		arg1 = arg1.replace("\"", "");
@@ -426,7 +434,7 @@ public class ExpandedGraph {
 	
 	public Node filterFunction(String op, Node arg1, Node arg2){
 		Node n = NodeFactory.createBlankNode();
-		Node o = NodeFactory.createLiteral(op);
+		Node o = filterOperator(op);
 		Node a = NodeFactory.createBlankNode();
 		Node b = NodeFactory.createBlankNode();
 		boolean x = !GraphUtil.listObjects(graph, arg1, functionNode).hasNext();
@@ -496,19 +504,70 @@ public class ExpandedGraph {
 		}
 	}
 	
+	public Node filterOperator(String s){
+		s = s.replace("\"", "");
+		if (s.equals("=")){
+			return NodeFactory.createURI(this.URI+"eq");
+		}
+		else if (s.equals("!=")){
+			return NodeFactory.createURI(this.URI+"neq");
+		}
+		else if (s.equals("<")){
+			return NodeFactory.createURI(this.URI+"lt");
+		}
+		else if (s.equals(">")){
+			return NodeFactory.createURI(this.URI+"gt");
+		}
+		else if (s.equals("<=")){
+			return NodeFactory.createURI(this.URI+"lteq");
+		}
+		else if (s.equals(">=")){
+			return NodeFactory.createURI(this.URI+"gteq");
+		}
+		else{
+			return NodeFactory.createLiteral(s);
+		}
+	}
+	
+	public String filterOperatorToString(Node n){
+		if (n.equals(NodeFactory.createURI(this.URI+"eq"))){
+			return "=";
+		}
+		else if (n.equals(NodeFactory.createURI(this.URI+"neq"))){
+			return "!=";
+		}
+		else if (n.equals(NodeFactory.createURI(this.URI+"lt"))){
+			return "<";
+		}
+		else if (n.equals(NodeFactory.createURI(this.URI+"gt"))){
+			return ">";
+		}
+		else if (n.equals(NodeFactory.createURI(this.URI+"lteq"))){
+			return "<=";
+		}
+		else if (n.equals(NodeFactory.createURI(this.URI+"gteq"))){
+			return ">=";
+		}
+		else{
+			return n.toString();
+		}
+	}
+	
 	public void project(Collection<Var> vars){
-		Node root = NodeFactory.createBlankNode("project");
-		graph.add(Triple.create(root, typeNode, projectNode));
-		graph.add(Triple.create(root, opNode, this.root));
-		this.vars.addAll(vars);
-		
-		if (graph.contains(NodeFactory.createBlankNode("orderBy"), typeNode, orderByNode)){
-			graph.add(Triple.create(root, modNode, NodeFactory.createBlankNode("orderBy")));
-		}
-		for (Var v : vars){
-			graph.add(Triple.create(root, argNode, NodeFactory.createBlankNode(v.getName())));		
-		}
-		this.root = root;
+		if (!GraphUtil.listSubjects(graph, typeNode, projectNode).hasNext()){
+			Node root = NodeFactory.createBlankNode("project");
+			graph.add(Triple.create(root, typeNode, projectNode));
+			graph.add(Triple.create(root, opNode, this.root));
+			this.vars.addAll(vars);
+			
+			if (graph.contains(NodeFactory.createBlankNode("orderBy"), typeNode, orderByNode)){
+				graph.add(Triple.create(root, modNode, NodeFactory.createBlankNode("orderBy")));
+			}
+			for (Var v : vars){
+				graph.add(Triple.create(root, argNode, NodeFactory.createBlankNode(v.getName())));		
+			}
+			this.root = root;
+		}	
 	}
 	
 	public void setDistinctNode(boolean isDistinct){
@@ -640,10 +699,9 @@ public class ExpandedGraph {
 	}
 	
 	public TreeSet<org.semanticweb.yars.nx.Node[]> getTriples(){
-		this.update();
-		JenaModelIterator jmi = new JenaModelIterator(this.asModel());
+		Model model = this.asModel();
+		JenaModelIterator jmi = new JenaModelIterator(model);
 		TreeSet<org.semanticweb.yars.nx.Node[]> triples = new TreeSet<org.semanticweb.yars.nx.Node[]>(NodeComparator.NC);
-		
 		while(jmi.hasNext()){
 			org.semanticweb.yars.nx.Node[] triple = jmi.next();
 			triples.add(new org.semanticweb.yars.nx.Node[]{triple[0],triple[1],triple[2]});
@@ -681,6 +739,7 @@ public class ExpandedGraph {
 		UpdateAction.execute(conjunctionRule,this.graph);
 		UpdateAction.execute(disjunctionRule,this.graph);
 		UpdateAction.execute(joinTripleRule,this.graph);
+		markNewLeaves();
 	}
 	
 	public void iterativeUpdate(UpdateRequest request){
@@ -690,6 +749,24 @@ public class ExpandedGraph {
 			GraphUtil.addInto(before, graph);
 			UpdateAction.execute(request, graph);
 		}
+	}
+	
+	public void removeRedundantOperators(){
+		iterativeUpdate(redundancyRule);
+		iterativeUpdate(joinRule);
+	}
+	
+	public void markLeaves(){
+		UpdateAction.execute(leafRule0, this.graph);
+		UpdateAction.execute(leafRule, this.graph);
+	}
+	
+	public void markNewLeaves(){
+		UpdateAction.execute(newLeafRule, this.graph);
+	}
+	
+	public void unmarkLeaves(){
+		UpdateAction.execute(leafCleanUpRule, this.graph);
 	}
 	
 	public void branchRelabelling(){
@@ -708,15 +785,19 @@ public class ExpandedGraph {
 		if (verbose){
 			System.out.println("CQ Normalisation");
 		}
+		markLeaves();
+		markNewLeaves();
 		while(!before.isIsomorphicWith(graph)){
 			before = GraphFactory.createPlainGraph();
 			GraphUtil.addInto(before, graph);
 			this.update();
 		}
+		unmarkLeaves();
 		if (verbose){
 			print();
 		}
 		boolean distinct = this.graph.contains(this.root, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
+		removeRedundantOperators();
 		if (leaning && distinct){
 			if (verbose){
 				System.out.println("Branch relabelling");
@@ -773,8 +854,6 @@ public class ExpandedGraph {
 		}	
 	}
 	
-	//
-	
 	public String getCleanLiteral(Node n){
 		if (n.isLiteral()){
 			String o = n.getLiteralValue().toString();
@@ -788,69 +867,6 @@ public class ExpandedGraph {
 		else{
 			return "";
 		}
-	}
-	
-	public String joinToString(Node n){
-		String ans = "";
-		ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
-		ans += "\t{ \n";
-		while (args.hasNext()){
-			Node arg = args.next();
-			Node type = GraphUtil.listObjects(graph, arg, typeNode).next();
-			ans += "\t";
-			if (type.equals(unionNode)){
-				ans += unionToString(arg);
-			}
-			else if (type.equals(joinNode)){
-				ans += joinToString(arg);
-			}
-			else if (type.equals(optionalNode)){
-				ans += optionalToString(arg);
-			}
-			else if (type.equals(tpNode)){
-				ans += tripleToString(arg);
-			}
-			else if (type.equals(graphNode)){
-				ans += graphToString(arg);
-			}
-			ans += "\n";
-		}
-		ans += "\t }";
-		if (GraphUtil.listObjects(graph, n, modNode).hasNext()){
-			Node f = GraphUtil.listObjects(graph, n, modNode).next();
-			ans += "\n\tFILTER" + filterToString(GraphUtil.listObjects(graph, f, argNode).next()) + "\n";
-		}
-		return ans;
-	}
-	
-	public String tripleToString(Node n){
-		String ans = "\t";
-		Node subjects = GraphUtil.listObjects(graph, n, subNode).next();
-		Node predicates = GraphUtil.listObjects(graph, n, preNode).next();
-		Node objects = GraphUtil.listObjects(graph, n, objNode).next();
-		String sub = subjects.toString();
-		String pre = predicates.toString();
-		String obj = objects.toString();
-		if (subjects.isBlank()){
-			sub = "?"+subjects.getBlankNodeLabel();
-		}
-		else if (subjects.isURI()){
-			sub = "<"+sub+">";
-		}
-		if (predicates.isBlank()){
-			pre = "?"+predicates.getBlankNodeLabel();
-		}
-		else if (predicates.isURI()){
-			pre = "<"+pre+">";
-		}
-		if (objects.isBlank()){
-			obj = "?"+objects.getBlankNodeLabel();
-		}
-		else if (objects.isURI()){
-			obj = "<"+obj+">";
-		}
-		ans = "\t" + sub +" "+ pre +" "+ obj + " . ";
-		return ans;
 	}
 	
 	public String tripleToString(Triple n){
@@ -889,327 +905,6 @@ public class ExpandedGraph {
 		return ans;
 	}
 	
-	public String unionToString(Node n){
-		String ans = "";
-		ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
-		ans += "\t{ \n";
-		while (args.hasNext()){
-			Node arg = args.next();
-			Node type = GraphUtil.listObjects(graph, arg, typeNode).next();
-			ans += "\t{";
-			if (type.equals(unionNode)){
-				ans += unionToString(arg);
-			}
-			else if (type.equals(joinNode)){
-				ans += joinToString(arg);
-			}
-			else if (type.equals(optionalNode)){
-				ans += optionalToString(arg);
-			}
-			else if (type.equals(tpNode)){
-				ans += tripleToString(arg);
-			}
-			else if (type.equals(graphNode)){
-				ans += graphToString(arg);
-			}
-			ans += "} \n";
-			if (args.hasNext()){
-				ans += "\t UNION\n";
-			}
-		}
-		ans += "\t }";
-		if (GraphUtil.listObjects(graph, n, modNode).hasNext()){
-			Node f = GraphUtil.listObjects(graph, n, modNode).next();
-			ans += "\n\tFILTER" + filterToString(GraphUtil.listObjects(graph, f, argNode).next()) + "\n";
-		}
-		return ans;
-	}
-	
-	public String optionalToString(Node n){
-		String ans = "\t";
-		Node left = GraphUtil.listObjects(graph, n, leftNode).next();
-		if (graph.contains(Triple.create(left, typeNode, unionNode))){
-			ans += unionToString(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, joinNode))){
-			ans += joinToString(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, tpNode))){
-			ans += tripleToString(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, optionalNode))){
-			ans += optionalToString(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, graphNode))){
-			ans += graphToString(left);
-		}
-		Node right = GraphUtil.listObjects(graph, n, rightNode).next();
-		ans += "\tOPTIONAL { \n\t";
-		if (graph.contains(Triple.create(right, typeNode, unionNode))){
-			ans += unionToString(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, joinNode))){
-			ans += joinToString(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, tpNode))){
-			ans += tripleToString(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, optionalNode))){
-			ans += optionalToString(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, graphNode))){
-			ans += graphToString(right);
-		}
-		ans += "\t\n";
-		ans += "\t }";
-		if (GraphUtil.listObjects(graph, n, modNode).hasNext()){
-			Node f = GraphUtil.listObjects(graph, n, modNode).next();
-			ans += "\n\tFILTER" + filterToString(GraphUtil.listObjects(graph, f, argNode).next()) + "\n";
-		}
-		return ans;
-	}
-	
-	public String graphToString(Node n){
-		String ans = "";
-		Node val = GraphUtil.listObjects(graph, n, valueNode).next();
-		String uri = "";
-		if (val.isURI()){
-			uri = val.getURI();
-		}
-		else{
-			uri = "?"+val.getBlankNodeLabel();
-		}
-		ans += "\tGRAPH " + uri;
-		Node next = GraphUtil.listObjects(graph, n, argNode).next();
-		ans += "\t { \n";
-		if (graph.contains(Triple.create(next, typeNode, unionNode))){
-			ans += unionToString(next);
-		}
-		else if (graph.contains(Triple.create(next, typeNode, joinNode))){
-			ans += joinToString(next);
-		}
-		else if (graph.contains(Triple.create(next, typeNode, tpNode))){
-			ans += tripleToString(next);
-		}
-		else if (graph.contains(Triple.create(next, typeNode, optionalNode))){
-			ans += optionalToString(next);
-		}
-		else if (graph.contains(Triple.create(next, typeNode, graphNode))){
-			ans += graphToString(next);
-		}
-		ans += "\t\n }";
-		if (GraphUtil.listObjects(graph, n, modNode).hasNext()){
-			Node f = GraphUtil.listObjects(graph, n, modNode).next();
-			ans += "\n\tFILTER" + filterToString(GraphUtil.listObjects(graph, f, argNode).next()) + "\n";
-		}
-		return ans;
-	}
-	
-	public String filterToString(Node n){
-		String ans = "";
-		if (graph.contains(n, typeNode, andNode)){
-			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
-			ans += "( ";
-			while (args.hasNext()){
-				ans += filterToString(args.next());
-				if (args.hasNext()){
-					ans += " && ";
-				}
-			}
-			ans += " )";
-		}
-		else if (graph.contains(n, typeNode, orNode)){
-			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
-			ans += "( ";
-			while (args.hasNext()){
-				ans += filterToString(args.next());
-				if (args.hasNext()){
-					ans += " || ";
-				}
-			}
-			ans += " )";
-		}
-		else if (graph.contains(n, typeNode, notNode)){
-			Node args = GraphUtil.listObjects(graph, n, argNode).next();
-			ans += "(! " + filterToString(args) + ")";
-		}
-		else{
-			if (GraphUtil.listObjects(graph, n, functionNode).hasNext()){
-				Node function = GraphUtil.listObjects(graph, n, functionNode).next();
-				String op = function.toString().replace("\"", "");
-				ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
-				List<Node> argList = args.toList();
-				int nParams = argList.size();
-				int i = 0;
-				if (nParams == 1){
-					ans += op + "(" + filterToString(argList.get(0)) + ")";
-					return ans;
-				}
-				List<String> params = new ArrayList<String>();
-				for (int k = 0; k < nParams; k++){
-					params.add("");
-				}
-				ans += "( ";		
-				for (Node arg: argList){
-					if (GraphUtil.listObjects(graph, arg, valueNode).hasNext()){
-						Node value = GraphUtil.listObjects(graph, arg, valueNode).next();
-						String argString = "";
-						if (value.isBlank()){
-							argString = "?"+value.getBlankNodeLabel();
-							argString = argString.replace("\"", "");
-						}
-						else if (value.isLiteral()){
-							argString = "\""+value.getLiteralValue().toString()+"\"";
-						}
-						else{
-							argString = "<"+value.getURI()+">";
-							argString = argString.replace("\"", "");
-						}
-						
-						op = op.replaceAll("\"", "");
-						if (isOrderedFunction(op)){
-							int order = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, arg, orderNode).next()));
-							params.set(order, argString);
-						}
-						else{
-							params.set(i, argString);
-						}
-					}
-					if (GraphUtil.listObjects(graph, arg, functionNode).hasNext()){
-						op = op.replaceAll("\"", "");
-						if (isOrderedFunction(op)){
-							int order = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, arg, orderNode).next()));
-							params.set(order, filterToString(arg));
-						}
-						else{
-							params.set(i, filterToString(arg));
-						}
-					}
-					i++;
-				}
-				if (isOperator(op)){
-					ans += params.get(0) + " " + op + " " + params.get(1) + ")";
-				}
-				else{
-					ans += op + "(" + params.get(0) + ", " + params.get(1) + "))";
-				}
-			}
-			if (GraphUtil.listObjects(graph, n, valueNode).hasNext()){
-				Node v = GraphUtil.listObjects(graph, n, valueNode).next();
-				if (v.isBlank()){
-					return "?"+v.getBlankNodeLabel();
-				}
-				else if (v.isLiteral()){
-					return "\""+getCleanLiteral(v).toString()+"\"";
-				}
-				else{
-					return "<"+v.getURI()+">";
-				}
-			}
-		}
-		return ans;
-	}
-	
-	public String getQuery(){
-		Node project = GraphUtil.listSubjects(this.graph, typeNode, projectNode).next();
-		ExtendedIterator<Node> projectVars = GraphUtil.listObjects(this.graph, project, argNode);
-		String s = "SELECT ";
-		if (distinct){
-			s += "DISTINCT ";
-		}
-		if (projectVars.hasNext()){
-			while (projectVars.hasNext()){
-				s = s + "?" + projectVars.next().toString() + " ";
-				if (projectVars.hasNext()){
-					s = s + ", ";
-				}
-			}
-		}
-		else{
-			s += "* ";
-		}
-		s += "\n";
-		ExtendedIterator<Node> f = GraphUtil.listSubjects(graph, typeNode, fromNode);
-		ExtendedIterator<Node> fn = GraphUtil.listSubjects(graph, typeNode, fromNamedNode);
-		if (f.hasNext()){
-			ExtendedIterator<Node> URIs = GraphUtil.listObjects(graph, f.next(), argNode);
-			if (URIs.hasNext()){
-				while (URIs.hasNext()){
-					s += "FROM " + URIs.next().getURI() + "\n";
-				}
-			}
-		}
-		if (fn.hasNext()){
-			ExtendedIterator<Node> URIs = GraphUtil.listObjects(graph, fn.next(), argNode);
-			if (URIs.hasNext()){
-				while (URIs.hasNext()){
-					s += "FROM NAMED " + URIs.next().getURI() + "\n";
-				}
-			}
-		}
-		s = s + "\nWHERE {\n";
-		ExtendedIterator<Node> m = GraphUtil.listObjects(graph, project, opNode);
-		Node first = m.next();
-		if (graph.contains(Triple.create(first, typeNode, fromNode))){
-			first = m.next();
-		}
-		if (graph.contains(Triple.create(first, typeNode, unionNode))){
-			s += unionToString(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, joinNode))){
-			s += joinToString(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, optionalNode))){
-			s += optionalToString(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, tpNode))){
-			s += tripleToString(first);
-		}
-		if (GraphUtil.listSubjects(graph, typeNode, filterNode).hasNext()){
-			Node filter = GraphUtil.listSubjects(graph, typeNode, filterNode).next();
-			Node clause = GraphUtil.listObjects(graph, filter, argNode).next();
-			s = s + "\n\tFILTER" + filterToString(clause) + "\n";
-		}
-		s = s + "\n}";
-		if (GraphUtil.listSubjects(graph, typeNode, orderByNode).hasNext()){
-			Node orderBy = GraphUtil.listSubjects(graph, typeNode, orderByNode).next();
-			s = s + "\nORDER BY ";
-			List<Node> args = GraphUtil.listObjects(graph, orderBy, argNode).toList();
-			List<String> params = new ArrayList<String>();
-			for (int i = 0; i < args.size(); i++){
-				params.add("");
-			}
-			for (Node a : args){
-				int order = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, a, orderNode).next()));
-				String varName = "?"+GraphUtil.listObjects(graph, a, varNode).next().toString();
-				int dir = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, a, dirNode).next()));
-				if (dir < 0){
-					varName = "DESC("+varName+")";
-				}
-				params.set(order, varName);
-			}
-			for (int i = 0; i < params.size(); i++){
-				String p = params.get(i);
-				if (i == params.size() - 1){
-					s = s + p;
-				}
-				else{
-					s = s + p + ", ";
-				}
-			}
-		}
-		if (GraphUtil.listSubjects(graph, typeNode, limitNode).hasNext()){
-			Node limit = GraphUtil.listSubjects(graph, typeNode, limitNode).next();
-			int start = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, limit, offsetNode).next()));
-			int finish = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, limit, valueNode).next()));
-			if (start > 0){
-				s = s + "\nOFFSET "+start;
-			}
-			s = s + "\nLIMIT "+finish;
-		}
-		return s;
-	}
-	
 	public ExpandedGraph getConjunctiveQueries() throws InterruptedException, HashCollisionException{
 		ArrayList<ExpandedGraph> result = new ArrayList<ExpandedGraph>();
 		ArrayList<ExpandedGraph> redundant = new ArrayList<ExpandedGraph>();
@@ -1244,10 +939,10 @@ public class ExpandedGraph {
 					while (orderVars.hasNext()){
 						Node v = orderVars.next();
 						Node var = GraphUtil.listObjects(graph, v, varNode).next();
-						outer.add(Triple.create(var, valueNode, NodeFactory.createLiteral(v.getBlankNodeLabel())));
+						outer.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
 						outer.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 						outer.add(Triple.create(var, typeNode, varNode));
-						inner.add(Triple.create(var, valueNode, NodeFactory.createLiteral(v.getBlankNodeLabel())));
+						inner.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
 						inner.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 					}
 				}
@@ -1270,6 +965,22 @@ public class ExpandedGraph {
 					e.root = union;
 					e.graph.add(Triple.create(union, typeNode, unionNode));
 					e.project(vars);
+					ExtendedIterator<Node> projectedVars = GraphUtil.listObjects(e.graph, root, argNode);
+					UpdateAction.execute(filterVarsRule,e.graph);
+					while(projectedVars.hasNext()){
+						Node p = projectedVars.next();
+						e.graph.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+						e.graph.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+					}
+					for (Node f : filterVars){
+						e.graph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
+						e.graph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+					}
+					ExtendedIterator<Node> cqFilterVars = GraphUtil.listSubjects(e.graph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
+					while(cqFilterVars.hasNext()){
+						Node p = cqFilterVars.next();
+						e.graph.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+					}
 					UpdateAction.execute(tripleRelabelRule,e.graph);
 					UpdateAction.execute(branchRelabelRule,e.graph);
 					UpdateAction.execute(branchCleanUpRule,e.graph);
@@ -1282,8 +993,14 @@ public class ExpandedGraph {
 						ExpandedGraph e1 = result.get(j);
 						String askQuery = "ASK\nWHERE{\n";
 						String askQuery1 = "ASK\nWHERE{\n";
-						ExtendedIterator<Triple> t0 = GraphUtil.findAll(e1.graph);
-						ExtendedIterator<Triple> t1 = GraphUtil.findAll(e.graph);
+						Graph g0 = GraphFactory.createDefaultGraph();
+						Graph g1 = GraphFactory.createDefaultGraph();
+						GraphUtil.addInto(g0, e.graph);
+						GraphUtil.addInto(g1, e1.graph);
+						UpdateAction.execute(askRule, g0);
+						UpdateAction.execute(askRule, g1);
+						ExtendedIterator<Triple> t0 = GraphUtil.findAll(g1);
+						ExtendedIterator<Triple> t1 = GraphUtil.findAll(g0);
 						while(t0.hasNext()){
 							askQuery += tripleToString(t0.next()) + "\n";
 						}
@@ -1294,8 +1011,10 @@ public class ExpandedGraph {
 						askQuery1 += "}";
 						Query q = QueryFactory.create(askQuery);
 						Query q1 = QueryFactory.create(askQuery1);
-						QueryExecution qexec = QueryExecutionFactory.create(q, e.asModel());
-						QueryExecution qexec1 = QueryExecutionFactory.create(q1, e1.asModel());
+						Model m0 = ModelFactory.createModelForGraph(g0);
+						Model m1 = ModelFactory.createModelForGraph(g1);
+						QueryExecution qexec = QueryExecutionFactory.create(q, m0);
+						QueryExecution qexec1 = QueryExecutionFactory.create(q1, m1);
 						boolean a = qexec.execAsk();
 						boolean b = qexec1.execAsk();
 						if (a && b){
@@ -1317,6 +1036,10 @@ public class ExpandedGraph {
 				if (result.size() == 1){
 					for (ExpandedGraph e : result){
 						Node eRoot = GraphUtil.listSubjects(e.graph, typeNode, unionNode).next();
+						if (!filterGraph.isEmpty()){
+							Node fNode = GraphUtil.listSubjects(filterGraph, typeNode, filterNode).next();
+							eg.graph.add(Triple.create(eRoot, modNode, fNode));
+						}
 						eRoot = GraphUtil.listObjects(e.graph, eRoot, argNode).next();
 						GraphUtil.addInto(eg.graph, ge.extract(eRoot, e.graph));				
 						eg.graph.add(Triple.create(eg.root, opNode, eRoot));
@@ -1338,17 +1061,22 @@ public class ExpandedGraph {
 							eg.graph.delete(Triple.create(eg.root, opNode, n));
 							eg.graph.add(Triple.create(uNode, typeNode, unionNode));
 							eg.graph.add(Triple.create(uNode, argNode, n));
+							GraphUtil.addInto(eg.graph, filterGraph);
 						}
 						else{
 							Node eRoot = GraphUtil.listSubjects(e.graph, typeNode, unionNode).next();
 							eRoot = GraphUtil.listObjects(e.graph, eRoot, argNode).next();
 							GraphUtil.addInto(eg.graph, ge.extract(eRoot, e.graph));				
-							eg.graph.add(Triple.create(uNode, argNode, eRoot));
-							GraphUtil.addInto(eg.graph, filterGraph);
+							eg.graph.add(Triple.create(uNode, argNode, eRoot));	
 						}
-					}
+					}	
 				}
 				eg.setDistinctNode(true);
+				if (!filterGraph.isEmpty()){
+					Node fNode = GraphUtil.listSubjects(filterGraph, typeNode, filterNode).next();
+					eg.graph.add(Triple.create(uNode, modNode, fNode));
+					GraphUtil.addInto(eg.graph, filterGraph);
+				}
 				UpdateAction.execute(branchUnionRule,eg.graph);
 				UpdateAction.execute(branchCleanUpRule2,eg.graph);
 				UpdateAction.execute(joinRule, eg.graph);
@@ -1382,10 +1110,6 @@ public class ExpandedGraph {
 			m.add(Triple.create(s, p, o));
 		}
 		return ModelFactory.createModelForGraph(m);
-	}
-	
-	public void printQuery(){	
-		System.out.println(this.getQuery());
 	}
 	
 	public String executeQuery(String file){

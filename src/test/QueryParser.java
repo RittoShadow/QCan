@@ -18,6 +18,8 @@ import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
 
+import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
+
 public class QueryParser {
 	
 	String queryInfo = "";
@@ -33,6 +35,7 @@ public class QueryParser {
 	int supportedQueries = 0;
 	int unsupportedQueries = 0;
 	int badSyntaxQueries = 0;
+	int interruptedExceptions = 0;
 	int otherUnspecifiedExceptions = 0;
 	int numberOfDuplicates = 0;
 	boolean enableFilter = true;
@@ -40,31 +43,66 @@ public class QueryParser {
 	boolean enableCanonical = true;
 	boolean enableLeaning = true;
 	
-	public void parse(String s) throws Exception{
-		SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning);
-		queryInfo = totalQueries + "\t" + q.getGraphCreationTime() + "\t";
-		queryInfo += q.getCanonicalisationTime() + "\t";
-		queryInfo += q.getInitialTriples() + "\t";
-		queryInfo += q.triplePatternsIn() + "\t";
-		queryInfo += q.getVarsIn() + "\t";
-		queryInfo += q.triplePatternsOut() + "\t";
-		queryInfo += q.getVarsOut() + "\t";
-		queryInfo += q.graphSizeIn() + "\t";
-		queryInfo += q.graphSizeOut() + "\t";
-		queryInfo += q.isDistinct() + "\t";
-		queryInfo += q.hasJoin() + "\t";
-		queryInfo += q.hasUnion() + "\t";
-		queryInfo += q.getContainsOptional() + "\t";
-		queryInfo += q.getContainsFilter() + "\t";
-		queryInfo += q.getContainsNamedGraphs() + "\t";
-		queryInfo += q.getContainsSolutionMods() + "\t";
-		canonQueries.add(q.getQuery());
-		bw.append(queryInfo);
-		bw.newLine();
-		supportedQueries++;
+	public void parse(final String s) throws Exception{
+		System.out.println("Begin parsing.");
+		Thread slave = new Thread(new Runnable(){
+
+			@Override
+			public void run() {
+				try {
+					SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning);
+					queryInfo = totalQueries + "\t" + q.getGraphCreationTime() + "\t";
+					queryInfo += q.getCanonicalisationTime() + "\t";
+					queryInfo += q.getInitialTriples() + "\t";
+					queryInfo += q.triplePatternsIn() + "\t";
+					queryInfo += q.getVarsIn() + "\t";
+					queryInfo += q.triplePatternsOut() + "\t";
+					queryInfo += q.getVarsOut() + "\t";
+					queryInfo += q.graphSizeIn() + "\t";
+					queryInfo += q.graphSizeOut() + "\t";
+					queryInfo += q.isDistinct() + "\t";
+					queryInfo += q.hasJoin() + "\t";
+					queryInfo += q.hasUnion() + "\t";
+					queryInfo += q.getContainsOptional() + "\t";
+					queryInfo += q.getContainsFilter() + "\t";
+					queryInfo += q.getContainsNamedGraphs() + "\t";
+					queryInfo += q.getContainsSolutionMods() + "\t";
+					System.out.println("Adding to set");
+					canonQueries.add(q.getQuery());
+					System.out.println("Added to set");
+					System.out.println("Writing to file");
+				} catch (InterruptedException | HashCollisionException e) {
+					
+				}
+				
+			}
+			
+		});
+		slave.start();
+		try{
+			slave.join(1000*10*60);
+			System.out.println("Parsing done");
+			bw.append(queryInfo);
+			bw.newLine();
+			bw.flush();
+			System.out.println("Flushed");
+			supportedQueries++;
+		}
+		catch(InterruptedException e){
+			interruptedExceptions++;
+			unsupportedQueriesList.add(s);
+			System.out.println("Timeout");
+			bw.newLine();
+			bw.flush();
+		}
+		
 	}
 	
 	public QueryParser(File f, File out, int upTo, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanon) throws IOException{
+		this(f, out, upTo, 0, enableFilter, enableOptional, enableLeaning, enableCanon);
+	}
+	
+	public QueryParser(File f, File out, int upTo, int offset, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanon) throws IOException{
 		String s;
 		int i = 0;
 		this.enableFilter = enableFilter;
@@ -79,6 +117,13 @@ public class QueryParser {
 			while ((s = bf.readLine())!=null){
 				if (i == upTo){
 					break;
+				}
+				if (i % 1000 == 0){
+					System.out.println(i + " queries read.");
+				}
+				if (i < offset){
+					i++;
+					continue;
 				}
 				try{
 					if (i == 0){
@@ -192,6 +237,7 @@ public class QueryParser {
 		}
 		bw.append("Total number of duplicates detected: "+numberOfDuplicates);
 		bw.append("Most duplicates found: "+max);
+		bw.flush();
 		bw.close();
 	}
 	
@@ -203,6 +249,7 @@ public class QueryParser {
 		output += "Number of queries with unsupported features: "+this.unsupportedQueries + "\n";
 		output += "Number of queries with unspecified exceptions: "+this.otherUnspecifiedExceptions + "\n";
 		output += "Number of queries with bad syntax: "+this.badSyntaxQueries + "\n";
+		output += "Number of timeouts: "+this.interruptedExceptions + "\n";
 		output += "Summary of unsupported features: \n" + unsupportedFeaturesToString() + "\n";	
 		output += "Total elapsed time (in milliseconds) : " + this.totalTime;
 		return output;
@@ -219,6 +266,7 @@ public class QueryParser {
 			for (String s : unsupportedQueriesList){
 				bw.append(s);
 				bw.newLine();
+				bw.flush();
 			}
 			bw.close();
 		}

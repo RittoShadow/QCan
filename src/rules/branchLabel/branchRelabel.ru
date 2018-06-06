@@ -34,7 +34,8 @@ WHERE {
 					  }
 					  UNION
 					  {
-						  ?filter ex:value ?v
+						  ?v ex:temp true .
+						  
 					  }
 					  UNION
 					  {

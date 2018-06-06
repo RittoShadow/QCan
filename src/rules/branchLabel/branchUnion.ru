@@ -19,6 +19,7 @@ WHERE {
 		 SELECT DISTINCT ?vname
 		 WHERE{
 		 	?v ex:value ?vname .
+		 	FILTER(!isBlank(?vname)) .
 		 	}
 		 }
 		 BIND(BNODE(?vname) AS ?x)

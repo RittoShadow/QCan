@@ -50,7 +50,7 @@ public class Benchmark {
 		this.enableCanonicalisation = enableCanonicalisation;
 	}
 	
-	public void execute(int upTo, boolean printDist) throws IOException, InterruptedException, HashCollisionException{
+	public void execute(int upTo, int offset, boolean printDist) throws IOException, InterruptedException, HashCollisionException{
 		File out;
 		if (enableLeaning){
 			out = new File("resultFiles/results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
@@ -68,7 +68,7 @@ public class Benchmark {
 			}
 		}
 		else{
-			pq = new QueryParser(f, out, upTo, enableFilter, enableOptional, enableLeaning, enableCanonicalisation);
+			pq = new QueryParser(f, out, upTo, offset, enableFilter, enableOptional, enableLeaning, enableCanonicalisation);
 			if (printDist){
 				pq.getDistributionInfo();
 			}
@@ -105,6 +105,8 @@ public class Benchmark {
 	    Option option_C = new Option("c", false, "Set to enable canonicalisation.");
 	    Option option_N = new Option("n", true, "Number of queries to parse. Default is 10000");
 	    option_N.setArgName("number");
+	    Option option_OFF = new Option("y", true, "Start at this query. Default is 0.");
+	    option_OFF.setArgName("offset");
 	    Option option_X = new Option("x", true, "Path to file containing queries.");
 	    Option option_D = new Option("d", false, "Set to output distribution of queries.");
 	    Option option_O = new Option("o", false, "Set to enable canonicalisation of OPTIONAL terms.");
@@ -124,6 +126,7 @@ public class Benchmark {
 	    options.addOption(option_O);
 	    options.addOption(option_L);
 	    options.addOption(option_J);
+	    options.addOption(option_OFF);
 
 	    String header = "";
 	    String footer = "";
@@ -138,9 +141,13 @@ public class Benchmark {
 	        commandLine = parser.parse(options, args);
 	        if (commandLine.hasOption("x")){
 	        	int upTo = 10000;
+	        	int offset = 0;
 	        	String file = commandLine.getOptionValue("x");
 	        	if (commandLine.hasOption("n")){
 	        		upTo = Integer.parseInt(commandLine.getOptionValue("n"));
+	        	}
+	        	if (commandLine.hasOption("y")){
+	        		offset = Integer.parseInt(commandLine.getOptionValue("y"));
 	        	}
 	        	if (commandLine.hasOption("w")){
 	        		QueryParser.removeQueries(file);
@@ -164,7 +171,7 @@ public class Benchmark {
 	        	else{
 	        		b = new Benchmark(file, enableFilter, enableOptional, enableLeaning, enableCanonicalisation);
 	        	}
-	    		b.execute(upTo, commandLine.hasOption("d"));
+	    		b.execute(upTo, offset, commandLine.hasOption("d"));
 	        }
 	    }
 	    catch (ParseException exception){

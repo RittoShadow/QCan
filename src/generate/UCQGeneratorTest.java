@@ -70,6 +70,7 @@ public class UCQGeneratorTest {
 			line += "\t"+e1.getNumberOfTriples();
 			bw.append(line);
 			bw.newLine();
+			bw.flush();
 		}
 	}
 	

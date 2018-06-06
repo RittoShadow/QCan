@@ -1,0 +1,1 @@
+PREFIX : <http://example.org/> SELECT DISTINCT ?a WHERE{	{ ?a :p ?b } UNION { ?a :p ?c . ?a :p ?d } .	{ ?a :p ?b } UNION { ?d :p ?c } .	{ ?a :p ?b } UNION { ?e :p ?a } . { ?e :p ?a } UNION { ?e :p ?c } .}

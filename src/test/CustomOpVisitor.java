@@ -47,6 +47,7 @@ public class CustomOpVisitor implements OpVisitor {
 	private Stack<ExpandedGraph> unionStack = new Stack<ExpandedGraph>();
 	private Stack<ExpandedGraph> joinStack = new Stack<ExpandedGraph>();
 	private Stack<ExpandedGraph> optionalStack = new Stack<ExpandedGraph>();
+	private Stack<ExpandedGraph> filterStack = new Stack<ExpandedGraph>();
 	private List<Var> projectionVars;
 	private List<String> graphURI;
 	private List<String> namedGraphURI;
@@ -137,6 +138,7 @@ public class CustomOpVisitor implements OpVisitor {
 		if (enableFilter){
 			FilterParser fp = new FilterParser(graphStack.peek(), filterId++);
 			fp.parse(arg0.toString().replace("exprlist", "&&").split("\n")[0].substring(8));
+			filterStack.add(graphStack.peek());
 		}
 		else{
 			throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
@@ -200,6 +202,14 @@ public class CustomOpVisitor implements OpVisitor {
 		else if (arg0.getRight() instanceof OpJoin){
 			e2 = joinStack.pop();
 		}
+		else if (arg0.getRight() instanceof OpFilter){
+			if (enableFilter){
+				e2 = filterStack.pop();
+			}
+			else{
+				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+			}
+		}
 		else{
 			e2 = graphStack.pop();
 		}
@@ -219,6 +229,14 @@ public class CustomOpVisitor implements OpVisitor {
 		}
 		else if (arg0.getLeft() instanceof OpJoin){
 			e1 = joinStack.pop();
+		}
+		else if (arg0.getLeft() instanceof OpFilter){
+			if (enableFilter){
+				e1 = filterStack.pop();
+			}
+			else{
+				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+			}
 		}
 		else{
 			e1 = graphStack.pop();
@@ -242,6 +260,14 @@ public class CustomOpVisitor implements OpVisitor {
 			else if (arg0.getRight() instanceof OpLeftJoin){
 				e2 = optionalStack.pop();
 			}
+			else if (arg0.getRight() instanceof OpFilter){
+				if (enableFilter){
+					e2 = filterStack.pop();
+				}
+				else{
+					throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+				}
+			}
 			else{
 				e2 = joinStack.pop();
 			}
@@ -253,6 +279,14 @@ public class CustomOpVisitor implements OpVisitor {
 			}
 			else if (arg0.getLeft() instanceof OpLeftJoin){
 				e1 = optionalStack.pop();
+			}
+			else if (arg0.getLeft() instanceof OpFilter){
+				if (enableFilter){
+					e1 = filterStack.pop();
+				}
+				else{
+					throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+				}
 			}
 			else{
 				e1 = joinStack.pop();
@@ -288,6 +322,14 @@ public class CustomOpVisitor implements OpVisitor {
 		else if (arg0.getLeft() instanceof OpJoin){
 			e1 = joinStack.pop();
 		}
+		else if (arg0.getLeft() instanceof OpFilter){
+			if (enableFilter){
+				e1 = filterStack.pop();
+			}
+			else{
+				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+			}
+		}
 		else{
 			e1 = graphStack.pop();
 		}
@@ -307,6 +349,14 @@ public class CustomOpVisitor implements OpVisitor {
 		}
 		else if (arg0.getRight() instanceof OpJoin){
 			e2 = joinStack.pop();
+		}
+		else if (arg0.getRight() instanceof OpFilter){
+			if (enableFilter){
+				e2 = filterStack.pop();
+			}
+			else{
+				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+			}
 		}
 		else{
 			e2 = graphStack.pop();

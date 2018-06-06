@@ -36,12 +36,13 @@ public class QueryParserTest {
 	
 	public void parse(String s) throws Exception{
 		try{
-		SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning);
+		SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning, true);
 		canonQueries.add(q.getQuery());
 		q.getOriginalGraph().print();
 		System.out.println("");
 		q.getCanonicalGraph().print();
-		q.getCanonicalGraph().printQuery();
+		QueryBuilder qb = new QueryBuilder(q.getCanonicalGraph());
+		System.out.println(qb.getQuery());
 		}
 		catch (Exception e){
 			e.printStackTrace();
@@ -109,6 +110,6 @@ public class QueryParserTest {
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException{
-		QueryParserTest qp = new QueryParserTest(new File("testFiles/test16.txt"));
+		QueryParserTest qp = new QueryParserTest(new File("testFiles/test25.txt"));
 	}
 }

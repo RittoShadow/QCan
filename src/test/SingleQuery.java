@@ -32,6 +32,10 @@ public class SingleQuery {
 	}
 	
 	public SingleQuery(String q, boolean enableFilter, boolean enableOptional, boolean canon, boolean leaning) throws InterruptedException, HashCollisionException{
+		this(q,enableFilter,enableOptional,canon,leaning,false);
+	}
+	
+	public SingleQuery(String q, boolean enableFilter, boolean enableOptional, boolean canon, boolean leaning, boolean verbose) throws InterruptedException, HashCollisionException{
 		setEnableFilter(enableFilter);
 		setEnableOptional(enableOptional);
 		setLeaning(leaning);
@@ -40,7 +44,7 @@ public class SingleQuery {
 		time = System.nanoTime() - t;
 		if (canon){
 			t = System.nanoTime();
-			canonicalise();
+			canonicalise(verbose);
 			canonTime = System.nanoTime() - t;
 		}
 		else{
@@ -69,6 +73,11 @@ public class SingleQuery {
 	public void canonicalise() throws InterruptedException, HashCollisionException{
 		this.graph.setLeaning(enableLeaning);
 		canonGraph = this.graph.getCanonicalForm(false);
+	}
+	
+	public void canonicalise(boolean verbose) throws InterruptedException, HashCollisionException{
+		this.graph.setLeaning(enableLeaning);
+		canonGraph = this.graph.getCanonicalForm(verbose);
 	}
 	
 	public void setLeaning(boolean b){
@@ -112,7 +121,8 @@ public class SingleQuery {
 	}
 	
 	public String getQuery(){
-		return this.canonGraph.getQuery();
+		QueryBuilder qb = new QueryBuilder(this.canonGraph);
+		return qb.getQuery();
 	}
 	
 	public boolean isDistinct(){
