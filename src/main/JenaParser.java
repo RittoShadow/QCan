@@ -1,4 +1,4 @@
-package test;
+package main;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -8,7 +8,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
 
 import org.apache.jena.ext.com.google.common.collect.HashMultiset;
@@ -17,10 +16,11 @@ import org.apache.jena.ext.com.google.common.collect.TreeMultiset;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
+import org.apache.jena.sparql.algebra.Algebra;
+import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.op.OpNull;
 
-import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
-
-public class QueryParser {
+public class JenaParser {
 	
 	String queryInfo = "";
 	String distInfo = "";
@@ -29,86 +29,38 @@ public class QueryParser {
 	BufferedWriter bw;
 	Multiset<String> uQ = HashMultiset.create();
 	public Multiset<String> canonQueries = TreeMultiset.create();
-	public ArrayList<String> unsupportedQueriesList = new ArrayList<String>();
 	long totalTime = 0;
 	int totalQueries = 0;
 	int supportedQueries = 0;
 	int unsupportedQueries = 0;
 	int badSyntaxQueries = 0;
-	int interruptedExceptions = 0;
 	int otherUnspecifiedExceptions = 0;
-	int numberOfDuplicates = 0;
 	boolean enableFilter = true;
 	boolean enableOptional = true;
-	boolean enableCanonical = true;
-	boolean enableLeaning = true;
+	int numberOfDuplicates = 0;
 	
-	public void parse(final String s) throws Exception{
-		System.out.println("Begin parsing.");
-		Thread slave = new Thread(new Runnable(){
-
-			@Override
-			public void run() {
-				try {
-					SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning);
-					queryInfo = totalQueries + "\t" + q.getGraphCreationTime() + "\t";
-					queryInfo += q.getCanonicalisationTime() + "\t";
-					queryInfo += q.getInitialTriples() + "\t";
-					queryInfo += q.triplePatternsIn() + "\t";
-					queryInfo += q.getVarsIn() + "\t";
-					queryInfo += q.triplePatternsOut() + "\t";
-					queryInfo += q.getVarsOut() + "\t";
-					queryInfo += q.graphSizeIn() + "\t";
-					queryInfo += q.graphSizeOut() + "\t";
-					queryInfo += q.isDistinct() + "\t";
-					queryInfo += q.hasJoin() + "\t";
-					queryInfo += q.hasUnion() + "\t";
-					queryInfo += q.getContainsOptional() + "\t";
-					queryInfo += q.getContainsFilter() + "\t";
-					queryInfo += q.getContainsNamedGraphs() + "\t";
-					queryInfo += q.getContainsSolutionMods() + "\t";
-					System.out.println("Adding to set");
-					canonQueries.add(q.getQuery());
-					System.out.println("Added to set");
-					System.out.println("Writing to file");
-				} catch (InterruptedException | HashCollisionException e) {
-					
-				}
-				
-			}
-			
-		});
-		slave.start();
-		try{
-			slave.join(1000*10*60);
-			System.out.println("Parsing done");
-			bw.append(queryInfo);
-			bw.newLine();
-			bw.flush();
-			System.out.println("Flushed");
-			supportedQueries++;
+	public void parse(String s) throws Exception{
+		long t = System.nanoTime();
+		Query query = QueryFactory.create(s);
+		Op op = Algebra.compile(query);
+		t = System.nanoTime() - t;
+		if (op instanceof OpNull){
+			return;
 		}
-		catch(InterruptedException e){
-			interruptedExceptions++;
-			unsupportedQueriesList.add(s);
-			System.out.println("Timeout");
-			bw.newLine();
-			bw.flush();
-		}
-		
+		queryInfo = totalQueries + "\t" + t + "\t";
+		queryInfo += query.getResultVars().size() + "\t";
+		queryInfo += query.isDistinct() + "\t";
+		canonQueries.add(op.toString());
+		bw.append(queryInfo);
+		bw.newLine();
+		supportedQueries++;
 	}
 	
-	public QueryParser(File f, File out, int upTo, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanon) throws IOException{
-		this(f, out, upTo, 0, enableFilter, enableOptional, enableLeaning, enableCanon);
-	}
-	
-	public QueryParser(File f, File out, int upTo, int offset, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanon) throws IOException{
+	public JenaParser(File f, File out, int upTo, boolean enableFilter, boolean enableOptional) throws IOException{
 		String s;
 		int i = 0;
 		this.enableFilter = enableFilter;
 		this.enableOptional = enableOptional;
-		this.enableLeaning(enableLeaning);
-		this.enableCanonicalisation(enableCanon);
 		try {
 			bf = new BufferedReader(new FileReader(f));
 			fw = new FileWriter(out);
@@ -118,17 +70,11 @@ public class QueryParser {
 				if (i == upTo){
 					break;
 				}
-				if (i % 1000 == 0){
-					System.out.println(i + " queries read.");
-				}
-				if (i < offset){
-					i++;
-					continue;
-				}
 				try{
 					if (i == 0){
+						Query query = QueryFactory.create(s);
 						@SuppressWarnings("unused")
-						SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning);
+						Op op = Algebra.compile(query);
 					}
 					this.parse(s);
 				}
@@ -138,11 +84,9 @@ public class QueryParser {
 				}
 				catch(QueryParseException e){
 					badSyntaxQueries++;
-					unsupportedQueriesList.add("Bad syntax: "+s);
 				} 
 				catch (Exception e) {
 					otherUnspecifiedExceptions++;
-					unsupportedQueriesList.add(s + ":" +e.getMessage());
 				}
 				totalQueries++;
 				i++;
@@ -150,7 +94,6 @@ public class QueryParser {
 			this.totalTime = System.currentTimeMillis() - t;
 			bw.write(getQueryInfo());
 			bw.close();
-			this.outputUnsupportedQueries();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}		
@@ -207,14 +150,6 @@ public class QueryParser {
 		return output;
 	}
 	
-	public void enableCanonicalisation(boolean b){
-		this.enableCanonical = b;
-	}
-	
-	public void enableLeaning(boolean b){
-		this.enableLeaning = b;
-	}
-	
 	public void getDistributionInfo() throws IOException{
 		int i = 0;
 		int max = 0;
@@ -237,7 +172,6 @@ public class QueryParser {
 		}
 		bw.append("Total number of duplicates detected: "+numberOfDuplicates);
 		bw.append("Most duplicates found: "+max);
-		bw.flush();
 		bw.close();
 	}
 	
@@ -245,11 +179,9 @@ public class QueryParser {
 		String output = "";
 		output += "Total number of queries: " + this.totalQueries + "\n";
 		output += "Number of canonicalised queries: " + this.supportedQueries + "\n";
-		output += "Number of unique queries: " + this.canonQueries.entrySet().size() + "\n";
+		output += "Number of unique queries: " + this.canonQueries.size() + "\n";
 		output += "Number of queries with unsupported features: "+this.unsupportedQueries + "\n";
 		output += "Number of queries with unspecified exceptions: "+this.otherUnspecifiedExceptions + "\n";
-		output += "Number of queries with bad syntax: "+this.badSyntaxQueries + "\n";
-		output += "Number of timeouts: "+this.interruptedExceptions + "\n";
 		output += "Summary of unsupported features: \n" + unsupportedFeaturesToString() + "\n";	
 		output += "Total elapsed time (in milliseconds) : " + this.totalTime;
 		return output;
@@ -259,21 +191,8 @@ public class QueryParser {
 		System.out.println(this.unsupportedFeaturesToString());
 	}
 	
-	public void outputUnsupportedQueries() throws IOException{
-		if (!unsupportedQueriesList.isEmpty()){
-			FileWriter fw = new FileWriter(new File("resultFiles/unsupported"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log"));
-			BufferedWriter bw = new BufferedWriter(fw);
-			for (String s : unsupportedQueriesList){
-				bw.append(s);
-				bw.newLine();
-				bw.flush();
-			}
-			bw.close();
-		}
-	}
-	
 	public static void main(String[] args) throws IOException{
-		@SuppressWarnings("unused")
-		QueryParser qp = new QueryParser(new File("testFiles/unsupported20171201_224715.log"), new File("resultFiles/unsupported20171201_224715.log"),-1,true,true,true,true);
+		JenaParser qp = new JenaParser(new File("testFiles/filterTest1"), new File("resultFiles/filterTest"), -1, true, false);
+		qp.getDistributionInfo();
 	}
 }

@@ -1,4 +1,4 @@
-package test;
+package main;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -110,6 +110,6 @@ public class QueryParserTest {
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException{
-		QueryParserTest qp = new QueryParserTest(new File("testFiles/test25.txt"));
+		QueryParserTest qp = new QueryParserTest(new File("testFiles/filterTest5.txt"));
 	}
 }

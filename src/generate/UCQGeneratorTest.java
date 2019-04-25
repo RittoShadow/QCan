@@ -15,7 +15,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
-import test.ExpandedGraph;
+import main.RGraph;
 
 public class UCQGeneratorTest {
 	
@@ -61,10 +61,10 @@ public class UCQGeneratorTest {
 			line += "\t"+unions;
 			generator.selectTriples(conjunctions, unions);
 			long t = System.nanoTime();
-			ExpandedGraph e = generator.generateGraph(conjunctions, unions);
+			RGraph e = generator.generateGraph(conjunctions, unions);
 			line += "\t"+(System.nanoTime()-t);
 			t = System.nanoTime();
-			ExpandedGraph e1 = e.getCanonicalForm(false);
+			RGraph e1 = e.getCanonicalForm(false);
 			line += "\t"+(System.nanoTime()-t);
 			line += "\t"+e.getNumberOfTriples();
 			line += "\t"+e1.getNumberOfTriples();

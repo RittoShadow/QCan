@@ -19,6 +19,7 @@ WHERE {
 		 SELECT DISTINCT ?vname
 		 WHERE{
 		 	?v ex:value ?vname .
+		 	?v ex:temp ?t .
 		 	FILTER(!isBlank(?vname)) .
 		 	}
 		 }

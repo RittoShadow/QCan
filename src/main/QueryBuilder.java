@@ -1,4 +1,4 @@
-package test;
+package main;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,6 +20,7 @@ import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpDistinct;
+import org.apache.jena.sparql.algebra.op.OpExtend;
 import org.apache.jena.sparql.algebra.op.OpFilter;
 import org.apache.jena.sparql.algebra.op.OpGraph;
 import org.apache.jena.sparql.algebra.op.OpJoin;
@@ -30,19 +31,26 @@ import org.apache.jena.sparql.algebra.op.OpSlice;
 import org.apache.jena.sparql.algebra.op.OpUnion;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
+import org.apache.jena.sparql.core.VarExprList;
+import org.apache.jena.sparql.expr.E_Add;
 import org.apache.jena.sparql.expr.E_Bound;
 import org.apache.jena.sparql.expr.E_Equals;
 import org.apache.jena.sparql.expr.E_GreaterThan;
 import org.apache.jena.sparql.expr.E_GreaterThanOrEqual;
+import org.apache.jena.sparql.expr.E_IsBlank;
 import org.apache.jena.sparql.expr.E_Lang;
+import org.apache.jena.sparql.expr.E_LangMatches;
 import org.apache.jena.sparql.expr.E_LessThan;
 import org.apache.jena.sparql.expr.E_LessThanOrEqual;
 import org.apache.jena.sparql.expr.E_LogicalAnd;
 import org.apache.jena.sparql.expr.E_LogicalNot;
 import org.apache.jena.sparql.expr.E_LogicalOr;
+import org.apache.jena.sparql.expr.E_Multiply;
 import org.apache.jena.sparql.expr.E_NotEquals;
+import org.apache.jena.sparql.expr.E_Subtract;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.NodeValue;
+import org.apache.jena.sparql.util.ExprUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
 
 public class QueryBuilder {
@@ -65,6 +73,7 @@ public class QueryBuilder {
 	private final Node valueNode = NodeFactory.createURI(this.URI+"value");
 	private final Node dirNode = NodeFactory.createURI(this.URI+"direction");
 	private final Node modNode = NodeFactory.createURI(this.URI+"modifier");
+	private final Node filterNode = NodeFactory.createURI(this.URI+"filter");
 	private final Node functionNode = NodeFactory.createURI(this.URI+"function");
 	private final Node andNode = NodeFactory.createURI(this.URI+"and");
 	private final Node orNode = NodeFactory.createURI(this.URI+"or");
@@ -76,10 +85,11 @@ public class QueryBuilder {
 	private final Node fromNamedNode = NodeFactory.createURI(this.URI+"fromNamed");
 	private final Node graphNode = NodeFactory.createURI(this.URI+"graph");
 	private final Node distinctNode = NodeFactory.createURI(this.URI+"distinct");
+	private final Node bindNode = NodeFactory.createURI(this.URI+"bind");
 	private Graph graph;
 	private Op op;
 	
-	public QueryBuilder(ExpandedGraph e){
+	public QueryBuilder(RGraph e){
 		this.graph = e.graph;
 	}
 	
@@ -111,13 +121,31 @@ public class QueryBuilder {
 				else if (f.equals("lang")){
 					return new E_Lang(exprs[0]);
 				}
+				else if (f.equals("langMatches")){
+					return new E_LangMatches(exprs[0], exprs[1]);
+				}
+				else if (f.equals("isBlank")){
+					return new E_IsBlank(exprs[0]);
+				}
+				else if (f.equals("+")) {
+					return new E_Add(exprs[0], exprs[1]);
+				}
+				else if (f.equals("*")) {
+					return new E_Multiply(exprs[0], exprs[1]);
+				}
+				else if (f.equals("-")) {
+					return new E_Subtract(exprs[0], exprs[1]);
+				}
+				else {
+					return ExprUtils.parse(f);
+				}
+				
 			}
 			//TODO
 			else{
 				return null;
 			}
 		}
-		return null;
 	}
 	
 	public String getCleanLiteral(Node n){
@@ -148,6 +176,12 @@ public class QueryBuilder {
 		else if (function.equals(NodeFactory.createURI(this.URI+"gteq"))){
 			return true;
 		}
+		else if (function.equals(NodeFactory.createLiteral("-"))){
+			return true;
+		}
+		else if (function.equals(NodeFactory.createLiteral("/"))){
+			return true;
+		}
 		return false;
 	}
 	
@@ -167,7 +201,7 @@ public class QueryBuilder {
 		else if (s.equals(NodeFactory.createURI(this.URI+"plus"))){
 			return true;
 		}
-		else if (s.equals(NodeFactory.createURI(this.URI+"substract"))){
+		else if (s.equals(NodeFactory.createURI(this.URI+"subtract"))){
 			return true;
 		}
 		else if (s.equals(NodeFactory.createURI(this.URI+"divide"))){
@@ -206,10 +240,34 @@ public class QueryBuilder {
 		for (Triple t : tripleList){
 			bp.add(t);
 		}
-		ans = OpJoin.create(ans, new OpBGP(bp));
-		if (GraphUtil.listObjects(graph, n, modNode).hasNext()){
-			Node f = GraphUtil.listObjects(graph, n, modNode).next();
-			ans = OpFilter.filter(filterToOp(GraphUtil.listObjects(graph, f, argNode).next()), ans);
+		if (!bp.isEmpty()){
+			ans = OpJoin.create(ans, new OpBGP(bp));
+		}
+		ans = filterOrBindToOp(ans, n);
+		return ans;
+	}
+	
+	public Op filterOrBindToOp(Op in, Node n) {
+		Op ans = in;
+		ExtendedIterator<Node> filterOrBind = GraphUtil.listObjects(graph, n, modNode);
+		VarExprList varExprList = new VarExprList();
+		Expr filterExpr = null;
+		while (filterOrBind.hasNext()) {
+			Node f = filterOrBind.next();
+			Node type = GraphUtil.listObjects(graph, f, typeNode).next();
+			if (type.equals(filterNode)) {
+				filterExpr = filterToOp(GraphUtil.listObjects(graph, f, argNode).next());
+			}
+			else if (type.equals(bindNode)) {
+				Var var = Var.alloc(GraphUtil.listObjects(graph, f, varNode).next().getBlankNodeLabel());
+				varExprList.add(var, bindToOp(GraphUtil.listObjects(graph, f, argNode).next()));
+			}
+		}
+		if (filterExpr != null) {
+			ans = OpFilter.filter(filterExpr, ans);
+		}
+		if (!varExprList.isEmpty()) {
+			ans = OpExtend.create(ans, varExprList);
 		}
 		return ans;
 	}
@@ -287,7 +345,9 @@ public class QueryBuilder {
 	public Op unionToOp(Node n){
 		Op ans = null;
 		ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
-		Node firstArg = args.next();
+		List<Node> argList = args.toList();
+		Collections.sort(argList, new NodeComparator());
+		Node firstArg = argList.get(0);
 		Node firstType = GraphUtil.listObjects(graph, firstArg, typeNode).next();
 		if (firstType.equals(unionNode)){
 			ans = unionToOp(firstArg);
@@ -304,8 +364,8 @@ public class QueryBuilder {
 		else if (firstType.equals(graphNode)){
 			ans = graphToOp(firstArg);
 		}
-		while (args.hasNext()){
-			Node arg = args.next();
+		for (int i = 1; i < argList.size(); i++){
+			Node arg = argList.get(i);
 			Node type = GraphUtil.listObjects(graph, arg, typeNode).next();
 			if (type.equals(unionNode)){
 				ans = new OpUnion(ans, unionToOp(arg));
@@ -323,10 +383,7 @@ public class QueryBuilder {
 				ans = new OpUnion(ans, graphToOp(arg));
 			}
 		}
-		if (GraphUtil.listObjects(graph, n, modNode).hasNext()){
-			Node f = GraphUtil.listObjects(graph, n, modNode).next();
-			ans = OpFilter.filter(filterToOp(GraphUtil.listObjects(graph, f, argNode).next()), ans);
-		}
+		ans = filterOrBindToOp(ans, n);
 		return ans;
 	}
 	
@@ -365,37 +422,128 @@ public class QueryBuilder {
 		else if (graph.contains(Triple.create(right, typeNode, graphNode))){
 			rightOp = graphToOp(right);
 		}
-		if (GraphUtil.listObjects(graph, n, modNode).hasNext()){
-			Node f = GraphUtil.listObjects(graph, n, modNode).next();
-			leftOp = OpFilter.filter(filterToOp(GraphUtil.listObjects(graph, f, argNode).next()), leftOp);
-		}
+		leftOp = filterOrBindToOp(leftOp, n);
 		return OpLeftJoin.createLeftJoin(leftOp, rightOp, null);
 	}
 	
 	public Op graphToOp(Node n){
 		Op ans = null;
-		Node val = GraphUtil.listObjects(graph, n, valueNode).next();
+		Node val = GraphUtil.listObjects(graph, n, valueNode).next();	
 		Node next = GraphUtil.listObjects(graph, n, argNode).next();
-		if (graph.contains(Triple.create(next, typeNode, unionNode))){
+		if (val.isBlank()){
+			val = NodeFactory.createVariable(val.getBlankNodeLabel());
+			Var value = Var.alloc(val);
+			if (graph.contains(Triple.create(next, typeNode, unionNode))){
+				ans = new OpGraph(value, unionToOp(next));
+			}
+			else if (graph.contains(Triple.create(next, typeNode, joinNode))){
+				ans = new OpGraph(value, joinToOp(next));
+			}
+			else if (graph.contains(Triple.create(next, typeNode, tpNode))){
+				ans = new OpGraph(value, tripleToOp(next));
+			}
+			else if (graph.contains(Triple.create(next, typeNode, optionalNode))){
+				ans = new OpGraph(value, optionalToOp(next));
+			}
+			else if (graph.contains(Triple.create(next, typeNode, graphNode))){
+				ans = new OpGraph(value, graphToOp(next));
+			}
+		}
+		else{
+			if (val.isURI()){
+				val = NodeFactory.createURI(val.getURI());
+			}
+			if (graph.contains(Triple.create(next, typeNode, unionNode))){
 			ans = new OpGraph(val, unionToOp(next));
+			}
+			else if (graph.contains(Triple.create(next, typeNode, joinNode))){
+				ans = new OpGraph(val, joinToOp(next));
+			}
+			else if (graph.contains(Triple.create(next, typeNode, tpNode))){
+				ans = new OpGraph(val, tripleToOp(next));
+			}
+			else if (graph.contains(Triple.create(next, typeNode, optionalNode))){
+				ans = new OpGraph(val, optionalToOp(next));
+			}
+			else if (graph.contains(Triple.create(next, typeNode, graphNode))){
+				ans = new OpGraph(val, graphToOp(next));
+			}
 		}
-		else if (graph.contains(Triple.create(next, typeNode, joinNode))){
-			ans = new OpGraph(val, joinToOp(next));
-		}
-		else if (graph.contains(Triple.create(next, typeNode, tpNode))){
-			ans = new OpGraph(val, tripleToOp(next));
-		}
-		else if (graph.contains(Triple.create(next, typeNode, optionalNode))){
-			ans = new OpGraph(val, optionalToOp(next));
-		}
-		else if (graph.contains(Triple.create(next, typeNode, graphNode))){
-			ans = new OpGraph(val, graphToOp(next));
-		}
-		if (GraphUtil.listObjects(graph, n, modNode).hasNext()){
-			Node f = GraphUtil.listObjects(graph, n, modNode).next();
-			ans = OpFilter.filter(filterToOp(GraphUtil.listObjects(graph, f, argNode).next()), ans);
+		ExtendedIterator<Node> filterOrBind = GraphUtil.listObjects(graph, n, modNode);
+		while (filterOrBind.hasNext()){
+			Node f = filterOrBind.next();
+			Node type = GraphUtil.listObjects(graph, f, typeNode).next();
+			if (type.equals(filterNode)) {
+				ans = OpFilter.filter(filterToOp(GraphUtil.listObjects(graph, f, argNode).next()), ans);
+			}
+			else if (type.equals(bindNode)) {
+				Var var = Var.alloc(GraphUtil.listObjects(graph, f, varNode).next().getBlankNodeLabel());
+				ans = OpExtend.create(ans, var, bindToOp(GraphUtil.listObjects(graph, f, argNode).next()));
+			}
 		}
 		return ans;
+	}
+	
+	public Expr bindToOp(Node n){
+		Expr e = null;
+		if (GraphUtil.listObjects(graph, n, functionNode).hasNext()){
+			Node function = GraphUtil.listObjects(graph, n, functionNode).next();
+			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
+			List<Node> argList = args.toList();
+			int nParams = argList.size();
+			int i = 0;
+			if (nParams == 1){
+				return filterOperatorToString(function, bindToOp(argList.get(0)));
+			}
+			List<Expr> params = new ArrayList<Expr>();
+			for (int k = 0; k < nParams; k++){
+				params.add(null);
+			}
+			for (Node arg: argList){
+				if (GraphUtil.listObjects(graph, arg, valueNode).hasNext()){
+					Node value = GraphUtil.listObjects(graph, arg, valueNode).next();
+					Expr argString = null;
+					if (value.isBlank()){
+						argString = NodeValue.makeNode(Var.alloc(value.getBlankNodeLabel()));
+					}
+					else if (value.isURI()){
+						argString = NodeValue.makeNode(value);
+					}
+					else{
+						argString = NodeValue.makeNode(value);
+					}
+					
+					if (isOrderedFunction(function)){
+						int order = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, arg, orderNode).next()));
+						params.set(order, argString);
+					}
+					else{
+						params.set(i, argString);
+					}
+				}
+				if (GraphUtil.listObjects(graph, arg, functionNode).hasNext()){
+					if (isOrderedFunction(function)){
+						int order = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, arg, orderNode).next()));
+						params.set(order, bindToOp(arg));
+					}
+					else{
+						params.set(i, bindToOp(arg));
+					}
+				}
+				i++;
+			}
+			return filterOperatorToString(function, params.get(0), params.get(1));
+		}
+		if (GraphUtil.listObjects(graph, n, valueNode).hasNext()){
+			Node v = GraphUtil.listObjects(graph, n, valueNode).next();
+			if (v.isBlank()){
+				return NodeValue.makeNode(Var.alloc(v.getBlankNodeLabel()));
+			}
+			else{
+				return NodeValue.makeNode(v);
+			}
+		}
+		return e;
 	}
 	
 	public Expr filterToOp(Node n){
@@ -403,13 +551,25 @@ public class QueryBuilder {
 		if (graph.contains(n, typeNode, andNode)){
 			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
 			while (args.hasNext()){
-				e = new E_LogicalAnd(e, filterToOp(args.next()));
+				Node a = args.next();
+				if (args.hasNext()){
+					e = new E_LogicalAnd(filterToOp(args.next()), filterToOp(a));
+				}
+				else{
+					e = new E_LogicalAnd(e, filterToOp(a));
+				}	
 			}
 		}
 		else if (graph.contains(n, typeNode, orNode)){
 			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
 			while (args.hasNext()){
-				e = new E_LogicalOr(e, filterToOp(args.next()));
+				Node a = args.next();
+				if (args.hasNext()){
+					e = new E_LogicalOr(filterToOp(args.next()), filterToOp(a));
+				}
+				else{
+					e = new E_LogicalOr(e, filterToOp(a));
+				}	
 			}
 		}
 		else if (graph.contains(n, typeNode, notNode)){
@@ -433,7 +593,17 @@ public class QueryBuilder {
 				for (Node arg: argList){
 					if (GraphUtil.listObjects(graph, arg, valueNode).hasNext()){
 						Node value = GraphUtil.listObjects(graph, arg, valueNode).next();
-						Expr argString = NodeValue.makeNode(Var.alloc(value.getBlankNodeLabel()));
+						Expr argString = null;
+						if (value.isBlank()){
+							argString = NodeValue.makeNode(Var.alloc(value.getBlankNodeLabel()));
+						}
+						else if (value.isURI()){
+							argString = NodeValue.makeNode(value);
+						}
+						else{
+							argString = NodeValue.makeNode(value);
+						}
+						
 						if (isOrderedFunction(function)){
 							int order = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, arg, orderNode).next()));
 							params.set(order, argString);
@@ -443,8 +613,7 @@ public class QueryBuilder {
 						}
 					}
 					if (GraphUtil.listObjects(graph, arg, functionNode).hasNext()){
-						Node fun = GraphUtil.listObjects(graph, arg, functionNode).next();
-						if (isOrderedFunction(fun)){
+						if (isOrderedFunction(function)){
 							int order = new Integer(getCleanLiteral(GraphUtil.listObjects(graph, arg, orderNode).next()));
 							params.set(order, filterToOp(arg));
 						}
@@ -458,7 +627,12 @@ public class QueryBuilder {
 			}
 			if (GraphUtil.listObjects(graph, n, valueNode).hasNext()){
 				Node v = GraphUtil.listObjects(graph, n, valueNode).next();
-				return NodeValue.makeNode(Var.alloc(v.getBlankNodeLabel()));
+				if (v.isBlank()){
+					return NodeValue.makeNode(Var.alloc(v.getBlankNodeLabel()));
+				}
+				else{
+					return NodeValue.makeNode(v);
+				}
 			}
 		}
 		return e;
@@ -496,6 +670,9 @@ public class QueryBuilder {
 		else if (graph.contains(Triple.create(first, typeNode, optionalNode))){
 			op = optionalToOp(first);
 		}
+		else if (graph.contains(Triple.create(first, typeNode, graphNode))){
+			op = graphToOp(first);
+		}
 		else if (graph.contains(Triple.create(first, typeNode, tpNode))){
 			op = tripleToOp(first);
 		}
@@ -527,6 +704,7 @@ public class QueryBuilder {
 		if (this.graph.contains(project, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean))){
 			op = new OpDistinct(op);
 		}
+		System.out.println(op);
 		Query q = OpAsQuery.asQuery(op);
 		if (f.hasNext()){
 			ExtendedIterator<Node> URIs = GraphUtil.listObjects(graph, f.next(), argNode);
@@ -558,8 +736,13 @@ public class QueryBuilder {
 		while(matcher.find()){
 			vars.add(matcher.group(0));
 		}
-		int i = 0;
+		List<String> newVars = new ArrayList<String>();
 		for (String var : vars){
+			newVars.add(var);
+		}
+		Collections.sort(newVars);
+		int i = 0;
+		for (String var : newVars){
 			ans = ans.replace(var, "?v"+i);
 			i++;
 		}
@@ -586,7 +769,7 @@ public class QueryBuilder {
 		public int compareSubject(Triple o1, Triple o2){
 			if (o1.getSubject().isBlank()){
 				if (o2.getSubject().isBlank()){
-					return 0;
+					return o1.getSubject().getBlankNodeLabel().compareTo(o2.getSubject().getBlankNodeLabel());
 				}
 				else{
 					return 1;
@@ -604,7 +787,7 @@ public class QueryBuilder {
 		public int comparePredicate(Triple o1, Triple o2){
 			if (o1.getPredicate().isBlank()){
 				if (o2.getPredicate().isBlank()){
-					return 0;
+					return o1.getPredicate().getBlankNodeLabel().compareTo(o2.getPredicate().getBlankNodeLabel());
 				}
 				else{
 					return 1;
@@ -622,7 +805,7 @@ public class QueryBuilder {
 		public int compareObject(Triple o1, Triple o2){
 			if (o1.getObject().isBlank()){
 				if (o2.getObject().isBlank()){
-					return 0;
+					return o1.getObject().getBlankNodeLabel().compareTo(o2.getObject().getBlankNodeLabel());
 				}
 				else{
 					return 1;
@@ -637,5 +820,14 @@ public class QueryBuilder {
 				}
 			}
 		}
+	}
+	
+	public class NodeComparator implements Comparator<Node>{
+
+		@Override
+		public int compare(Node o1, Node o2) {
+			return o1.toString().compareTo(o2.toString());
+		}
+		
 	}
 }

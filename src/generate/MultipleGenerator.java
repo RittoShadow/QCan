@@ -22,7 +22,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
-import test.ExpandedGraph;
+import main.RGraph;
 
 public class MultipleGenerator implements FileVisitor<Path> {
 	
@@ -67,13 +67,13 @@ public class MultipleGenerator implements FileVisitor<Path> {
 				try {
 					g = new Generator(file.toFile());
 					g.generateTriples();
-					ExpandedGraph e = g.generateGraph();	
+					RGraph e = g.generateGraph();	
 					String output = "";
 					initialNodes = e.getNumberOfNodes();
 					initialVars = e.getNumberOfVars();
 					initialTriples = e.getNumberOfTriples();
 					long t = System.nanoTime();
-					ExpandedGraph a = e.getCanonicalForm(false);
+					RGraph a = e.getCanonicalForm(false);
 					t = System.nanoTime() - t;
 					finalNodes = a.getNumberOfNodes();
 					finalVars = a.getNumberOfVars();

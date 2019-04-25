@@ -1,8 +1,9 @@
-package test;
+package main;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -23,8 +24,10 @@ import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.engine.QueryIterator;
+import org.apache.jena.sparql.engine.binding.Binding;
 import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.update.UpdateAction;
 import org.apache.jena.update.UpdateFactory;
@@ -41,7 +44,10 @@ import cl.uchile.dcc.blabel.lean.BFSGraphLeaning;
 import cl.uchile.dcc.blabel.lean.DFSGraphLeaning;
 import cl.uchile.dcc.blabel.lean.GraphLeaning.GraphLeaningResult;
 
-public class ExpandedGraph {
+/**
+ * @author Jaime
+ */
+public class RGraph {
 	
 	public Graph graph = GraphFactory.createDefaultGraph();
 	public Set<Var> vars = new HashSet<Var>();
@@ -82,17 +88,14 @@ public class ExpandedGraph {
 	private final Node graphNode = NodeFactory.createURI(this.URI+"graph");
 	private final Node distinctNode = NodeFactory.createURI(this.URI+"distinct");
 	private final Node tempNode = NodeFactory.createURI(this.URI+"temp");
+	private final Node bindNode = NodeFactory.createURI(this.URI+"bind");
+	private final Node tableNode = NodeFactory.createURI(this.URI+"table");
 	@SuppressWarnings("unused")
 	private final Node leafNode = NodeFactory.createURI(this.URI+"leaf");
-	private final UpdateRequest conjunctionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/conjunction.ru"));
-	private final UpdateRequest disjunctionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/disjunction.ru"));
-	private final UpdateRequest distributionRule1 = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/distribution.ru"));
-	private final UpdateRequest distributionRule2 = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/distribution2.ru"));
 	private final UpdateRequest duplicatesRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/duplicates.ru"));
 	private final UpdateRequest joinRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/join.ru"));
 	private final UpdateRequest joinTripleRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/joinTriple.ru"));
 	private final UpdateRequest redundancyRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/redundancy.ru"));
-	private final UpdateRequest unionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/union.ru"));
 	private final UpdateRequest branchCleanUpRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/cleanUp.ru"));
 	private final UpdateRequest branchCleanUpRule2 = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/branchCleanUp2.ru"));
 	private final UpdateRequest branchRelabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/branchRelabel.ru"));
@@ -101,13 +104,14 @@ public class ExpandedGraph {
 	private final UpdateRequest joinLabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/joinLabel.ru"));
 	private final UpdateRequest tripleRelabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/tripleRelabel.ru"));
 	private final UpdateRequest askRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/ask.ru"));
-	private final UpdateRequest leafRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/leaf.ru"));
-	private final UpdateRequest newLeafRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/newLeaf.ru"));
-	private final UpdateRequest leafRule0 = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/leaf0.ru"));
-	private final UpdateRequest leafCleanUpRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/leafCleanup.ru"));
 
-
-	public ExpandedGraph(List<Triple> triples, List<Var> vars, int id){
+	/**
+	 * @param triples List of RDF triples.
+	 * @param vars List of the variables in the triples.
+	 * @param id A number to identify the r-graph.
+	 * @return A new r-graph based on the list of triples.
+	 */
+	public RGraph(List<Triple> triples, List<Var> vars, int id){
 		if (vars != null){
 			this.vars.addAll(vars);
 		}
@@ -171,21 +175,44 @@ public class ExpandedGraph {
 		}	
 	}
 	
-	public ExpandedGraph(Node root, Graph graph, Collection<Var> vars){
+	
+	/**
+	 * @param root This node will be the new root of the r-graph.
+	 * @param graph The graph on which the new r-graph is based.
+	 * @param vars The list of variables in the r-graph.
+	 * @return A new r-graph based on a given graph.
+	 */
+	public RGraph(Node root, Graph graph, Collection<Var> vars){
 		this.root = root;
 		this.graph = graph;
-		this.vars.addAll(vars);
+		if (vars != null) {
+			this.vars.addAll(vars);
+		}
 	}
 	
-	public ExpandedGraph(List<Triple> triples, List<Var> vars){
+	/**
+	 * @param triples List of RDF triples.
+	 * @param vars List of the variables in the triples.
+	 * @return A new r-graph based on a list of triples.
+	 */
+	public RGraph(List<Triple> triples, List<Var> vars){
 		this(triples,vars,0);
 	}
 	
-	public ExpandedGraph(List<Triple> triples, int id){
+	/**
+	 * @param triples List of RDF triples.
+	 * @param id A number to identify the r-graph.
+	 * @return A new r-graph based on the list of triples.
+	 */
+	public RGraph(List<Triple> triples, int id){
 		this(triples, null, id);
 	}
 	
-	public ExpandedGraph(Collection<org.semanticweb.yars.nx.Node[]> data){
+	/**
+	 * @param data A collection of triples of nodes.
+	 * @return A new r-graph based on a collection of nodes.
+	 */
+	public RGraph(Collection<org.semanticweb.yars.nx.Node[]> data){
 		for (org.semanticweb.yars.nx.Node[] node : data){
 			Node subject = null, predicate = null, object = null;
 			if (Pattern.matches("_:.+", node[0].toN3())){
@@ -224,6 +251,30 @@ public class ExpandedGraph {
 		}
 	}
 	
+	public static RGraph table(Table table) {
+		Node tableRoot = NodeFactory.createBlankNode();
+		Graph graph = GraphFactory.createDefaultGraph();
+		RGraph ans = new RGraph(tableRoot, graph, null);
+		List<Var> vars = table.getVars();
+		ans.graph.add(Triple.create(tableRoot, ans.typeNode, ans.tableNode));
+		for (Var var : vars) {
+			ans.graph.add(Triple.create(tableRoot, ans.varNode, NodeFactory.createBlankNode(var.getVarName())));
+		}
+		Iterator<Binding> iter = table.rows();
+		while (iter.hasNext()) {
+			Node auxNode = NodeFactory.createBlankNode();
+			ans.graph.add(Triple.create(tableRoot, ans.argNode, auxNode));
+			ans.graph.add(Triple.create(auxNode, ans.typeNode, ans.bindNode));
+			@SuppressWarnings("unused")
+			Binding b = iter.next();
+		}
+		return ans;
+	}
+	
+	/**
+	 * @param s An RDF literal with a datatype.
+	 * @return A node that represents a literal with a datatype. If no datatype is specified, it is assumed to be a string.
+	 */
 	public Node createLiteralWithType(String s){
 		Node ans;
 		s = s.replaceAll("\"", "");
@@ -237,11 +288,20 @@ public class ExpandedGraph {
 		return ans;
 	}
 	
-	public void addVars(ExpandedGraph e){
+	/**
+	 * Adds all the variables in another r-graph to this one.
+	 * @param e An r-graph.
+	 */
+	public void addVars(RGraph e){
 		this.vars.addAll(e.vars);
 	}
 	
-	public void join(ExpandedGraph arg1, int Id){
+	/**
+	 * Joins this r-graph with another r-graph. The result is a conjunction of both r-graphs. (Q_1 AND Q_2)
+	 * @param arg1 An r-graph to join with this one.
+	 * @param Id A number to identify this join.
+	 */
+	public void join(RGraph arg1, int Id){
 		Node root = NodeFactory.createBlankNode("join"+Id);
 		graph.add(Triple.create(root, typeNode, joinNode));
 		boolean a = this.graph.contains(this.root, typeNode, optionalNode);
@@ -278,7 +338,12 @@ public class ExpandedGraph {
 		this.root = root;
 	}
 	
-	public void union(ExpandedGraph arg1, int Id){
+	/**
+	 * Joins this r-graph with another r-graph. The result is the union of both r-graphs. (Q_1 UNION Q_2)
+	 * @param arg1 An r-graph to join with this one.
+	 * @param Id A number to identify this union.
+	 */
+	public void union(RGraph arg1, int Id){
 		Node root = NodeFactory.createBlankNode("union"+Id);
 		boolean a = this.graph.contains(this.root, typeNode, unionNode);
 		boolean b = arg1.graph.contains(arg1.root, typeNode, unionNode);
@@ -308,7 +373,12 @@ public class ExpandedGraph {
 		GraphUtil.addInto(this.graph, arg1.graph);	
 	}
 	
-	public void optional(ExpandedGraph arg1, int Id){
+	/**
+	 * Joins this r-graph with another r-graph. This includes the second r-graph as an optional query pattern. (Q_1 OPT Q_2)
+	 * @param arg1 An r-graph that represents an optional query pattern.
+	 * @param Id A number to identify this r-graph.
+	 */
+	public void optional(RGraph arg1, int Id){
 		Node root = NodeFactory.createBlankNode("optional"+Id);
 		graph.add(Triple.create(root, typeNode, optionalNode));
 //		boolean a = this.graph.contains(this.root, typeNode, optionalNode);
@@ -336,6 +406,32 @@ public class ExpandedGraph {
 		GraphUtil.addInto(this.graph, arg1.graph);	
 	}
 	
+	/**
+	 * 
+	 * @param arg1 An r-graph that represents a BIND expression (BIND var AS expr) and adds it to this r-graph.
+	 * @param id A number to identify the BIND r-graph.
+	 */
+	public void bind(RGraph arg1, int id){
+		graph.add(Triple.create(root, modNode, arg1.root));
+		GraphUtil.addInto(this.graph, arg1.graph);
+	}
+	
+	/**
+	 * Creates an r-graph that represents each of the assignments in a BIND expression (BIND var AS expr) and adds it to this r-graph.
+	 * @param expr An expression in an assignment.
+	 * @param var The variable the expression is assigned to.
+	 */
+	public void bindNode(Node expr, Var var) {
+		graph.add(Triple.create(this.root, varNode, NodeFactory.createBlankNode(var.getVarName())));
+		graph.add(Triple.create(this.root, typeNode, bindNode));
+		graph.add(Triple.create(this.root, argNode, expr));
+	}
+	
+	/**
+	 * Creates an r-graph that represents a FILTER expression (FILTER expr) and adds it to this r-graph. 
+	 * @param n A node that represents an expression.
+	 * @param id A number to identifyy the r-graph.
+	 */
 	public void filter(Node n, int id){
 		Node filter = NodeFactory.createBlankNode("filter"+id);
 		graph.add(Triple.create(root, modNode, filter));
@@ -343,6 +439,25 @@ public class ExpandedGraph {
 		graph.add(Triple.create(filter, argNode, n));	
 	}
 	
+	/**
+	 * Creates an r-graph that represents a FILTER expression (FILTER expr) and adds it to this r-graph. 
+	 * @param n An r-graph that represents an expression.
+	 * @param id A number to identify the r-graph.
+	 */
+	public void filter(RGraph arg1, int id){
+		Node filter = NodeFactory.createBlankNode("filter"+id);
+		graph.add(Triple.create(root, modNode, filter));
+		graph.add(Triple.create(filter, typeNode, filterNode));
+		graph.add(Triple.create(filter, argNode, arg1.root));	
+		GraphUtil.addInto(this.graph, arg1.graph);
+	}
+	
+	/**
+	 * Creates an r-graph that represents the conjunction of two expressions (FILTER expr1 && expr2) and adds it to this r-graph .
+	 * @param arg1 An r-graph that represents an expression.
+	 * @param arg2 An r-graph that represents an expression.
+	 * @return Returns the node that represents the AND operator.
+	 */
 	public Node filterAnd(Node arg1, Node arg2){
 		Node o = NodeFactory.createBlankNode();
 		graph.add(Triple.create(o, typeNode, andNode));
@@ -351,6 +466,12 @@ public class ExpandedGraph {
 		return o;
 	}
 	
+	/**
+	 * Creates an r-graph that represents the disjunction of two expressions (FILTER expr1 || expr2) and adds it to this r-graph. 
+	 * @param arg1 An r-graph that represents an expression.
+	 * @param arg2 An r-graph that represents an expression.
+	 * @return Returns the node that represents the OR operator.
+	 */
 	public Node filterOr(Node arg1, Node arg2){
 		Node o = NodeFactory.createBlankNode();
 		graph.add(Triple.create(o, typeNode, orNode));
@@ -359,6 +480,11 @@ public class ExpandedGraph {
 		return o;
 	}
 	
+	/**
+	 * Creates an r-graph that represents the negation of an expression (FILTER !expr) and adds it to this r-graph.
+	 * @param arg1 An r-graph that represents an expression.
+	 * @return Returns the node that represents the NOT operator.
+	 */
 	public Node filterNot(Node arg1){
 		Node o = NodeFactory.createBlankNode();
 		graph.add(Triple.create(o, typeNode, notNode));
@@ -366,6 +492,12 @@ public class ExpandedGraph {
 		return o;
 	}
 	
+	/**
+	 * Creates an r-graph that represents a function over an expression (FILTER (f expr)) and adds it to this r-graph.
+	 * @param op A string that represents a SPARQL function.
+	 * @param arg1 A string that represents an expression.
+	 * @return Returns the node that represents the function.
+	 */
 	public Node filterFunction(String op, String arg1){
 		Node n = NodeFactory.createBlankNode();
 		Node o = filterOperator(op);
@@ -374,7 +506,8 @@ public class ExpandedGraph {
 			graph.add(Triple.create(a, valueNode, NodeFactory.createBlankNode(arg1.substring(1))));
 		}
 		if (Pattern.matches("<.+://.+>", arg1.toString())){
-			
+			Node aux = NodeFactory.createURI(arg1);
+			graph.add(Triple.create(a, valueNode, aux));
 		}
 		else{
 			Node aux = NodeFactory.createLiteral(arg1);
@@ -386,6 +519,12 @@ public class ExpandedGraph {
 		return n;
 	}
 	
+	/**
+	 * Creates an r-graph that represents a function over an expression (FILTER (f expr)) and adds it to this r-graph.
+	 * @param op A string that represents a SPARQL function.
+	 * @param arg1 A node that represents an expression.
+	 * @return Returns the node that represents the function.
+	 */
 	public Node filterFunction(String op, Node arg1){
 		Node n = NodeFactory.createBlankNode();
 		Node o = filterOperator(op);
@@ -401,6 +540,13 @@ public class ExpandedGraph {
 		return n;
 	}
 	
+	/**
+	 * Creates an r-graph that represents a binary SPARQL function (FILTER (f expr1 expr2)) and adds it to this r-graph.
+	 * @param op A string that represents a binary SPARQL function.
+	 * @param arg1 A string that represents an expression.
+	 * @param arg2 A string that represents an expression.
+	 * @return Returns a node that represents the function.
+	 */
 	public Node filterFunction(String op, String arg1, String arg2){
 		Node n = NodeFactory.createBlankNode();
 		Node o = filterOperator(op);
@@ -432,6 +578,13 @@ public class ExpandedGraph {
 		return n;
 	}
 	
+	/**
+	 * Creates an r-graph that represents a binary SPARQL function (FILTER (f expr1 expr2)) and adds it to this r-graph.
+	 * @param op A string that represents a binary SPARQL function.
+	 * @param arg1 A node that represents an expression.
+	 * @param arg2 A node that represents an expression.
+	 * @return Returns a node that represents the function.
+	 */
 	public Node filterFunction(String op, Node arg1, Node arg2){
 		Node n = NodeFactory.createBlankNode();
 		Node o = filterOperator(op);
@@ -461,6 +614,10 @@ public class ExpandedGraph {
 		return n;
 	}
 	
+	/**
+	 * @param s A string that represents a SPARQL function.
+	 * @return Returns true if the function is ordered (i.e (f expr1 expr2) != (f expr2 expr1)).
+	 */
 	public boolean isOrderedFunction(String s){
 		if (s.equals("<")){
 			return true;
@@ -474,9 +631,19 @@ public class ExpandedGraph {
 		else if (s.equals(">=")){
 			return true;
 		}
+		else if (s.equals("-")){
+			return true;
+		}
+		else if (s.equals("/")){
+			return true;
+		}
 		return false;
 	}
 	
+	/**
+	 * @param s A string that represents a SPARQL function.
+	 * @return Returns true if the string represents a valid SPARQL function.
+	 */
 	public boolean isOperator(String s){
 		if (isOrderedFunction(s)){
 			return true;
@@ -504,6 +671,10 @@ public class ExpandedGraph {
 		}
 	}
 	
+	/**
+	 * @param s A string that represents a SPARQL function.
+	 * @return Returns a node that represents a SPARQL function.
+	 */
 	public Node filterOperator(String s){
 		s = s.replace("\"", "");
 		if (s.equals("=")){
@@ -553,6 +724,10 @@ public class ExpandedGraph {
 		}
 	}
 	
+	/**
+	 * Creates an r-graph that represents the projection of variables (SELECT vars) and adds it to this r-graph.
+	 * @param vars A collection of projected variables.
+	 */
 	public void project(Collection<Var> vars){
 		if (!GraphUtil.listSubjects(graph, typeNode, projectNode).hasNext()){
 			Node root = NodeFactory.createBlankNode("project");
@@ -570,14 +745,25 @@ public class ExpandedGraph {
 		}	
 	}
 	
+	/**
+	 * Creates a node that indicates if the DISTINCT keyword has been used, and adds it to this r-graph.
+	 * @param isDistinct A boolean that is true if the DISTINCT keyword has been used, and false otherwise.
+	 */
 	public void setDistinctNode(boolean isDistinct){
 		graph.add(Triple.create(root, distinctNode, NodeFactory.createLiteralByValue(isDistinct, XSDDatatype.XSDboolean)));
 	}
 	
+	/**
+	 * @return Returns true if the DISTINCT keyword has been used, and false otherwise.
+	 */
 	public boolean isDistinct(){
 		return this.graph.contains(root, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
 	}
 	
+	/**
+	 * Creates an r-graph that represents the RDF datasets that form the default graph, and adds it to this r-graph.
+	 * @param g A collection of strings that identify RDF datasets.
+	 */
 	public void fromGraph(Collection<String> g){
 		Node n = NodeFactory.createBlankNode();
 		graph.add(Triple.create(root, opNode, n));
@@ -587,6 +773,10 @@ public class ExpandedGraph {
 		}
 	}
 	
+	/**
+	 * Creates an r-graph that represents the RDF datasets that define the named graphs, and adds it to this r-graph.
+	 * @param g A collection of strings that identify RDF datasets.
+	 */
 	public void fromNamedGraph(Collection<String> g){
 		Node aux;
 		ExtendedIterator<Node> e = GraphUtil.listSubjects(graph, typeNode, fromNode);
@@ -605,6 +795,11 @@ public class ExpandedGraph {
 		}
 	}
 	
+	/**
+	 * Creates an r-graph that represents an ORDER BY clause, and adds it to this r-graph.
+	 * @param vars The list of variables according to which the results are ordered.
+	 * @param dir A list of integers that indicates if results are ordered ascending or descending.
+	 */
 	public void orderBy(List<Var> vars, List<Integer> dir){
 		Node project = GraphUtil.listSubjects(graph, typeNode, projectNode).next();
 		Node order = NodeFactory.createBlankNode("orderBy");
@@ -620,6 +815,11 @@ public class ExpandedGraph {
 		}
 	}
 	
+	/**
+	 * Creates an r-graph that represents a combination of LIMIT and OFFSET, and adds it to this r-graph.
+	 * @param offset A number that causes the solutions to start at the specified number. An offset of 0 has no effect. 
+	 * @param limit A number that specifies the number of solutions to return.
+	 */
 	public void slice(int offset, int limit){
 		Node order = GraphUtil.listSubjects(graph, typeNode, projectNode).next();
 		Node lNode = NodeFactory.createBlankNode("limit");
@@ -675,7 +875,7 @@ public class ExpandedGraph {
 		return ModelFactory.createModelForGraph(graph);
 	}
 	
-	public boolean isIsomorphicWith(ExpandedGraph e){
+	public boolean isIsomorphicWith(RGraph e){
 		return this.graph.isIsomorphicWith(e.graph);
 	}
 	
@@ -698,6 +898,9 @@ public class ExpandedGraph {
 		}
 	}
 	
+	/**
+	 * @return Returns a set containing all triples in this r-graph.
+	 */
 	public TreeSet<org.semanticweb.yars.nx.Node[]> getTriples(){
 		Model model = this.asModel();
 		JenaModelIterator jmi = new JenaModelIterator(model);
@@ -719,27 +922,18 @@ public class ExpandedGraph {
 		return dfsgl.call();
 	}
 	
+	/**
+	 * @param triples A collection of RDF triples.
+	 * @return A canonical labelling of all blank nodes.
+	 * @throws InterruptedException
+	 * @throws HashCollisionException
+	 */
 	public GraphLabellingResult label(Collection<org.semanticweb.yars.nx.Node[]> triples) throws InterruptedException, HashCollisionException{
 		GraphLabellingArgs gla = new GraphLabellingArgs();
 		gla.setDistinguishIsoPartitions(false);
 		GraphLabelling gl = new GraphLabelling(triples,gla);	
 		GraphLabellingResult glr = gl.call();
 		return glr;
-	}
-	
-	public void update(){
-		// Delete empty unions.
-		UpdateAction.execute(unionRule,this.graph);
-		// Distribute union over conjunction Case: (A U B) * C
-//		System.out.println("Distribution 1\n"+executeQuery("rules/distribution.qu"));
-		UpdateAction.execute(distributionRule1, this.graph);
-		// Distribute union over conjunction Case: (A U B) * (C U D)
-//		System.out.println("Distribution 2\n"+executeQuery("rules/distribution2.qu"));
-		UpdateAction.execute(distributionRule2, this.graph);
-		UpdateAction.execute(conjunctionRule,this.graph);
-		UpdateAction.execute(disjunctionRule,this.graph);
-		UpdateAction.execute(joinTripleRule,this.graph);
-		markNewLeaves();
 	}
 	
 	public void iterativeUpdate(UpdateRequest request){
@@ -756,45 +950,34 @@ public class ExpandedGraph {
 		iterativeUpdate(joinRule);
 	}
 	
-	public void markLeaves(){
-		UpdateAction.execute(leafRule0, this.graph);
-		UpdateAction.execute(leafRule, this.graph);
-	}
-	
-	public void markNewLeaves(){
-		UpdateAction.execute(newLeafRule, this.graph);
-	}
-	
-	public void unmarkLeaves(){
-		UpdateAction.execute(leafCleanUpRule, this.graph);
-	}
-	
+	/**
+	 * Re-labels all the variables in each conjunctive query.
+	 */
 	public void branchRelabelling(){
 		iterativeUpdate(redundancyRule);
 		iterativeUpdate(joinRule);
 		UpdateAction.execute(joinLabelRule,this.graph);
 	}
 	
-	public ExpandedGraph getLeanForm() throws InterruptedException{
+	/**
+	 * Performs a leaning of the current r-graph.
+	 * @return Returns the lean form of this graph.
+	 * @throws InterruptedException
+	 */
+	public RGraph getLeanForm() throws InterruptedException{
 		GraphLeaningResult glResult = this.DFSLeaning(getTriples());
-		return new ExpandedGraph(glResult.getLeanData());
+		return new RGraph(glResult.getLeanData());
 	}
 	
-	public ExpandedGraph getCanonicalForm(boolean verbose) throws InterruptedException, HashCollisionException{
-		Graph before = GraphFactory.createPlainGraph();
+	/**
+	 * @param verbose A boolean that allows messages to appear during canonicalisation.
+	 * @return Returns the canonical form of the r-graph.
+	 * @throws InterruptedException
+	 * @throws HashCollisionException
+	 */
+	public RGraph getCanonicalForm(boolean verbose) throws InterruptedException, HashCollisionException{
 		if (verbose){
 			System.out.println("CQ Normalisation");
-		}
-		markLeaves();
-		markNewLeaves();
-		while(!before.isIsomorphicWith(graph)){
-			before = GraphFactory.createPlainGraph();
-			GraphUtil.addInto(before, graph);
-			this.update();
-		}
-		unmarkLeaves();
-		if (verbose){
-			print();
 		}
 		boolean distinct = this.graph.contains(this.root, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
 		removeRedundantOperators();
@@ -810,10 +993,11 @@ public class ExpandedGraph {
 			}
 			if (verbose){
 				print();
-				System.out.println("UCQs");
+				System.out.println("UCQ minimisation");
 			}
-			ExpandedGraph e = getConjunctiveQueries();
+			RGraph e = ucqMinimisation();
 			if (verbose){
+				e.print();
 				System.out.println("Beginning leaning.");
 			}
 			GraphLeaningResult glResult = this.DFSLeaning(e.getTriples());
@@ -824,9 +1008,8 @@ public class ExpandedGraph {
 				System.out.println("Depth of solution tree, I'm guessing: "+glResult.getDepth());
 				System.out.println("Number of joins performed: "+glResult.getJoins());
 			}
-			ExpandedGraph ans = new ExpandedGraph(glResult.getLeanData());
+			RGraph ans = new RGraph(glResult.getLeanData());
 			UpdateAction.execute(duplicatesRule,ans.graph);
-			ans.update();
 			if (verbose){
 				System.out.println("Beginning labelling");
 			}
@@ -838,7 +1021,10 @@ public class ExpandedGraph {
 				System.out.println("Number of colouring iterations is: "+glr.getColourIterationCount());
 				System.out.println("Number of partitions found is: "+glr.getPartitionCount());
 			}
-			ans = new ExpandedGraph(glr.getGraph());
+			ans = new RGraph(glr.getGraph());
+			if (verbose){
+				ans.print();
+			}
 			return ans;
 		}
 		else{
@@ -849,11 +1035,15 @@ public class ExpandedGraph {
 				System.out.println("Number of colouring iterations is: "+glr.getColourIterationCount());
 				System.out.println("Number of partitions found is: "+glr.getPartitionCount());
 			}
-			ExpandedGraph ans = new ExpandedGraph(glr.getGraph());
+			RGraph ans = new RGraph(glr.getGraph());
 			return ans;
 		}	
 	}
 	
+	/**
+	 * @param n A node that represents a literal value.
+	 * @return Returns a string representation of the literal value with no datatype.
+	 */
 	public String getCleanLiteral(Node n){
 		if (n.isLiteral()){
 			String o = n.getLiteralValue().toString();
@@ -905,12 +1095,30 @@ public class ExpandedGraph {
 		return ans;
 	}
 	
-	public ExpandedGraph getConjunctiveQueries() throws InterruptedException, HashCollisionException{
-		ArrayList<ExpandedGraph> result = new ArrayList<ExpandedGraph>();
-		ArrayList<ExpandedGraph> redundant = new ArrayList<ExpandedGraph>();
+	public RGraph ucqMinimisation() throws InterruptedException, HashCollisionException{
+		ArrayList<RGraph> result = new ArrayList<RGraph>();
+		ArrayList<RGraph> redundant = new ArrayList<RGraph>();
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
-		Node union = GraphUtil.listObjects(this.graph, this.root, opNode).next();
-		if (graph.contains(union, typeNode, unionNode)){ //Make sure it's a union of conjunctive queries.
+		ExtendedIterator<Node> ucqs = GraphUtil.listSubjects(this.graph, typeNode, unionNode);
+		while (ucqs.hasNext()){ //Make sure it's a union of conjunctive queries.
+			Node union = ucqs.next();
+			Node subUnion, preUnion;
+			if (GraphUtil.listSubjects(graph, opNode, union).hasNext()){
+				subUnion = GraphUtil.listSubjects(graph, opNode, union).next();
+				preUnion = opNode;
+			}
+			else if (GraphUtil.listSubjects(graph, leftNode, union).hasNext()){
+				subUnion = GraphUtil.listSubjects(graph, leftNode, union).next();
+				preUnion = leftNode;
+			}
+			else if (GraphUtil.listSubjects(graph, rightNode, union).hasNext()){
+				subUnion = GraphUtil.listSubjects(graph, rightNode, union).next();
+				preUnion = rightNode;
+			}
+			else{
+				subUnion = GraphUtil.listSubjects(graph, argNode, union).next();
+				preUnion = argNode;
+			}
 			Graph inner = ge.extract(union, graph);
 			Graph outer = GraphFactory.createPlainGraph();
 			Graph filterGraph = GraphFactory.createPlainGraph();
@@ -922,7 +1130,8 @@ public class ExpandedGraph {
 				}
 				GraphUtil.addInto(outer, graph);
 				GraphUtil.deleteFrom(outer, inner);
-				outer.remove(root, opNode, union);
+				outer.remove(subUnion, preUnion, union);
+				//Extract all projected variables from projection node.
 				ExtendedIterator<Node> pVars = GraphUtil.listObjects(graph, root, argNode);
 				while (pVars.hasNext()){
 					Node p = pVars.next();
@@ -933,6 +1142,7 @@ public class ExpandedGraph {
 					inner.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 				}
 				ExtendedIterator<Node> orderBy = GraphUtil.listSubjects(graph, typeNode, orderByNode);
+				//Extract all variables in ORDER BY clauses
 				while (orderBy.hasNext()){
 					Node o = orderBy.next();
 					ExtendedIterator<Node> orderVars = GraphUtil.listObjects(graph, o, argNode);
@@ -952,26 +1162,30 @@ public class ExpandedGraph {
 					filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
 					filterGraph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 				}
+				//Iterate through all conjunctive queries.
 				while (cQueries.hasNext()){
 					Node cRoot = cQueries.next();
 					Graph cGraph = ge.extract(cRoot, inner);
+					//Check all variables in filter clauses.
 					for (Node f : filterVars){
 						cGraph.add(Triple.create(f, typeNode, varNode));
 						cGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
 						cGraph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 					}
-					ExpandedGraph e = new ExpandedGraph(cRoot,cGraph,this.vars);
+					RGraph e = new RGraph(cRoot,cGraph,this.vars);
 					e.graph.add(Triple.create(union, argNode, e.root));
 					e.root = union;
 					e.graph.add(Triple.create(union, typeNode, unionNode));
 					e.project(vars);
 					ExtendedIterator<Node> projectedVars = GraphUtil.listObjects(e.graph, root, argNode);
 					UpdateAction.execute(filterVarsRule,e.graph);
+					//Projected variables are grounded.
 					while(projectedVars.hasNext()){
 						Node p = projectedVars.next();
 						e.graph.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
 						e.graph.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 					}
+					//Variables in filter clauses are grounded.
 					for (Node f : filterVars){
 						e.graph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
 						e.graph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
@@ -984,13 +1198,13 @@ public class ExpandedGraph {
 					UpdateAction.execute(tripleRelabelRule,e.graph);
 					UpdateAction.execute(branchRelabelRule,e.graph);
 					UpdateAction.execute(branchCleanUpRule,e.graph);
-					ExpandedGraph a = e.getLeanForm();
+					RGraph a = e.getLeanForm();
 					result.add(a);
 				}
 				for (int i = 0; i < result.size(); i++){
 					for (int j = i+1; j < result.size(); j++){
-						ExpandedGraph e = result.get(i);
-						ExpandedGraph e1 = result.get(j);
+						RGraph e = result.get(i);
+						RGraph e1 = result.get(j);
 						String askQuery = "ASK\nWHERE{\n";
 						String askQuery1 = "ASK\nWHERE{\n";
 						Graph g0 = GraphFactory.createDefaultGraph();
@@ -1028,29 +1242,30 @@ public class ExpandedGraph {
 						}
 					}
 				}
-				for (ExpandedGraph e : redundant){
+				for (RGraph e : redundant){
 					result.remove(e);
 				}
-				ExpandedGraph eg = new ExpandedGraph(root, outer, vars);
+				RGraph eg = new RGraph(root, outer, vars);
 				Node uNode = NodeFactory.createBlankNode();
+				//If there's only a single non-redundant CQ.
 				if (result.size() == 1){
-					for (ExpandedGraph e : result){
+					for (RGraph e : result){
 						Node eRoot = GraphUtil.listSubjects(e.graph, typeNode, unionNode).next();
+						eRoot = GraphUtil.listObjects(e.graph, eRoot, argNode).next();
+						GraphUtil.addInto(eg.graph, ge.extract(eRoot, e.graph));				
+						eg.graph.add(Triple.create(subUnion, preUnion, eRoot));
 						if (!filterGraph.isEmpty()){
 							Node fNode = GraphUtil.listSubjects(filterGraph, typeNode, filterNode).next();
 							eg.graph.add(Triple.create(eRoot, modNode, fNode));
 						}
-						eRoot = GraphUtil.listObjects(e.graph, eRoot, argNode).next();
-						GraphUtil.addInto(eg.graph, ge.extract(eRoot, e.graph));				
-						eg.graph.add(Triple.create(eg.root, opNode, eRoot));
 						GraphUtil.addInto(eg.graph, filterGraph);
 						UpdateAction.execute(joinTripleRule, eg.graph);
 					}
 				}
 				else{
-					eg.graph.add(Triple.create(eg.root, opNode, uNode));
+					eg.graph.add(Triple.create(subUnion, preUnion, uNode));
 					eg.graph.add(Triple.create(uNode, typeNode, unionNode));
-					for (ExpandedGraph e : result){
+					for (RGraph e : result){
 						UpdateAction.execute(joinTripleRule, e.graph);
 						if (eg == null){
 							eg = e;
@@ -1099,7 +1314,7 @@ public class ExpandedGraph {
 		return GraphUtil.listSubjects(graph, typeNode, varNode).toList().size();
 	}
 	
-	public Model getCQ(ExpandedGraph e){
+	public Model getCQ(RGraph e){
 		Graph m = GraphFactory.createDefaultGraph();
 		ExtendedIterator<Node> triples = GraphUtil.listSubjects(e.graph, typeNode, tpNode);
 		while(triples.hasNext()){

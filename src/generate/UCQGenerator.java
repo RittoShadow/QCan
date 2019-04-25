@@ -28,8 +28,8 @@ import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
-import test.CustomOpVisitor;
-import test.ExpandedGraph;
+import main.RGraphBuilder;
+import main.RGraph;
 
 public class UCQGenerator {
 	protected BufferedReader br;
@@ -86,7 +86,7 @@ public class UCQGenerator {
 		return ans;
 	}
 	
-	public ExpandedGraph generateGraph(int x, int y){
+	public RGraph generateGraph(int x, int y){
 		Op op = null;
 		for (int i = 0; i < x; i++){   
 			List<Triple> u = generateUnion(y);
@@ -108,9 +108,9 @@ public class UCQGenerator {
 		op = new OpProject(op, Arrays.asList(Var.alloc(triples.get(0).getSubject())));
 		op = new OpDistinct(op);
 		Query q = OpAsQuery.asQuery(op); 
-		CustomOpVisitor visitor = new CustomOpVisitor(q);
+		RGraphBuilder visitor = new RGraphBuilder(q);
 		OpWalker.walk(op, visitor);       
-		ExpandedGraph ans = visitor.getResult();
+		RGraph ans = visitor.getResult();
 		
 		return ans;
 	}
@@ -118,9 +118,9 @@ public class UCQGenerator {
 	public static void main(String[] args) throws IOException, InterruptedException, HashCollisionException{
 		UCQGenerator g = new UCQGenerator(new File("eval/k/k-6"));
 		g.generateTriples();
-		ExpandedGraph e = g.generateGraph(4,2);
+		RGraph e = g.generateGraph(4,2);
 		e.print();
-		ExpandedGraph a = e.getCanonicalForm(false);
+		RGraph a = e.getCanonicalForm(false);
 		a.print();
 		System.out.println("");
 	}

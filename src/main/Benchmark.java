@@ -1,4 +1,4 @@
-package test;
+package main;
 
 import java.io.File;
 import java.io.FileOutputStream;

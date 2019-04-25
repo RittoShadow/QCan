@@ -1,15 +1,15 @@
-package test;
+package main;
 
 import java.util.regex.Pattern;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 public class FilterParser {
 	
-	private ExpandedGraph graph;
+	private RGraph graph;
 	private int id;
 	final String URI = "http://example.org/";
 	
-	public FilterParser(ExpandedGraph e, int filterId){
+	public FilterParser(RGraph e, int filterId){
 		this.graph = e;
 		this.id = filterId;
 	}

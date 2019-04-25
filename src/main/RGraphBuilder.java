@@ -1,11 +1,18 @@
-package test;
+package main;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
+
+import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.OpVisitor;
+import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.algebra.op.OpAssign;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpConditional;
@@ -40,15 +47,25 @@ import org.apache.jena.sparql.algebra.op.OpTopN;
 import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.algebra.op.OpUnion;
 import org.apache.jena.sparql.core.Var;
+import org.apache.jena.sparql.core.VarExprList;
+import org.apache.jena.sparql.engine.binding.Binding;
+import org.apache.jena.sparql.expr.Expr;
+import org.apache.jena.sparql.expr.ExprWalker;
 
-public class CustomOpVisitor implements OpVisitor {
+/**
+ * This class implements Jena's OpVisitor. It recursively builds an r-graph from a query.
+ * @author Jaime
+ *
+ */
+public class RGraphBuilder implements OpVisitor {
 	
-	private Stack<ExpandedGraph> graphStack = new Stack<ExpandedGraph>();
-	private Stack<ExpandedGraph> unionStack = new Stack<ExpandedGraph>();
-	private Stack<ExpandedGraph> joinStack = new Stack<ExpandedGraph>();
-	private Stack<ExpandedGraph> optionalStack = new Stack<ExpandedGraph>();
-	private Stack<ExpandedGraph> filterStack = new Stack<ExpandedGraph>();
-	private List<Var> projectionVars;
+	private Stack<RGraph> graphStack = new Stack<RGraph>();
+	private Stack<RGraph> unionStack = new Stack<RGraph>();
+	private Stack<RGraph> joinStack = new Stack<RGraph>();
+	private Stack<RGraph> optionalStack = new Stack<RGraph>();
+	private Stack<RGraph> filterStack = new Stack<RGraph>();
+	List<Var> projectionVars;
+	Set<Var> totalVars = new HashSet<Var>();
 	private List<String> graphURI;
 	private List<String> namedGraphURI;
 	public int nTriples = 0;
@@ -58,7 +75,7 @@ public class CustomOpVisitor implements OpVisitor {
 	private int filterId = 0;
 	private boolean enableFilter = true;
 	private boolean enableOptional = true;
-	private boolean isDistinct = false;
+	boolean isDistinct = false;
 	private boolean containsUnion = false;
 	private boolean containsJoin = false;
 	private boolean containsOptional = false;
@@ -66,11 +83,11 @@ public class CustomOpVisitor implements OpVisitor {
 	private boolean containsSolutionMods = false;
 	private boolean containsNamedGraphs = false;
 	
-	public CustomOpVisitor(){
+	public RGraphBuilder(){
 		
 	}
 	
-	public CustomOpVisitor(Query query){
+	public RGraphBuilder(Query query){
 		this.projectionVars = query.getProjectVars();
 		graphURI = query.getGraphURIs();
 		namedGraphURI = query.getNamedGraphURIs();
@@ -79,7 +96,18 @@ public class CustomOpVisitor implements OpVisitor {
 	@Override
 	public void visit(OpBGP arg0) {
 		nTriples += arg0.getPattern().size();
-		graphStack.add(new ExpandedGraph(arg0.getPattern().getList(), bgpId++));
+		graphStack.add(new RGraph(arg0.getPattern().getList(), bgpId++));
+		for (Triple t : arg0.getPattern().getList()){
+			if (t.getSubject().isVariable()){
+				totalVars.add((Var) t.getSubject());
+			}
+			if (t.getPredicate().isVariable()){
+				totalVars.add((Var) t.getPredicate());
+			}
+			if (t.getObject().isVariable()){
+				totalVars.add((Var) t.getObject());
+			}
+		}
 	}
 
 	@Override
@@ -110,6 +138,12 @@ public class CustomOpVisitor implements OpVisitor {
 
 	@Override
 	public void visit(OpTable arg0) {
+		System.out.println(arg0.getTable().getVars());
+		Table t = arg0.getTable();
+		Iterator<Binding> iter = t.rows();
+		while (iter.hasNext()) {
+			System.out.println(iter.next());
+		}
 		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
 		
 	}
@@ -135,9 +169,12 @@ public class CustomOpVisitor implements OpVisitor {
 	@Override
 	public void visit(OpFilter arg0) {
 		containsFilter = true;
+		FilterVisitor fv = new FilterVisitor();
+		ExprWalker.walk(fv, arg0.getExprs().get(0));
 		if (enableFilter){
-			FilterParser fp = new FilterParser(graphStack.peek(), filterId++);
-			fp.parse(arg0.toString().replace("exprlist", "&&").split("\n")[0].substring(8));
+//			FilterParser fp = new FilterParser(graphStack.peek(), filterId++);
+//			fp.parse(arg0.toString().replace("exprlist", "&&").split("\n")[0].substring(8));
+			graphStack.peek().filter(fv.getGraph(), filterId++);
 			filterStack.add(graphStack.peek());
 		}
 		else{
@@ -177,16 +214,22 @@ public class CustomOpVisitor implements OpVisitor {
 
 	@Override
 	public void visit(OpExtend arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
-		
+		VarExprList ve = arg0.getVarExprList();
+		Map<Var,Expr> map = ve.getExprs();
+		for (Map.Entry<Var, Expr> m : map.entrySet()) {
+			BindVisitor bv = new BindVisitor(m.getKey());
+			ExprWalker.walk(bv, m.getValue());
+			graphStack.peek().bind(bv.getGraph(), bgpId++);
+		}
+		graphStack.peek().print();
 	}
 
 	@Override
 	public void visit(OpJoin arg0) {
-		ExpandedGraph e1, e2;
+		RGraph e1, e2;
 		containsJoin = true;
 		if (arg0.getRight() instanceof OpBGP){
-			e2 = new ExpandedGraph(((OpBGP)arg0.getRight()).getPattern().getList(), bgpId++);
+			e2 = graphStack.pop();
 		}
 		else if (arg0.getRight() instanceof OpUnion){
 			e2 = unionStack.pop();
@@ -214,7 +257,7 @@ public class CustomOpVisitor implements OpVisitor {
 			e2 = graphStack.pop();
 		}
 		if (arg0.getLeft() instanceof OpBGP){
-			e1 = new ExpandedGraph(((OpBGP)arg0.getLeft()).getPattern().getList(), bgpId++);
+			e1 = graphStack.pop();
 		}
 		else if (arg0.getLeft() instanceof OpUnion){
 			e1 = unionStack.pop();
@@ -248,11 +291,11 @@ public class CustomOpVisitor implements OpVisitor {
 
 	@Override
 	public void visit(OpLeftJoin arg0) {
-		ExpandedGraph e1, e2;
+		RGraph e1, e2;
 		containsOptional = true;
 		if (enableOptional){
 			if (arg0.getRight() instanceof OpBGP){
-				e2 = new ExpandedGraph(((OpBGP)arg0.getRight()).getPattern().getList(), bgpId++);
+				e2 = new RGraph(((OpBGP)arg0.getRight()).getPattern().getList(), bgpId++);
 			}
 			else if (arg0.getRight() instanceof OpUnion){
 				e2 = unionStack.pop();
@@ -272,7 +315,7 @@ public class CustomOpVisitor implements OpVisitor {
 				e2 = joinStack.pop();
 			}
 			if (arg0.getLeft() instanceof OpBGP){
-				e1 = new ExpandedGraph(((OpBGP)arg0.getLeft()).getPattern().getList(), bgpId++);
+				e1 = new RGraph(((OpBGP)arg0.getLeft()).getPattern().getList(), bgpId++);
 			}
 			else if (arg0.getLeft() instanceof OpUnion){
 				e1 = unionStack.pop();
@@ -303,10 +346,10 @@ public class CustomOpVisitor implements OpVisitor {
 
 	@Override
 	public void visit(OpUnion arg0) {
-		ExpandedGraph e1, e2;
+		RGraph e1, e2;
 		containsUnion = true;
 		if (arg0.getLeft() instanceof OpBGP){
-			e1 = new ExpandedGraph(((OpBGP)arg0.getLeft()).getPattern().getList(), bgpId++);
+			e1 = graphStack.pop();
 		}
 		else if (arg0.getLeft() instanceof OpUnion){
 			e1 = unionStack.pop();
@@ -334,7 +377,7 @@ public class CustomOpVisitor implements OpVisitor {
 			e1 = graphStack.pop();
 		}
 		if (arg0.getRight() instanceof OpBGP){
-			e2 = new ExpandedGraph(((OpBGP)arg0.getRight()).getPattern().getList(), bgpId++);
+			e2 = graphStack.pop();
 		}
 		else if (arg0.getRight() instanceof OpUnion){
 			e2 = unionStack.pop();
@@ -472,7 +515,7 @@ public class CustomOpVisitor implements OpVisitor {
 		this.enableOptional = b;
 	}
 	
-	public ExpandedGraph getResult(){
+	public RGraph getResult(){
 		if (!graphStack.peek().containsProjection()){
 			graphStack.peek().project(projectionVars);
 		}
@@ -484,7 +527,6 @@ public class CustomOpVisitor implements OpVisitor {
 			containsNamedGraphs = true;
 			graphStack.peek().fromNamedGraph(namedGraphURI);
 		}
-		graphStack.peek().setDistinctNode(isDistinct);
 		return graphStack.peek();
 	}
 	

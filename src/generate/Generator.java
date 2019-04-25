@@ -16,7 +16,7 @@ import org.apache.jena.graph.Triple;
 import org.apache.jena.sparql.core.Var;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
-import test.ExpandedGraph;
+import main.RGraph;
 
 public class Generator {
 	protected BufferedReader br;
@@ -52,8 +52,8 @@ public class Generator {
 		br.close();
 	}
 	
-	public ExpandedGraph generateGraph(){
-		ExpandedGraph ans = new ExpandedGraph(this.triples,this.vars);
+	public RGraph generateGraph(){
+		RGraph ans = new RGraph(this.triples,this.vars);
 		ans.project(vars.subList(0, 1));
 		ans.setDistinctNode(true);
 		ans.turnDistinctOn();
@@ -63,13 +63,13 @@ public class Generator {
 	public void printStats() throws InterruptedException, HashCollisionException, IOException{
 		int initialNodes, finalNodes, initialVars, finalVars, initialTriples, finalTriples;
 		generateTriples();
-		ExpandedGraph e = generateGraph();	
+		RGraph e = generateGraph();	
 		String output = "";
 		initialNodes = e.getNumberOfNodes();
 		initialVars = e.getNumberOfVars();
 		initialTriples = e.getNumberOfTriples();
 		long t = System.nanoTime();
-		ExpandedGraph a = e.getCanonicalForm(false);
+		RGraph a = e.getCanonicalForm(false);
 		t = System.nanoTime() - t;
 		finalNodes = a.getNumberOfNodes();
 		finalVars = a.getNumberOfVars();

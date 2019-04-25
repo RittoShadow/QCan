@@ -1,4 +1,4 @@
-package test;
+package main;
 
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
@@ -6,6 +6,9 @@ import org.apache.jena.query.QueryParseException;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpWalker;
+import org.apache.jena.sparql.algebra.Transformer;
+import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
+import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 
@@ -14,8 +17,8 @@ public class SingleQuery {
 	private long time = 0;
 	private long canonTime = 0;
 	private int nTriples = 0;
-	private ExpandedGraph graph;
-	private ExpandedGraph canonGraph;
+	private RGraph graph;
+	private RGraph canonGraph;
 	private boolean enableFilter = true;
 	private boolean enableOptional = true;
 	private boolean enableLeaning = true;
@@ -53,14 +56,59 @@ public class SingleQuery {
 		}
 	}
 	
+	public Op UCQTransformation(Op op){
+		Op op2 = Transformer.transform(new UCQVisitor(), op);
+		while (!op.equals(op2)){
+			op = op2;
+			op2 = Transformer.transform(new UCQVisitor(), op2);
+		}
+		op2 = Transformer.transform(new FilterTransform(), op2);
+		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
+		op2 = Transformer.transform(new TransformExtendCombine(), op2);
+		op2 = Transformer.transform(new BGPSort(), op2);
+		return op2;
+	}
+	
+	public boolean checkBranchVars(Op op){
+		BGPSort bgps = new BGPSort();
+		@SuppressWarnings("unused")
+		Op op2 = Transformer.transform(bgps, op);
+		for (int i = 0; i < bgps.ucqVars.size(); i++){
+			for (int j = i + 1; j < bgps.ucqVars.size(); j++){
+				if (bgps.ucqVars.get(i).equals(bgps.ucqVars.get(j))){
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
 	public void parseQuery(String q) throws UnsupportedOperationException, QueryParseException{
 		Query query = QueryFactory.create(q);
 		Op op = Algebra.compile(query);
-		CustomOpVisitor visitor = new CustomOpVisitor(query);
+		Op op2 = UCQTransformation(op);
+		System.out.println(op2);
+		RGraphBuilder visitor = new RGraphBuilder(query);
 		visitor.setEnableFilter(enableFilter);
 		visitor.setEnableOptional(enableOptional);
-		OpWalker.walk(op, visitor);
+		OpWalker.walk(op2, visitor);
 		graph = visitor.getResult();
+		if (!visitor.isDistinct){
+			if (visitor.totalVars.containsAll(visitor.projectionVars) && visitor.projectionVars.containsAll(visitor.totalVars)){
+				if (!checkBranchVars(op2)){
+					graph.setDistinctNode(true);
+				}			
+				else{
+					graph.setDistinctNode(visitor.isDistinct);
+				}
+			}
+			else{
+				graph.setDistinctNode(visitor.isDistinct);
+			}
+		}
+		else{
+			graph.setDistinctNode(true);
+		}
 		nTriples = visitor.nTriples;
 		containsUnion = visitor.getContainsUnion();
 		containsJoin = visitor.getContainsJoin();
@@ -78,6 +126,11 @@ public class SingleQuery {
 	public void canonicalise(boolean verbose) throws InterruptedException, HashCollisionException{
 		this.graph.setLeaning(enableLeaning);
 		canonGraph = this.graph.getCanonicalForm(verbose);
+	}
+	
+	public boolean determineSemantics(){
+		
+		return true;
 	}
 	
 	public void setLeaning(boolean b){
@@ -137,11 +190,11 @@ public class SingleQuery {
 		return canonGraph.containsJoin();
 	}
 	
-	public ExpandedGraph getOriginalGraph(){
+	public RGraph getOriginalGraph(){
 		return this.graph;
 	}
 	
-	public ExpandedGraph getCanonicalGraph(){
+	public RGraph getCanonicalGraph(){
 		return this.canonGraph;
 	}
 	
@@ -175,5 +228,12 @@ public class SingleQuery {
 	
 	public boolean getContainsNamedGraphs(){
 		return this.containsNamedGraphs;
+	}
+	
+	public static void main(String[] args) throws InterruptedException, HashCollisionException{
+		String q = "PREFIX : <http://example.com/> SELECT ?family WHERE { ?npl a :NobelPrizeLiterature ; :winner ?winner . ?winner :country ?country . VALUES (?country ?family) { (:France :Romance) (:France :Celtic) (:Spain :Romance) (:Norway :Germanic) (:Germany :Germanic) } }";
+		@SuppressWarnings("unused")
+		SingleQuery sq = new SingleQuery(q, true, true, true, true, true);
+		System.out.println(sq.getQuery());
 	}
 }
