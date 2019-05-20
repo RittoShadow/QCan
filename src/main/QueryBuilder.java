@@ -18,6 +18,8 @@ import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpAsQuery;
+import org.apache.jena.sparql.algebra.Table;
+import org.apache.jena.sparql.algebra.TableFactory;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpDistinct;
 import org.apache.jena.sparql.algebra.op.OpExtend;
@@ -28,10 +30,13 @@ import org.apache.jena.sparql.algebra.op.OpLeftJoin;
 import org.apache.jena.sparql.algebra.op.OpOrder;
 import org.apache.jena.sparql.algebra.op.OpProject;
 import org.apache.jena.sparql.algebra.op.OpSlice;
+import org.apache.jena.sparql.algebra.op.OpTable;
 import org.apache.jena.sparql.algebra.op.OpUnion;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
+import org.apache.jena.sparql.engine.binding.BindingFactory;
+import org.apache.jena.sparql.engine.binding.BindingMap;
 import org.apache.jena.sparql.expr.E_Add;
 import org.apache.jena.sparql.expr.E_Bound;
 import org.apache.jena.sparql.expr.E_Equals;
@@ -49,10 +54,17 @@ import org.apache.jena.sparql.expr.E_Multiply;
 import org.apache.jena.sparql.expr.E_NotEquals;
 import org.apache.jena.sparql.expr.E_Subtract;
 import org.apache.jena.sparql.expr.Expr;
+import org.apache.jena.sparql.expr.ExprAggregator;
 import org.apache.jena.sparql.expr.NodeValue;
+import org.apache.jena.sparql.expr.aggregate.AggregatorFactory;
 import org.apache.jena.sparql.util.ExprUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
 
+/**
+ * This class builds a query out of an r-graph.
+ * @author Jaime
+ *
+ */
 public class QueryBuilder {
 	final String URI = "http://example.org/";
 	private final Node typeNode = NodeFactory.createURI(this.URI+"type");
@@ -86,11 +98,15 @@ public class QueryBuilder {
 	private final Node graphNode = NodeFactory.createURI(this.URI+"graph");
 	private final Node distinctNode = NodeFactory.createURI(this.URI+"distinct");
 	private final Node bindNode = NodeFactory.createURI(this.URI+"bind");
+	private final Node tableNode = NodeFactory.createURI(this.URI+"table");
 	private Graph graph;
 	private Op op;
+	private boolean isDistinct;
 	
 	public QueryBuilder(RGraph e){
 		this.graph = e.graph;
+		Node project = GraphUtil.listSubjects(this.graph, typeNode, projectNode).next();
+		this.isDistinct = this.graph.contains(project, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
 	}
 	
 	public Expr filterOperatorToString(Node n, Expr... exprs){
@@ -135,6 +151,38 @@ public class QueryBuilder {
 				}
 				else if (f.equals("-")) {
 					return new E_Subtract(exprs[0], exprs[1]);
+				}
+				else if (f.equals("MAX")) {
+					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
+					return new ExprAggregator(Var.alloc(v.getBlankNodeLabel()), AggregatorFactory.createMax(isDistinct, exprs[0]));
+				}
+				else if (f.equals("MIN")) {
+					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
+					return new ExprAggregator(Var.alloc(v.getBlankNodeLabel()), AggregatorFactory.createMin(isDistinct, exprs[0]));
+				}
+				else if (f.equals("AVG")) {
+					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
+					return new ExprAggregator(Var.alloc(v.getBlankNodeLabel()), AggregatorFactory.createAvg(isDistinct, exprs[0]));
+				}
+				else if (f.equals("MAX")) {
+					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
+					return new ExprAggregator(Var.alloc(v.getBlankNodeLabel()), AggregatorFactory.createMax(isDistinct, exprs[0]));
+				}
+				else if (f.equals("COUNT")) {
+					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
+					return new ExprAggregator(Var.alloc(v.getBlankNodeLabel()), AggregatorFactory.createCountExpr(isDistinct, exprs[0]));
+				}
+				else if (f.equals("SUM")) {
+					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
+					return new ExprAggregator(Var.alloc(v.getBlankNodeLabel()), AggregatorFactory.createSum(isDistinct, exprs[0]));
+				}
+				else if (f.equals("SAMPLE")) {
+					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
+					return new ExprAggregator(Var.alloc(v.getBlankNodeLabel()), AggregatorFactory.createSample(isDistinct, exprs[0]));
+				}
+				else if (f.equals("GROUP_CONCAT")) {
+					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
+					return new ExprAggregator(Var.alloc(v.getBlankNodeLabel()), AggregatorFactory.createGroupConcat(isDistinct, exprs[0], f, null));
 				}
 				else {
 					return ExprUtils.parse(f);
@@ -234,6 +282,9 @@ public class QueryBuilder {
 			}
 			else if (type.equals(graphNode)){
 				ans = OpJoin.create(ans, graphToOp(arg));
+			}
+			else if (type.equals(tableNode)) {
+				ans = OpJoin.create(ans, tableToOp(arg));
 			}
 		}
 		Collections.sort(tripleList, new TripleComparator());
@@ -342,6 +393,26 @@ public class QueryBuilder {
 		return ans;
 	}
 	
+	public Op tableToOp(Node n) {
+		Op ans = null;
+		Table t = TableFactory.create();
+		ExtendedIterator<Node> rows = GraphUtil.listObjects(graph, n, argNode);
+		while (rows.hasNext()) {
+			BindingMap b = BindingFactory.create();
+			Node row = rows.next();
+			ExtendedIterator<Node> bindings = GraphUtil.listObjects(graph, row, argNode);
+			while (bindings.hasNext()) {
+				Node binding = bindings.next();
+				Node var = GraphUtil.listObjects(graph, binding, varNode).next();
+				Node value = GraphUtil.listObjects(graph, binding, valueNode).hasNext() ? GraphUtil.listObjects(graph, binding, valueNode).next() : null;
+				b.add(Var.alloc(var.getBlankNodeLabel()), value);
+			}
+			t.addBinding(b);
+		}
+		ans = OpTable.create(t);
+		return ans;
+	}
+	
 	public Op unionToOp(Node n){
 		Op ans = null;
 		ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
@@ -364,6 +435,9 @@ public class QueryBuilder {
 		else if (firstType.equals(graphNode)){
 			ans = graphToOp(firstArg);
 		}
+		else if (firstType.equals(tableNode)) {
+			ans = tableToOp(firstArg);
+		}
 		for (int i = 1; i < argList.size(); i++){
 			Node arg = argList.get(i);
 			Node type = GraphUtil.listObjects(graph, arg, typeNode).next();
@@ -381,6 +455,9 @@ public class QueryBuilder {
 			}
 			else if (type.equals(graphNode)){
 				ans = new OpUnion(ans, graphToOp(arg));
+			}
+			else if (type.equals(tableNode)) {
+				ans = new OpUnion(ans, tableToOp(arg));
 			}
 		}
 		ans = filterOrBindToOp(ans, n);
@@ -406,6 +483,9 @@ public class QueryBuilder {
 		else if (graph.contains(Triple.create(left, typeNode, graphNode))){
 			leftOp = graphToOp(left);
 		}
+		else if (graph.contains(Triple.create(left, typeNode, tableNode))) {
+			leftOp = tableToOp(left);
+		}
 		Node right = GraphUtil.listObjects(graph, n, rightNode).next();
 		if (graph.contains(Triple.create(right, typeNode, unionNode))){
 			rightOp = unionToOp(right);
@@ -421,6 +501,9 @@ public class QueryBuilder {
 		}
 		else if (graph.contains(Triple.create(right, typeNode, graphNode))){
 			rightOp = graphToOp(right);
+		}
+		else if (graph.contains(Triple.create(right, typeNode, tableNode))) {
+			rightOp = tableToOp(right);
 		}
 		leftOp = filterOrBindToOp(leftOp, n);
 		return OpLeftJoin.createLeftJoin(leftOp, rightOp, null);
@@ -504,7 +587,12 @@ public class QueryBuilder {
 					Node value = GraphUtil.listObjects(graph, arg, valueNode).next();
 					Expr argString = null;
 					if (value.isBlank()){
-						argString = NodeValue.makeNode(Var.alloc(value.getBlankNodeLabel()));
+						if (GraphUtil.listObjects(graph, value, functionNode).hasNext()) {
+							argString = bindToOp(value);
+						}
+						else {
+							argString = NodeValue.makeNode(Var.alloc(value.getBlankNodeLabel()));
+						}
 					}
 					else if (value.isURI()){
 						argString = NodeValue.makeNode(value);
@@ -541,6 +629,14 @@ public class QueryBuilder {
 			}
 			else{
 				return NodeValue.makeNode(v);
+			}
+		}
+		if (graph.contains(n,typeNode,varNode)){
+			if (n.isBlank()){
+				return NodeValue.makeNode(Var.alloc(n.getBlankNodeLabel()));
+			}
+			else{
+				return NodeValue.makeNode(n);
 			}
 		}
 		return e;
@@ -704,7 +800,6 @@ public class QueryBuilder {
 		if (this.graph.contains(project, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean))){
 			op = new OpDistinct(op);
 		}
-		System.out.println(op);
 		Query q = OpAsQuery.asQuery(op);
 		if (f.hasNext()){
 			ExtendedIterator<Node> URIs = GraphUtil.listObjects(graph, f.next(), argNode);
@@ -723,6 +818,7 @@ public class QueryBuilder {
 			}
 		}
 		Query query = OpAsQuery.asQuery(op);
+		System.out.println(op);
 		String ans = query.toString();
 		ans = newLabels(ans);
 		return ans;

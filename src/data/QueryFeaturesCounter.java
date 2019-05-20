@@ -40,52 +40,46 @@ public class QueryFeaturesCounter {
 	int numberOfDuplicates = 0;
 	
 	public void parse(String s) throws Exception{
-		try{
-			Query q = QueryFactory.create(s);
-			Op op = Algebra.compile(q);
-			if (!q.getGraphURIs().isEmpty() || !q.getNamedGraphURIs().isEmpty()){
-				this.features.add("named");
-			}	
-			FeatureCounter fc = new FeatureCounter();
-			OpWalker.walk(op, fc);
-			HashSet<String> features = fc.getFeatures();
-			for (String f : features){
-				this.features.add(f);
-			}
-			
-			boolean unions = features.contains("union");
-			boolean joins = features.contains("join");
-			boolean distinct = features.contains("distinct");
-			boolean unsupported = features.contains("Unsupported");
-			
-			features.remove("union");
-			features.remove("join");
-			features.remove("distinct");
-			features.remove("bgp");
-			features.remove("project");
-			features.remove("Unsupported");
-			
-			boolean others = !features.isEmpty();
-			String ans = "";
-			
-			if (unions && !unsupported){
-				ans += "U";
-				if (joins){
-					ans += "J";
-				}
-				if (distinct){
-					ans += "D";
-				}
-				if (others){
-					ans += "*";
-				}
-			}
-			this.features.add(ans);
-			
-		}
-		catch (Exception e){
-			e.printStackTrace();
+		Query q = QueryFactory.create(s);
+		Op op = Algebra.compile(q);
+		if (!q.getGraphURIs().isEmpty() || !q.getNamedGraphURIs().isEmpty()){
+			this.features.add("named");
 		}	
+		FeatureCounter fc = new FeatureCounter();
+		OpWalker.walk(op, fc);
+		HashSet<String> features = fc.getFeatures();
+		for (String f : features){
+			this.features.add(f);
+		}
+		
+		boolean unions = features.contains("union");
+		boolean joins = features.contains("join");
+		boolean distinct = features.contains("distinct");
+		boolean unsupported = features.contains("Unsupported");
+		
+		features.remove("union");
+		features.remove("join");
+		features.remove("distinct");
+		features.remove("bgp");
+		features.remove("project");
+		features.remove("Unsupported");
+		
+		boolean others = !features.isEmpty();
+		String ans = "";
+		
+		if (unions && !unsupported){
+			ans += "U";
+			if (joins){
+				ans += "J";
+			}
+			if (distinct){
+				ans += "D";
+			}
+			if (others){
+				ans += "*";
+			}
+		}
+		this.features.add(ans);
 	}
 	
 	public QueryFeaturesCounter(File f) throws IOException{
@@ -108,7 +102,6 @@ public class QueryFeaturesCounter {
 				}
 				catch(QueryParseException e){
 					badSyntaxQueries++;
-					e.printStackTrace();
 				} 
 				catch (Exception e) {
 					otherUnspecifiedExceptions++;
@@ -123,6 +116,9 @@ public class QueryFeaturesCounter {
 			bw.append(h + ": "+features.count(h));
 			bw.newLine();
 		}
+		bw.append("query parse exception: " + badSyntaxQueries);
+		bw.newLine();
+		bw.append("unspecified exceptions: " + otherUnspecifiedExceptions);
 		bw.close();
 	}
 	
@@ -132,6 +128,6 @@ public class QueryFeaturesCounter {
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException{
-		QueryFeaturesCounter qp = new QueryFeaturesCounter(new File("testFiles/cleantestCases.nt"));
+		QueryFeaturesCounter qp = new QueryFeaturesCounter(new File("testFiles/utfWikiDataQueries/utf8wikiDataQueries.tsv"));
 	}
 }

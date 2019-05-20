@@ -21,6 +21,10 @@ WHERE
 		  		?a ex:type ?type .
 		  		FILTER(?type != ex:TP)
 		  	}
+		  	FILTER NOT EXISTS{
+		  		?b1 ex:modifier ?m .
+		  		?m ex:type ex:bind .
+		  	}
 		  }
   	} 	
   	OPTIONAL{ ?b1 ex:modifier ?w }

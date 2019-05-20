@@ -2,9 +2,11 @@ package main;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
@@ -25,9 +27,13 @@ import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.Table;
+import org.apache.jena.sparql.algebra.op.OpGroup;
 import org.apache.jena.sparql.core.Var;
+import org.apache.jena.sparql.core.VarExprList;
 import org.apache.jena.sparql.engine.QueryIterator;
 import org.apache.jena.sparql.engine.binding.Binding;
+import org.apache.jena.sparql.expr.Expr;
+import org.apache.jena.sparql.expr.ExprWalker;
 import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.update.UpdateAction;
 import org.apache.jena.update.UpdateFactory;
@@ -90,6 +96,8 @@ public class RGraph {
 	private final Node tempNode = NodeFactory.createURI(this.URI+"temp");
 	private final Node bindNode = NodeFactory.createURI(this.URI+"bind");
 	private final Node tableNode = NodeFactory.createURI(this.URI+"table");
+	private final Node groupByNode = NodeFactory.createURI(this.URI+"group");
+	private final Node aggregateNode = NodeFactory.createURI(this.URI+"aggregate");
 	@SuppressWarnings("unused")
 	private final Node leafNode = NodeFactory.createURI(this.URI+"leaf");
 	private final UpdateRequest duplicatesRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/duplicates.ru"));
@@ -141,6 +149,10 @@ public class RGraph {
 				s = Triple.create(n, subNode, temp);
 //				graph.add(Triple.create(temp, typeNode, varNode));
 			}
+			else if (t.getSubject().isBlank()) {
+				Node temp = NodeFactory.createBlankNode(t.getSubject().getBlankNodeLabel());
+				s = Triple.create(n, subNode, temp);
+			}
 			else if (t.getSubject().isURI()){
 				s = Triple.create(n, subNode, NodeFactory.createURI(t.getSubject().toString()));
 			}
@@ -152,6 +164,10 @@ public class RGraph {
 				p = Triple.create(n, preNode, temp);
 //				graph.add(Triple.create(temp, typeNode, varNode));
 			}
+			else if (t.getPredicate().isBlank()) {
+				Node temp = NodeFactory.createBlankNode(t.getPredicate().getBlankNodeLabel());
+				p = Triple.create(n, preNode, temp);
+			}
 			else if (t.getPredicate().isURI()){
 				p = Triple.create(n, preNode, NodeFactory.createURI(t.getPredicate().toString()));
 			}
@@ -162,6 +178,10 @@ public class RGraph {
 				Node temp = NodeFactory.createBlankNode(t.getObject().getName());
 				o = Triple.create(n, objNode, temp);
 //				graph.add(Triple.create(temp, typeNode, varNode));
+			}
+			else if (t.getObject().isBlank()) {
+				Node temp = NodeFactory.createBlankNode(t.getObject().getBlankNodeLabel());
+				o = Triple.create(n, objNode, temp);
 			}
 			else if (t.getObject().isURI()){
 				o = Triple.create(n, objNode, NodeFactory.createURI(t.getObject().toString()));
@@ -255,18 +275,44 @@ public class RGraph {
 		Node tableRoot = NodeFactory.createBlankNode();
 		Graph graph = GraphFactory.createDefaultGraph();
 		RGraph ans = new RGraph(tableRoot, graph, null);
-		List<Var> vars = table.getVars();
 		ans.graph.add(Triple.create(tableRoot, ans.typeNode, ans.tableNode));
-		for (Var var : vars) {
-			ans.graph.add(Triple.create(tableRoot, ans.varNode, NodeFactory.createBlankNode(var.getVarName())));
-		}
 		Iterator<Binding> iter = table.rows();
 		while (iter.hasNext()) {
-			Node auxNode = NodeFactory.createBlankNode();
-			ans.graph.add(Triple.create(tableRoot, ans.argNode, auxNode));
-			ans.graph.add(Triple.create(auxNode, ans.typeNode, ans.bindNode));
-			@SuppressWarnings("unused")
+			Node rowNode = NodeFactory.createBlankNode();
+			ans.graph.add(Triple.create(tableRoot, ans.argNode, rowNode));
 			Binding b = iter.next();
+			Iterator<Var> vars = b.vars();
+			while (vars.hasNext()) {
+				Var var = vars.next();
+				Node bindingNode = NodeFactory.createBlankNode();
+				ans.graph.add(Triple.create(rowNode, ans.argNode, bindingNode));
+				ans.graph.add(Triple.create(bindingNode, ans.typeNode, ans.bindNode));
+				ans.graph.add(Triple.create(bindingNode, ans.varNode, NodeFactory.createBlankNode(var.getVarName())));
+				Node value = b.get(var);
+				ans.graph.add(Triple.create(bindingNode, ans.valueNode, value));
+			}
+		}
+		return ans;
+	}
+	
+	public static RGraph group(OpGroup arg) {
+		Node root = NodeFactory.createBlankNode();
+		RGraph ans = new RGraph(root, GraphFactory.createDefaultGraph(), Collections.<Var>emptySet());
+		ans.graph.add(Triple.create(root, ans.typeNode, ans.groupByNode));
+		Node varNode = NodeFactory.createBlankNode();
+		ans.graph.add(Triple.create(root, ans.argNode, varNode));
+		VarExprList vExpr = arg.getGroupVars();
+		for (Var v : vExpr.getVars()) {
+			ans.graph.add(Triple.create(varNode, ans.argNode, NodeFactory.createBlankNode(v.getVarName())));
+		}
+		Map<Var,Expr> varsExpr = vExpr.getExprs();
+		for (Map.Entry<Var, Expr> m : varsExpr.entrySet()) {
+			Var v = m.getKey();
+			FilterVisitor fv = new FilterVisitor();
+			ExprWalker.walk(fv, m.getValue());
+			Node r = fv.getGraph().root;
+			GraphUtil.addInto(ans.graph, fv.getGraph().graph);
+			ans.graph.add(Triple.create(NodeFactory.createBlankNode(v.getVarName()), ans.valueNode, r));
 		}
 		return ans;
 	}
@@ -590,16 +636,14 @@ public class RGraph {
 		Node o = filterOperator(op);
 		Node a = NodeFactory.createBlankNode();
 		Node b = NodeFactory.createBlankNode();
-		boolean x = !GraphUtil.listObjects(graph, arg1, functionNode).hasNext();
-		boolean y = !GraphUtil.listObjects(graph, arg2, functionNode).hasNext();
 		graph.add(Triple.create(n, functionNode, o));
-		if (x){
+		if (!GraphUtil.listObjects(graph, arg1, functionNode).hasNext()){
 			graph.add(Triple.create(a, valueNode, arg1));
 		}
 		else{
 			a = arg1;
 		}
-		if (y){
+		if (!GraphUtil.listObjects(graph, arg2, functionNode).hasNext()){
 			graph.add(Triple.create(b, valueNode, arg2));
 		}
 		else{
@@ -610,6 +654,57 @@ public class RGraph {
 		if (isOrderedFunction(op)){
 			graph.add(Triple.create(a, orderNode, NodeFactory.createLiteralByValue(0, XSDDatatype.XSDint)));
 			graph.add(Triple.create(b, orderNode, NodeFactory.createLiteralByValue(1, XSDDatatype.XSDint)));
+		}
+		return n;
+	}
+	
+	/**
+	 * @param group
+	 */
+	public void groupBy(RGraph group) {
+		graph.add(Triple.create(this.root, modNode, group.root));
+		GraphUtil.addInto(graph, group.graph);
+		ExtendedIterator<Node> vars = GraphUtil.listSubjects(group.graph, typeNode, varNode);
+		while (vars.hasNext()) {
+			Node v = vars.next();
+			if (GraphUtil.listObjects(group.graph, v, functionNode).hasNext()) {
+				graph.delete(Triple.create(v, typeNode, varNode));
+			}
+		}
+	}
+	
+	/**
+	 * @param args
+	 */
+	public void aggregation(List<RGraph> args) {
+		Node n = NodeFactory.createBlankNode();
+		graph.add(Triple.create(root, modNode, n));
+		graph.add(Triple.create(n, typeNode, aggregateNode));
+		for (RGraph arg : args) {
+			graph.add(Triple.create(n, argNode, arg.root));
+			GraphUtil.addInto(this.graph, arg.graph);
+		}
+	}
+	
+	/**
+	 * @param op
+	 * @param var
+	 * @param arg
+	 * @return
+	 */
+	public Node aggregation(String op, Var var, Node arg) {
+		Node n = NodeFactory.createBlankNode();
+		if (var != null) {
+			n = NodeFactory.createBlankNode(var.getVarName());
+		}			
+		Node o = filterOperator(op);
+		graph.add(Triple.create(n, functionNode, o));
+		if (!GraphUtil.listObjects(graph, arg, functionNode).hasNext()) {
+			graph.add(Triple.create(n, argNode, arg));
+			graph.add(Triple.create(arg, typeNode, varNode));
+		}
+		else {
+			graph.add(Triple.create(n, argNode, arg));
 		}
 		return n;
 	}
@@ -936,6 +1031,10 @@ public class RGraph {
 		return glr;
 	}
 	
+	/**
+	 * Iteratively performs a SPARQL UPDATE query until no changes are made.
+	 * @param request A SPARQL UPDATE query.
+	 */
 	public void iterativeUpdate(UpdateRequest request){
 		Graph before = GraphFactory.createPlainGraph();
 		while (!before.isIsomorphicWith(graph)){

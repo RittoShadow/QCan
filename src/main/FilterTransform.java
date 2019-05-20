@@ -9,6 +9,10 @@ import org.apache.jena.sparql.expr.ExprList;
 
 public class FilterTransform extends TransformCopy {
 	
+	/* (non-Javadoc)
+	 * This only applies if the variables in the filter expression are contained in the safe variables in the left Op. Needs revision.
+	 * @see org.apache.jena.sparql.algebra.TransformCopy#transform(org.apache.jena.sparql.algebra.op.OpJoin, org.apache.jena.sparql.algebra.Op, org.apache.jena.sparql.algebra.Op)
+	 */
 	public Op transform(OpJoin join, Op left, Op right) {
 		if (left instanceof OpFilter && !(right instanceof OpFilter)) {
 			return OpFilter.filter(((OpFilter) left).getExprs(), OpJoin.create(((OpFilter) left).getSubOp(), right));

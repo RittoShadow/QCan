@@ -67,46 +67,55 @@ public class FeatureCounter implements OpVisitor {
 	@Override
 	public void visit(OpQuadPattern arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpQuadBlock arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpTriple arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpQuad arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpPath arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpTable arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpNull arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpProcedure arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpPropFunc arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
@@ -122,26 +131,30 @@ public class FeatureCounter implements OpVisitor {
 	@Override
 	public void visit(OpService arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpDatasetNames arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpLabel arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpAssign arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpExtend arg0) {
-		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
@@ -162,31 +175,37 @@ public class FeatureCounter implements OpVisitor {
 	@Override
 	public void visit(OpDiff arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpMinus arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpConditional arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpSequence arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpDisjunction arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpList arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
@@ -202,6 +221,7 @@ public class FeatureCounter implements OpVisitor {
 	@Override
 	public void visit(OpReduced arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
@@ -217,11 +237,13 @@ public class FeatureCounter implements OpVisitor {
 	@Override
 	public void visit(OpGroup arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpTopN arg0) {
 		features.add("Unsupported");
+		features.add(arg0.getName());
 	}
 	
 	public boolean getContainsUnion(){

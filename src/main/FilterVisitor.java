@@ -1,11 +1,14 @@
 package main;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Stack;
 
+import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.sparql.core.Var;
+import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprAggregator;
 import org.apache.jena.sparql.expr.ExprFunction0;
 import org.apache.jena.sparql.expr.ExprFunction1;
@@ -15,6 +18,7 @@ import org.apache.jena.sparql.expr.ExprFunctionN;
 import org.apache.jena.sparql.expr.ExprFunctionOp;
 import org.apache.jena.sparql.expr.ExprVar;
 import org.apache.jena.sparql.expr.ExprVisitor;
+import org.apache.jena.sparql.expr.ExprWalker;
 import org.apache.jena.sparql.expr.NodeValue;
 import org.apache.jena.sparql.graph.GraphFactory;
 
@@ -40,26 +44,36 @@ public class FilterVisitor implements ExprVisitor {
 	@Override
 	public void visit(ExprFunction1 func) {
 		Node arg = nodeStack.pop();
-		if (func.getOpName().equals("!")){
+		if (func.getOpName() != null) {
+			if (func.getOpName().equals("!")){
 			nodeStack.add(filterGraph.filterNot(arg));
+			}
+			else{
+				nodeStack.add(filterGraph.filterFunction(func.getOpName(), arg));
+			}
 		}
-		else{
-			nodeStack.add(filterGraph.filterFunction(func.getOpName(), arg));
-		}
+		else {
+			nodeStack.add(filterGraph.filterFunction(func.getFunctionSymbol().getSymbol(), arg));
+		}		
 	}
 
 	@Override
 	public void visit(ExprFunction2 func) {
 		Node arg2 = nodeStack.pop();
 		Node arg1 = nodeStack.pop();
-		if (func.getOpName().equals("&&")){
+		if (func.getOpName() != null) {
+			if (func.getOpName().equals("&&")){
 			nodeStack.add(filterGraph.filterAnd(arg1, arg2));
+			}
+			else if (func.getOpName().equals("||")){
+				nodeStack.add(filterGraph.filterOr(arg1, arg2));
+			}
+			else{
+				nodeStack.add(filterGraph.filterFunction(func.getOpName(), arg1, arg2));
+			}
 		}
-		else if (func.getOpName().equals("||")){
-			nodeStack.add(filterGraph.filterOr(arg1, arg2));
-		}
-		else{
-			nodeStack.add(filterGraph.filterFunction(func.getOpName(), arg1, arg2));
+		else {
+			nodeStack.add(filterGraph.filterFunction(func.getFunctionSymbol().getSymbol(), arg1, arg2));
 		}
 	}
 
@@ -90,8 +104,20 @@ public class FilterVisitor implements ExprVisitor {
 
 	@Override
 	public void visit(ExprAggregator eAgg) {
-		// TODO Auto-generated method stub
-		
+		List<Expr> exprs = eAgg.getAggregator().getExprList().getList();
+		for (Expr e : exprs) {
+			if (e instanceof ExprVar) {
+				nodeStack.add(filterGraph.aggregation(eAgg.getAggregator().getName(), eAgg.getVar(), NodeFactory.createBlankNode(e.getVarName())));
+			}
+			else {
+				FilterVisitor fv = new FilterVisitor();
+				ExprWalker.walk(fv, e);
+				RGraph r = fv.getGraph();
+				nodeStack.add(r.root);
+				nodeStack.add(filterGraph.aggregation(eAgg.getAggregator().getName(), eAgg.getVar(), nodeStack.peek()));
+				GraphUtil.addInto(filterGraph.graph, r.graph);
+			}
+		}	
 	}
 	
 	public RGraph getGraph(){

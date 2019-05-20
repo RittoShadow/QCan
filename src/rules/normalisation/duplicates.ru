@@ -15,7 +15,6 @@ WHERE
 	SELECT (COUNT(?x) AS ?t)
 	WHERE{
 		?w ex:arg ?x .
-		?x ex:type ex:join .
 		}
 	}
   	FILTER(?t = 1)

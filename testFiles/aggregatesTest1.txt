@@ -1,0 +1,3 @@
+PREFIX : <http://books.example/> SELECT (SUM(?lprice) AS ?totalPrice) WHERE {  ?org :affiliates ?auth .  ?auth :writesBook ?book .  ?book :price ?lprice . } GROUP BY ?org HAVING (SUM(?lprice) > 10)
+PREFIX : <http://example.com/data/#> SELECT ?x (MIN(?y) * 2 AS ?min) WHERE {  ?x :p ?y .  ?x :q ?z . } GROUP BY ?x (STR(?z))
+PREFIX : <http://example.com/data/#> SELECT ?g (AVG(?p) AS ?avg) ((MIN(?p) + MAX(?p)) / 2 AS ?c) WHERE {  ?g :p ?p . } GROUP BY ?g

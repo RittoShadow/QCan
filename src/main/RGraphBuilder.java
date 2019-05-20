@@ -2,7 +2,6 @@ package main;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -12,6 +11,7 @@ import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.OpVisitor;
+import org.apache.jena.sparql.algebra.OpWalker.WalkerVisitor;
 import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.algebra.op.OpAssign;
 import org.apache.jena.sparql.algebra.op.OpBGP;
@@ -46,11 +46,19 @@ import org.apache.jena.sparql.algebra.op.OpTable;
 import org.apache.jena.sparql.algebra.op.OpTopN;
 import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.algebra.op.OpUnion;
+import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
-import org.apache.jena.sparql.engine.binding.Binding;
 import org.apache.jena.sparql.expr.Expr;
+import org.apache.jena.sparql.expr.ExprAggregator;
 import org.apache.jena.sparql.expr.ExprWalker;
+import org.apache.jena.sparql.path.PathLib;
+import org.apache.jena.sparql.path.PathVisitor;
+import org.apache.jena.sparql.syntax.ElementWalker;
+import org.apache.jena.sparql.syntax.ElementWalker.Walker;
+import org.apache.jena.sparql.syntax.PatternVars.WalkerSkipMinus;
+
+import com.sun.org.apache.xpath.internal.axes.WalkerFactory;
 
 /**
  * This class implements Jena's OpVisitor. It recursively builds an r-graph from a query.
@@ -64,6 +72,7 @@ public class RGraphBuilder implements OpVisitor {
 	private Stack<RGraph> joinStack = new Stack<RGraph>();
 	private Stack<RGraph> optionalStack = new Stack<RGraph>();
 	private Stack<RGraph> filterStack = new Stack<RGraph>();
+	private RGraph groupByGraph = null;
 	List<Var> projectionVars;
 	Set<Var> totalVars = new HashSet<Var>();
 	private List<String> graphURI;
@@ -132,20 +141,20 @@ public class RGraphBuilder implements OpVisitor {
 
 	@Override
 	public void visit(OpPath arg0) {
+		TriplePath tp = arg0.getTriplePath();
+		System.out.println(tp);
+		PPathVisitor ppv = new PPathVisitor(tp.getSubject(),tp.getObject());
+		tp.getPath().visit(ppv);
+		System.out.println(ppv.getOp());
 		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
 		
 	}
 
 	@Override
 	public void visit(OpTable arg0) {
-		System.out.println(arg0.getTable().getVars());
 		Table t = arg0.getTable();
-		Iterator<Binding> iter = t.rows();
-		while (iter.hasNext()) {
-			System.out.println(iter.next());
-		}
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
-		
+		RGraph table = RGraph.table(t);
+		graphStack.add(table);		
 	}
 
 	@Override
@@ -221,7 +230,6 @@ public class RGraphBuilder implements OpVisitor {
 			ExprWalker.walk(bv, m.getValue());
 			graphStack.peek().bind(bv.getGraph(), bgpId++);
 		}
-		graphStack.peek().print();
 	}
 
 	@Override
@@ -429,6 +437,7 @@ public class RGraphBuilder implements OpVisitor {
 
 	@Override
 	public void visit(OpSequence arg0) {
+		System.out.println(arg0.getElements());
 		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
 		
 	}
@@ -497,8 +506,17 @@ public class RGraphBuilder implements OpVisitor {
 
 	@Override
 	public void visit(OpGroup arg0) {
+		RGraph r = RGraph.group(arg0);
+		List<ExprAggregator> agg = arg0.getAggregators();
+		List<RGraph> rGraphs = new ArrayList<RGraph>();
+		for (ExprAggregator a : agg) {
+			FilterVisitor fv = new FilterVisitor();
+			ExprWalker.walk(fv, a);
+			rGraphs.add(fv.getGraph());
+		}
+		r.aggregation(rGraphs);
+		this.groupByGraph = r;		
 		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
-		
 	}
 
 	@Override
@@ -526,6 +544,9 @@ public class RGraphBuilder implements OpVisitor {
 		if (!this.namedGraphURI.isEmpty()){
 			containsNamedGraphs = true;
 			graphStack.peek().fromNamedGraph(namedGraphURI);
+		}
+		if (groupByGraph != null) {
+			graphStack.peek().groupBy(groupByGraph);;
 		}
 		return graphStack.peek();
 	}

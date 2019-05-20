@@ -43,28 +43,37 @@ public class BindVisitor implements ExprVisitor {
 	public void visit(ExprFunction1 func) {
 		// TODO Auto-generated method stub
 		Node arg = nodeStack.pop();
-		if (func.getOpName().equals("!")){
+		if (func.getOpName() != null) {
+			if (func.getOpName().equals("!")){
 			nodeStack.add(bindGraph.filterNot(arg));
+			}
+			else{
+				nodeStack.add(bindGraph.filterFunction(func.getOpName(), arg));
+			}
 		}
-		else{
-			nodeStack.add(bindGraph.filterFunction(func.getOpName(), arg));
-		}
+		else {
+			nodeStack.add(bindGraph.filterFunction(func.getFunctionSymbol().getSymbol(), arg));
+		}		
 	}
 
 	@Override
 	public void visit(ExprFunction2 func) {
 		// TODO Auto-generated method stub
-		System.out.println(func);
 		Node arg2 = nodeStack.pop();
 		Node arg1 = nodeStack.pop();
-		if (func.getOpName().equals("&&")){
+		if (func.getOpName() != null) {
+			if (func.getOpName().equals("&&")){
 			nodeStack.add(bindGraph.filterAnd(arg1, arg2));
+			}
+			else if (func.getOpName().equals("||")){
+				nodeStack.add(bindGraph.filterOr(arg1, arg2));
+			}
+			else{
+				nodeStack.add(bindGraph.filterFunction(func.getOpName(), arg1, arg2));
+			}
 		}
-		else if (func.getOpName().equals("||")){
-			nodeStack.add(bindGraph.filterOr(arg1, arg2));
-		}
-		else{
-			nodeStack.add(bindGraph.filterFunction(func.getOpName(), arg1, arg2));
+		else {
+			nodeStack.add(bindGraph.filterFunction(func.getFunctionSymbol().getSymbol(), arg1, arg2));
 		}
 	}
 

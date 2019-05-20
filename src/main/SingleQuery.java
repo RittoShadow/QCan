@@ -12,6 +12,11 @@ import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 
+/**
+ * A class that takes a query as an input, performs a canonicalisation and measures how long it takes.
+ * @author Jaime
+ *
+ */
 public class SingleQuery {
 	
 	private long time = 0;
@@ -87,12 +92,13 @@ public class SingleQuery {
 		Query query = QueryFactory.create(q);
 		Op op = Algebra.compile(query);
 		Op op2 = UCQTransformation(op);
-		System.out.println(op2);
 		RGraphBuilder visitor = new RGraphBuilder(query);
 		visitor.setEnableFilter(enableFilter);
 		visitor.setEnableOptional(enableOptional);
+		System.out.println(op2);
 		OpWalker.walk(op2, visitor);
 		graph = visitor.getResult();
+		graph.print();
 		if (!visitor.isDistinct){
 			if (visitor.totalVars.containsAll(visitor.projectionVars) && visitor.projectionVars.containsAll(visitor.totalVars)){
 				if (!checkBranchVars(op2)){
@@ -231,9 +237,10 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "PREFIX : <http://example.com/> SELECT ?family WHERE { ?npl a :NobelPrizeLiterature ; :winner ?winner . ?winner :country ?country . VALUES (?country ?family) { (:France :Romance) (:France :Celtic) (:Spain :Romance) (:Norway :Germanic) (:Germany :Germanic) } }";
+		String q = "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT ?x ?name WHERE { ?x foaf:mbox <mailto:alice@example> .    ?x (foaf:knows|foaf:name)+ ?name .}";
 		@SuppressWarnings("unused")
 		SingleQuery sq = new SingleQuery(q, true, true, true, true, true);
+		sq.getCanonicalGraph().print();
 		System.out.println(sq.getQuery());
 	}
 }
