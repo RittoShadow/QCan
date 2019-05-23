@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
@@ -57,8 +58,6 @@ import org.apache.jena.sparql.path.PathVisitor;
 import org.apache.jena.sparql.syntax.ElementWalker;
 import org.apache.jena.sparql.syntax.ElementWalker.Walker;
 import org.apache.jena.sparql.syntax.PatternVars.WalkerSkipMinus;
-
-import com.sun.org.apache.xpath.internal.axes.WalkerFactory;
 
 /**
  * This class implements Jena's OpVisitor. It recursively builds an r-graph from a query.
@@ -143,6 +142,9 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpPath arg0) {
 		TriplePath tp = arg0.getTriplePath();
 		System.out.println(tp);
+		PathWalker pw = new PathWalker();
+		tp.getPath().visit(pw);
+		pw.print();
 		PPathVisitor ppv = new PPathVisitor(tp.getSubject(),tp.getObject());
 		tp.getPath().visit(ppv);
 		System.out.println(ppv.getOp());

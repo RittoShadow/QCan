@@ -1,6 +1,7 @@
 package main;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -19,7 +20,7 @@ public class BGPSort extends TransformCopy {
 	public Op transform(OpBGP bgp){
 		BasicPattern bp = new BasicPattern();
 		List<Triple> tp = bgp.getPattern().getList();
-		tp.sort(new TripleComparator());
+		Collections.sort(tp, new TripleComparator());
 		for (Triple t : tp){
 			bp.add(t);
 		}
