@@ -3,6 +3,7 @@ package main;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -22,12 +23,19 @@ import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QueryExecutionFactory;
 import org.apache.jena.query.QueryFactory;
+import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.Table;
+import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpGroup;
+import org.apache.jena.sparql.algebra.op.OpProject;
+import org.apache.jena.sparql.algebra.op.OpUnion;
+import org.apache.jena.sparql.core.BasicPattern;
+import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
 import org.apache.jena.sparql.engine.QueryIterator;
@@ -35,6 +43,11 @@ import org.apache.jena.sparql.engine.binding.Binding;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprWalker;
 import org.apache.jena.sparql.graph.GraphFactory;
+import org.apache.jena.sparql.path.Path;
+import org.apache.jena.sparql.path.PathFactory;
+import org.apache.jena.sparql.path.PathWriter;
+import org.apache.jena.sparql.sse.SSE;
+import org.apache.jena.sparql.sse.writers.WriterPath;
 import org.apache.jena.update.UpdateAction;
 import org.apache.jena.update.UpdateFactory;
 import org.apache.jena.update.UpdateRequest;
@@ -62,6 +75,7 @@ public class RGraph {
 	public Node root;
 	public boolean distinct = false;
 	public boolean leaning = true;
+	public boolean containsPaths = false;
 	final String URI = "http://example.org/";
 	private final Node typeNode = NodeFactory.createURI(this.URI+"type");
 	private final Node tpNode = NodeFactory.createURI(this.URI+"TP");
@@ -80,6 +94,7 @@ public class RGraph {
 	private final Node orderNode = NodeFactory.createURI(this.URI+"order");
 	private final Node valueNode = NodeFactory.createURI(this.URI+"value");
 	private final Node dirNode = NodeFactory.createURI(this.URI+"direction");
+	private final Node patternNode = NodeFactory.createURI(this.URI+"pattern");
 	private final Node modNode = NodeFactory.createURI(this.URI+"modifier");
 	private final Node filterNode = NodeFactory.createURI(this.URI+"filter");
 	private final Node functionNode = NodeFactory.createURI(this.URI+"function");
@@ -98,9 +113,15 @@ public class RGraph {
 	private final Node tableNode = NodeFactory.createURI(this.URI+"table");
 	private final Node groupByNode = NodeFactory.createURI(this.URI+"group");
 	private final Node aggregateNode = NodeFactory.createURI(this.URI+"aggregate");
+	private final Node minusNode = NodeFactory.createURI(this.URI+"minus");
+	private final Node extraNode = NodeFactory.createURI(this.URI+"extra");
+	private final Node pathNode = NodeFactory.createURI(this.URI+"path");
+	private final Node triplePathNode = NodeFactory.createURI(this.URI+"triplePath");
 	@SuppressWarnings("unused")
 	private final Node leafNode = NodeFactory.createURI(this.URI+"leaf");
 	private final UpdateRequest duplicatesRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/duplicates.ru"));
+	private final UpdateRequest conjunctionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/conjunction.ru"));
+	private final UpdateRequest disjunctionRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/disjunction.ru"));
 	private final UpdateRequest joinRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/join.ru"));
 	private final UpdateRequest joinTripleRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/joinTriple.ru"));
 	private final UpdateRequest redundancyRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/redundancy.ru"));
@@ -112,28 +133,25 @@ public class RGraph {
 	private final UpdateRequest joinLabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/joinLabel.ru"));
 	private final UpdateRequest tripleRelabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/tripleRelabel.ru"));
 	private final UpdateRequest askRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/ask.ru"));
+	
 
 	/**
 	 * @param triples List of RDF triples.
 	 * @param vars List of the variables in the triples.
-	 * @param id A number to identify the r-graph.
 	 * @return A new r-graph based on the list of triples.
 	 */
-	public RGraph(List<Triple> triples, List<Var> vars, int id){
+	public RGraph(List<Triple> triples, List<Var> vars){
 		if (vars != null){
 			this.vars.addAll(vars);
 		}
-		int j = 0;
-		this.id = id;
 		nTriples = triples.size();
 		if (triples.size() > 1){
-			this.root = NodeFactory.createBlankNode("join"+this.id);
+			this.root = NodeFactory.createBlankNode();
 			//Adding typing now.
 			graph.add(Triple.create(this.root, typeNode, joinNode));
 		}
 		for (Triple t : triples){
-			String nv = "tp" + this.id + j++;
-			Node n = NodeFactory.createBlankNode(nv);
+			Node n = NodeFactory.createBlankNode();
 			if (triples.size() == 1){
 				this.root = n;
 			}
@@ -212,20 +230,10 @@ public class RGraph {
 	
 	/**
 	 * @param triples List of RDF triples.
-	 * @param vars List of the variables in the triples.
-	 * @return A new r-graph based on a list of triples.
-	 */
-	public RGraph(List<Triple> triples, List<Var> vars){
-		this(triples,vars,0);
-	}
-	
-	/**
-	 * @param triples List of RDF triples.
-	 * @param id A number to identify the r-graph.
 	 * @return A new r-graph based on the list of triples.
 	 */
-	public RGraph(List<Triple> triples, int id){
-		this(triples, null, id);
+	public RGraph(List<Triple> triples){
+		this(triples, null);
 	}
 	
 	/**
@@ -233,6 +241,9 @@ public class RGraph {
 	 * @return A new r-graph based on a collection of nodes.
 	 */
 	public RGraph(Collection<org.semanticweb.yars.nx.Node[]> data){
+		Set<Node> rootCandidates = new HashSet<Node>();
+		Set<Node> predicates = new HashSet<Node>();
+		Set<Node> objects = new HashSet<Node>();
 		for (org.semanticweb.yars.nx.Node[] node : data){
 			Node subject = null, predicate = null, object = null;
 			if (Pattern.matches("_:.+", node[0].toN3())){
@@ -264,11 +275,102 @@ public class RGraph {
 			}
 			if (subject != null){
 				graph.add(Triple.create(subject, predicate, object));
+				rootCandidates.add(subject);
+				predicates.add(predicate);
+				objects.add(object);
 			}
 			else{
 				System.err.println("Invalid blank node label.");
 			}
 		}
+		for (Node p : predicates) {
+			rootCandidates.remove(p);
+		}
+		for (Node o : objects) {
+			rootCandidates.remove(o);
+		}
+		if (rootCandidates.size() == 1) {
+				this.root = (Node) rootCandidates.toArray()[0];
+		}
+	}
+	
+	public RGraph(Node s, Node o, PGraph p) {
+		Set<Var> vars = new HashSet<Var>();
+		Graph graph = GraphFactory.createPlainGraph();
+		Node tp = NodeFactory.createBlankNode();
+		graph.add(Triple.create(tp, typeNode, triplePathNode));
+		if (s.isVariable()) {
+			vars.add(Var.alloc(s));
+			graph.add(Triple.create(tp, subNode, NodeFactory.createBlankNode(s.getName())));
+		}
+		else if (s.isBlank()) {
+			graph.add(Triple.create(tp, subNode, NodeFactory.createBlankNode(s.getBlankNodeLabel())));
+		}
+		else if (s.isURI()) {
+			graph.add(Triple.create(tp, subNode, NodeFactory.createURI(s.getURI())));
+		}
+		else if (s.isLiteral()) {
+			graph.add(Triple.create(tp, subNode, NodeFactory.createLiteralByValue(s.getLiteralValue(), s.getLiteralDatatype())));
+		}
+		if (o.isVariable()) {
+			vars.add(Var.alloc(o));
+			graph.add(Triple.create(tp, objNode, NodeFactory.createBlankNode(o.getName())));
+		}
+		else if (o.isBlank()) {
+			graph.add(Triple.create(tp, objNode, NodeFactory.createBlankNode(o.getBlankNodeLabel())));
+		}
+		else if (o.isURI()) {
+			graph.add(Triple.create(tp, objNode, NodeFactory.createURI(o.getURI())));
+		}
+		else if (o.isLiteral()) {
+			graph.add(Triple.create(tp, objNode, NodeFactory.createLiteralByValue(o.getLiteralValue(), o.getLiteralDatatype())));
+		}
+		GraphUtil.addInto(graph, p.getMinimalDFA());
+		Node n = NodeFactory.createBlankNode();
+		graph.add(Triple.create(n, typeNode, pathNode));
+		graph.add(Triple.create(n, argNode, p.getStartState()));
+		graph.add(Triple.create(tp, preNode, n));
+		this.graph = graph;
+		this.vars = vars;
+		this.root = tp;
+	}
+	
+	public RGraph(Node s, Node o, Path p) {
+		Set<Var> vars = new HashSet<Var>();
+		Graph graph = GraphFactory.createPlainGraph();
+		Node tp = NodeFactory.createBlankNode();
+		graph.add(Triple.create(tp, typeNode, triplePathNode));
+		if (s.isVariable()) {
+			vars.add(Var.alloc(s));
+			graph.add(Triple.create(tp, subNode, NodeFactory.createBlankNode(s.getName())));
+		}
+		else if (s.isBlank()) {
+			graph.add(Triple.create(tp, subNode, NodeFactory.createBlankNode(s.getBlankNodeLabel())));
+		}
+		else if (s.isURI()) {
+			graph.add(Triple.create(tp, subNode, NodeFactory.createURI(s.getURI())));
+		}
+		else if (s.isLiteral()) {
+			graph.add(Triple.create(tp, subNode, NodeFactory.createLiteralByValue(s.getLiteralValue(), s.getLiteralDatatype())));
+		}
+		if (o.isVariable()) {
+			vars.add(Var.alloc(o));
+			graph.add(Triple.create(tp, objNode, NodeFactory.createBlankNode(o.getName())));
+		}
+		else if (o.isBlank()) {
+			graph.add(Triple.create(tp, objNode, NodeFactory.createBlankNode(o.getBlankNodeLabel())));
+		}
+		else if (o.isURI()) {
+			graph.add(Triple.create(tp, objNode, NodeFactory.createURI(o.getURI())));
+		}
+		else if (o.isLiteral()) {
+			graph.add(Triple.create(tp, objNode, NodeFactory.createLiteralByValue(o.getLiteralValue(), o.getLiteralDatatype())));
+		}
+		Node predicate = NodeFactory.createLiteral(WriterPath.asString(p));
+		graph.add(Triple.create(tp, preNode, predicate));
+		this.graph = graph;
+		this.vars = vars;
+		this.root = tp;
 	}
 	
 	public static RGraph table(Table table) {
@@ -294,28 +396,7 @@ public class RGraph {
 		}
 		return ans;
 	}
-	
-	public static RGraph group(OpGroup arg) {
-		Node root = NodeFactory.createBlankNode();
-		RGraph ans = new RGraph(root, GraphFactory.createDefaultGraph(), Collections.<Var>emptySet());
-		ans.graph.add(Triple.create(root, ans.typeNode, ans.groupByNode));
-		Node varNode = NodeFactory.createBlankNode();
-		ans.graph.add(Triple.create(root, ans.argNode, varNode));
-		VarExprList vExpr = arg.getGroupVars();
-		for (Var v : vExpr.getVars()) {
-			ans.graph.add(Triple.create(varNode, ans.argNode, NodeFactory.createBlankNode(v.getVarName())));
-		}
-		Map<Var,Expr> varsExpr = vExpr.getExprs();
-		for (Map.Entry<Var, Expr> m : varsExpr.entrySet()) {
-			Var v = m.getKey();
-			FilterVisitor fv = new FilterVisitor();
-			ExprWalker.walk(fv, m.getValue());
-			Node r = fv.getGraph().root;
-			GraphUtil.addInto(ans.graph, fv.getGraph().graph);
-			ans.graph.add(Triple.create(NodeFactory.createBlankNode(v.getVarName()), ans.valueNode, r));
-		}
-		return ans;
-	}
+
 	
 	/**
 	 * @param s An RDF literal with a datatype.
@@ -345,23 +426,42 @@ public class RGraph {
 	/**
 	 * Joins this r-graph with another r-graph. The result is a conjunction of both r-graphs. (Q_1 AND Q_2)
 	 * @param arg1 An r-graph to join with this one.
-	 * @param Id A number to identify this join.
 	 */
-	public void join(RGraph arg1, int Id){
-		Node root = NodeFactory.createBlankNode("join"+Id);
+	public void join(RGraph arg1){
+		Node root = NodeFactory.createBlankNode();
 		graph.add(Triple.create(root, typeNode, joinNode));
-		boolean a = this.graph.contains(this.root, typeNode, optionalNode);
-		boolean b = arg1.graph.contains(arg1.root, typeNode, optionalNode);
+		Node type0 = GraphUtil.listObjects(graph, this.root, typeNode).next();
+		Node type1 = GraphUtil.listObjects(arg1.graph, arg1.root, typeNode).next();
 		if (!this.root.equals(root)){
 			graph.add(Triple.create(root, argNode, this.root));
 		}
 		if (!arg1.root.equals(root)){
 			graph.add(Triple.create(root, argNode, arg1.root));
 		}
-		if (a && b){  //Joins between operands with optional must be reordered.
-			System.out.println("You shouldn't be here");
+		if (type0.equals(joinNode)) {
+			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, this.root, argNode);
+			graph.delete(Triple.create(this.root, typeNode, joinNode));
+			graph.delete(Triple.create(root, argNode, this.root));
+			while (args.hasNext()) {
+				Node n = args.next();
+				graph.add(Triple.create(root, argNode, n));
+				graph.delete(Triple.create(this.root, argNode, n));
+			}
 		}
-		else if (a){
+		if (type1.equals(joinNode)) {
+			ExtendedIterator<Node> args = GraphUtil.listObjects(arg1.graph, arg1.root, argNode);
+			arg1.graph.delete(Triple.create(arg1.root, typeNode, joinNode));
+			graph.delete(Triple.create(root, argNode, arg1.root));
+			while (args.hasNext()) {
+				Node n = args.next();
+				arg1.graph.add(Triple.create(root, argNode, n));
+				arg1.graph.delete(Triple.create(arg1.root, argNode, n));
+			}
+		}
+		if (type0.equals(optionalNode) && type1.equals(optionalNode)){  //Joins between operands with optional must be reordered.
+			
+		}
+		else if (type0.equals(optionalNode)){
 			Node left1 = GraphUtil.listObjects(this.graph, this.root, leftNode).next();
 			graph.delete(Triple.create(this.root, leftNode, left1));
 			graph.delete(Triple.create(root, argNode, this.root));
@@ -370,7 +470,7 @@ public class RGraph {
 			graph.add(Triple.create(root, argNode, arg1.root));
 			root = this.root;
 		}
-		else if (b){
+		else if (type1.equals(optionalNode)){
 			Node left2 = GraphUtil.listObjects(arg1.graph, arg1.root, leftNode).next();
 			arg1.graph.delete(Triple.create(arg1.root, leftNode, left2));
 			graph.delete(Triple.create(root, argNode, arg1.root));
@@ -387,10 +487,9 @@ public class RGraph {
 	/**
 	 * Joins this r-graph with another r-graph. The result is the union of both r-graphs. (Q_1 UNION Q_2)
 	 * @param arg1 An r-graph to join with this one.
-	 * @param Id A number to identify this union.
 	 */
-	public void union(RGraph arg1, int Id){
-		Node root = NodeFactory.createBlankNode("union"+Id);
+	public void union(RGraph arg1){
+		Node root = NodeFactory.createBlankNode();
 		boolean a = this.graph.contains(this.root, typeNode, unionNode);
 		boolean b = arg1.graph.contains(arg1.root, typeNode, unionNode);
 		if (a && b){
@@ -422,29 +521,20 @@ public class RGraph {
 	/**
 	 * Joins this r-graph with another r-graph. This includes the second r-graph as an optional query pattern. (Q_1 OPT Q_2)
 	 * @param arg1 An r-graph that represents an optional query pattern.
-	 * @param Id A number to identify this r-graph.
 	 */
-	public void optional(RGraph arg1, int Id){
-		Node root = NodeFactory.createBlankNode("optional"+Id);
+	public void optional(RGraph arg1){
+		Node root = NodeFactory.createBlankNode();
 		graph.add(Triple.create(root, typeNode, optionalNode));
-//		boolean a = this.graph.contains(this.root, typeNode, optionalNode);
-//		boolean b = arg1.graph.contains(arg1.root, typeNode, optionalNode);
-//		if (a && b){
-//			ExtendedIterator<Node> nodes = GraphUtil.listObjects(arg1.graph, arg1.root, argNode);
-//			while(nodes.hasNext()){
-//				Node n = nodes.next();
-//				this.graph.add(Triple.create(this.root, argNode, n));
-//				GraphUtil.remove(arg1.graph, arg1.root, argNode, n);
-//			}
-//			GraphUtil.remove(arg1.graph, arg1.root, typeNode, unionNode);
-//		}
-//		else if (a){
-//			this.graph.add(Triple.create(this.root, leftNode, arg1.root));
-//		}
-//		else if (b){
-//			this.graph.add(Triple.create(arg1.root, rightNode, this.root));
-//			this.root = arg1.root;
-//		}
+		graph.add(Triple.create(root, leftNode, this.root));
+		graph.add(Triple.create(root, rightNode, arg1.root));
+		this.root = root;
+		addVars(arg1);
+		GraphUtil.addInto(this.graph, arg1.graph);	
+	}
+	
+	public void minus(RGraph arg1){
+		Node root = NodeFactory.createBlankNode();
+		graph.add(Triple.create(root, typeNode, minusNode));
 		graph.add(Triple.create(root, leftNode, this.root));
 		graph.add(Triple.create(root, rightNode, arg1.root));
 		this.root = root;
@@ -455,10 +545,15 @@ public class RGraph {
 	/**
 	 * 
 	 * @param arg1 An r-graph that represents a BIND expression (BIND var AS expr) and adds it to this r-graph.
-	 * @param id A number to identify the BIND r-graph.
 	 */
-	public void bind(RGraph arg1, int id){
-		graph.add(Triple.create(root, modNode, arg1.root));
+	public void bind(RGraph arg1){
+		if (!GraphUtil.listObjects(graph, root, patternNode).hasNext()) {
+			Node n = NodeFactory.createBlankNode();
+			graph.add(Triple.create(root, patternNode, n));
+			graph.add(Triple.create(n, typeNode, extraNode));
+		}
+		Node n = GraphUtil.listObjects(graph, root, patternNode).next();
+		graph.add(Triple.create(n, argNode, arg1.root));
 		GraphUtil.addInto(this.graph, arg1.graph);
 	}
 	
@@ -476,10 +571,9 @@ public class RGraph {
 	/**
 	 * Creates an r-graph that represents a FILTER expression (FILTER expr) and adds it to this r-graph. 
 	 * @param n A node that represents an expression.
-	 * @param id A number to identifyy the r-graph.
 	 */
-	public void filter(Node n, int id){
-		Node filter = NodeFactory.createBlankNode("filter"+id);
+	public void filter(Node n){
+		Node filter = NodeFactory.createBlankNode();
 		graph.add(Triple.create(root, modNode, filter));
 		graph.add(Triple.create(filter, typeNode, filterNode));
 		graph.add(Triple.create(filter, argNode, n));	
@@ -488,11 +582,16 @@ public class RGraph {
 	/**
 	 * Creates an r-graph that represents a FILTER expression (FILTER expr) and adds it to this r-graph. 
 	 * @param n An r-graph that represents an expression.
-	 * @param id A number to identify the r-graph.
 	 */
-	public void filter(RGraph arg1, int id){
-		Node filter = NodeFactory.createBlankNode("filter"+id);
-		graph.add(Triple.create(root, modNode, filter));
+	public void filter(RGraph arg1){
+		if (!GraphUtil.listObjects(graph, root, patternNode).hasNext()) {
+			Node n = NodeFactory.createBlankNode();
+			graph.add(Triple.create(root, patternNode, n));
+			graph.add(Triple.create(n, typeNode, extraNode));
+		}
+		Node n = GraphUtil.listObjects(graph, root, patternNode).next();
+		Node filter = NodeFactory.createBlankNode();
+		graph.add(Triple.create(n, argNode, filter));
 		graph.add(Triple.create(filter, typeNode, filterNode));
 		graph.add(Triple.create(filter, argNode, arg1.root));	
 		GraphUtil.addInto(this.graph, arg1.graph);
@@ -658,11 +757,68 @@ public class RGraph {
 		return n;
 	}
 	
+	public Node filterFunction(String op, List<Node> nodes) {
+		int i = 0;
+		Node n = NodeFactory.createBlankNode();
+		Node o = filterOperator(op);
+		graph.add(Triple.create(n, functionNode, o));
+		for (Node node : nodes) {
+			Node newNode = NodeFactory.createBlankNode();
+			if (!GraphUtil.listObjects(graph, node, functionNode).hasNext()){
+				graph.add(Triple.create(n, argNode, newNode));
+				graph.add(Triple.create(newNode, valueNode, node));
+				if (isOrderedFunction(op)) {
+					graph.add(Triple.create(newNode, orderNode, NodeFactory.createLiteralByValue(i++, XSDDatatype.XSDint)));
+				}
+			}
+			else {
+				graph.add(Triple.create(n, argNode, node));
+				if (isOrderedFunction(op)) {
+					graph.add(Triple.create(node, orderNode, NodeFactory.createLiteralByValue(i++, XSDDatatype.XSDint)));
+				}
+			}
+		}
+		return n;
+	}
+	
+	public void filterNormalisation() {
+		iterativeUpdate(conjunctionRule);
+		iterativeUpdate(disjunctionRule);
+	}
+	
+	public static RGraph group(OpGroup arg) {
+		Node root = NodeFactory.createBlankNode();
+		RGraph ans = new RGraph(root, GraphFactory.createDefaultGraph(), Collections.<Var>emptySet());
+		ans.graph.add(Triple.create(root, ans.typeNode, ans.groupByNode));
+		Node varNode = NodeFactory.createBlankNode();
+		ans.graph.add(Triple.create(root, ans.argNode, varNode));
+		VarExprList vExpr = arg.getGroupVars();
+		for (Var v : vExpr.getVars()) {
+			ans.graph.add(Triple.create(varNode, ans.valueNode, NodeFactory.createBlankNode(v.getVarName())));
+		}
+		Map<Var,Expr> varsExpr = vExpr.getExprs();
+		for (Map.Entry<Var, Expr> m : varsExpr.entrySet()) {
+			Var v = m.getKey();
+			FilterVisitor fv = new FilterVisitor();
+			ExprWalker.walk(fv, m.getValue());
+			Node r = fv.getGraph().root;
+			GraphUtil.addInto(ans.graph, fv.getGraph().graph);
+			ans.graph.add(Triple.create(NodeFactory.createBlankNode(v.getVarName()), ans.valueNode, r));
+		}
+		return ans;
+	}
+	
 	/**
 	 * @param group
 	 */
 	public void groupBy(RGraph group) {
-		graph.add(Triple.create(this.root, modNode, group.root));
+		if (!GraphUtil.listObjects(graph, root, patternNode).hasNext()) {
+			Node n = NodeFactory.createBlankNode();
+			graph.add(Triple.create(root, patternNode, n));
+			graph.add(Triple.create(n, typeNode, extraNode));
+		}
+		Node n = GraphUtil.listObjects(graph, root, patternNode).next();
+		graph.add(Triple.create(n, argNode, group.root));
 		GraphUtil.addInto(graph, group.graph);
 		ExtendedIterator<Node> vars = GraphUtil.listSubjects(group.graph, typeNode, varNode);
 		while (vars.hasNext()) {
@@ -676,12 +832,20 @@ public class RGraph {
 	/**
 	 * @param args
 	 */
-	public void aggregation(List<RGraph> args) {
-		Node n = NodeFactory.createBlankNode();
-		graph.add(Triple.create(root, modNode, n));
-		graph.add(Triple.create(n, typeNode, aggregateNode));
+	public void aggregation(RGraph r, List<RGraph> args) {
+		if (!GraphUtil.listObjects(graph, root, patternNode).hasNext()) {
+			Node n = NodeFactory.createBlankNode();
+			graph.add(Triple.create(root, patternNode, n));
+			graph.add(Triple.create(n, typeNode, extraNode));
+		}
+		Node n = GraphUtil.listObjects(graph, root, patternNode).next();
+		Node extend = NodeFactory.createBlankNode();
+		graph.add(Triple.create(r.root, patternNode, extend));
+		graph.add(Triple.create(extend, typeNode, aggregateNode));
+		graph.add(Triple.create(n, argNode, r.root));
+		GraphUtil.addInto(this.graph, r.graph);
 		for (RGraph arg : args) {
-			graph.add(Triple.create(n, argNode, arg.root));
+			graph.add(Triple.create(extend, argNode, arg.root));
 			GraphUtil.addInto(this.graph, arg.graph);
 		}
 	}
@@ -692,7 +856,7 @@ public class RGraph {
 	 * @param arg
 	 * @return
 	 */
-	public Node aggregation(String op, Var var, Node arg) {
+	public Node aggregationFunction(String op, Var var, Node arg) {
 		Node n = NodeFactory.createBlankNode();
 		if (var != null) {
 			n = NodeFactory.createBlankNode(var.getVarName());
@@ -700,7 +864,9 @@ public class RGraph {
 		Node o = filterOperator(op);
 		graph.add(Triple.create(n, functionNode, o));
 		if (!GraphUtil.listObjects(graph, arg, functionNode).hasNext()) {
-			graph.add(Triple.create(n, argNode, arg));
+			Node a = NodeFactory.createBlankNode();
+			graph.add(Triple.create(n, argNode, a));
+			graph.add(Triple.create(a, valueNode, arg));
 			graph.add(Triple.create(arg, typeNode, varNode));
 		}
 		else {
@@ -730,6 +896,48 @@ public class RGraph {
 			return true;
 		}
 		else if (s.equals("/")){
+			return true;
+		}
+		else if (s.equals("regex")) {
+			return true;
+		}
+		else if (s.equals("concat")) {
+			return true;
+		}
+		else if (s.equals("if")) {
+			return true;
+		}
+		else if (s.equals("in")) {
+			return true;
+		}
+		else if (s.equals("notin")) {
+			return true;
+		}
+		else if (s.equals("replace")) {
+			return true;
+		}
+		else if (s.equals("strdt")) {
+			return true;
+		}
+		else if (s.equals("strlang")) {
+			return true;
+		}
+		else if (s.equals("strstarts")) {
+			return true;
+		}
+		else if (s.equals("strends")) {
+			return true;
+		}
+		else if (s.equals("contains")) {
+			return true;
+		}
+		else if (s.equals("strbefore")) {
+			return true;
+		}
+		else if (s.equals("strafter")) {
+			return true;
+		}
+		else if (s.equals("substr")) {
 			return true;
 		}
 		return false;
@@ -824,20 +1032,20 @@ public class RGraph {
 	 * @param vars A collection of projected variables.
 	 */
 	public void project(Collection<Var> vars){
-		if (!GraphUtil.listSubjects(graph, typeNode, projectNode).hasNext()){
-			Node root = NodeFactory.createBlankNode("project");
-			graph.add(Triple.create(root, typeNode, projectNode));
-			graph.add(Triple.create(root, opNode, this.root));
+		// Used to check if there's a projection node
+		Node root = NodeFactory.createBlankNode();
+		graph.add(Triple.create(root, typeNode, projectNode));
+		graph.add(Triple.create(root, opNode, this.root));
+		if (this.vars != null) {
 			this.vars.addAll(vars);
-			
-			if (graph.contains(NodeFactory.createBlankNode("orderBy"), typeNode, orderByNode)){
-				graph.add(Triple.create(root, modNode, NodeFactory.createBlankNode("orderBy")));
-			}
-			for (Var v : vars){
-				graph.add(Triple.create(root, argNode, NodeFactory.createBlankNode(v.getName())));		
-			}
-			this.root = root;
-		}	
+		}		
+		if (graph.contains(NodeFactory.createBlankNode("orderBy"), typeNode, orderByNode)){
+			graph.add(Triple.create(root, modNode, NodeFactory.createBlankNode("orderBy")));
+		}
+		for (Var v : vars){
+			graph.add(Triple.create(root, argNode, NodeFactory.createBlankNode(v.getName())));		
+		}
+		this.root = root;
 	}
 	
 	/**
@@ -896,8 +1104,8 @@ public class RGraph {
 	 * @param dir A list of integers that indicates if results are ordered ascending or descending.
 	 */
 	public void orderBy(List<Var> vars, List<Integer> dir){
-		Node project = GraphUtil.listSubjects(graph, typeNode, projectNode).next();
-		Node order = NodeFactory.createBlankNode("orderBy");
+		Node project = root;
+		Node order = NodeFactory.createBlankNode();
 		graph.add(Triple.create(project, modNode, order));
 		graph.add(Triple.create(order, typeNode, orderByNode));
 		for (int i = 0; i < vars.size(); i++){
@@ -916,8 +1124,9 @@ public class RGraph {
 	 * @param limit A number that specifies the number of solutions to return.
 	 */
 	public void slice(int offset, int limit){
-		Node order = GraphUtil.listSubjects(graph, typeNode, projectNode).next();
-		Node lNode = NodeFactory.createBlankNode("limit");
+		Node order = root;
+		//Node order = GraphUtil.listSubjects(graph, typeNode, projectNode).next();
+		Node lNode = NodeFactory.createBlankNode();
 		graph.add(Triple.create(order, modNode, lNode));
 		graph.add(Triple.create(lNode, typeNode, limitNode));
 		graph.add(Triple.create(lNode, offsetNode, NodeFactory.createLiteralByValue(offset, XSDDatatype.XSDint)));
@@ -978,6 +1187,10 @@ public class RGraph {
 		return this.graph.toString().replace(";", "\n");
 	}
 	
+	public void printTurtle(Graph g) {
+		ModelFactory.createModelForGraph(g).write(System.out, "TURTLE");
+	}
+	
 	public void print(){
 		ExtendedIterator<Triple> e = GraphUtil.findAll(this.graph);
 		while (e.hasNext()){
@@ -989,7 +1202,7 @@ public class RGraph {
 	public void printGraph(Graph g){
 		ExtendedIterator<Triple> e = GraphUtil.findAll(g);
 		while (e.hasNext()){
-			System.out.println(e.next());
+			System.out.println(e.next() + " .");
 		}
 	}
 	
@@ -1019,7 +1232,7 @@ public class RGraph {
 	
 	/**
 	 * @param triples A collection of RDF triples.
-	 * @return A canonical labelling of all blank nodes.
+	 * @return A canonical labeling of all blank nodes.
 	 * @throws InterruptedException
 	 * @throws HashCollisionException
 	 */
@@ -1094,20 +1307,17 @@ public class RGraph {
 				print();
 				System.out.println("UCQ minimisation");
 			}
-			RGraph e = ucqMinimisation();
+			RGraph ans;
+			if (containsPaths) {
+				ans = uc2rpqMinimisation();
+			}
+			else {
+				ans = ucqMinimisation();
+			}
 			if (verbose){
-				e.print();
+				ans.print();
 				System.out.println("Beginning leaning.");
 			}
-			GraphLeaningResult glResult = this.DFSLeaning(e.getTriples());
-			if (verbose){
-				System.out.println("DFS Leaning results: \n");
-				System.out.println("Core map is: "+glResult.getCoreMap());
-				System.out.println("Number of solutions: "+glResult.getSolutionCount());
-				System.out.println("Depth of solution tree, I'm guessing: "+glResult.getDepth());
-				System.out.println("Number of joins performed: "+glResult.getJoins());
-			}
-			RGraph ans = new RGraph(glResult.getLeanData());
 			UpdateAction.execute(duplicatesRule,ans.graph);
 			if (verbose){
 				System.out.println("Beginning labelling");
@@ -1199,6 +1409,14 @@ public class RGraph {
 		ArrayList<RGraph> redundant = new ArrayList<RGraph>();
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
 		ExtendedIterator<Node> ucqs = GraphUtil.listSubjects(this.graph, typeNode, unionNode);
+		if (!ucqs.hasNext()) {
+			if (GraphUtil.listObjects(graph, root, opNode).hasNext()) {
+				Node first = GraphUtil.listObjects(graph, root, opNode).next();
+				if (GraphUtil.listObjects(graph, first, typeNode).next().equals(joinNode)) {
+					return this.getLeanForm();
+				}
+			}
+		}
 		while (ucqs.hasNext()){ //Make sure it's a union of conjunctive queries.
 			Node union = ucqs.next();
 			Node subUnion, preUnion;
@@ -1221,7 +1439,7 @@ public class RGraph {
 			Graph inner = ge.extract(union, graph);
 			Graph outer = GraphFactory.createPlainGraph();
 			Graph filterGraph = GraphFactory.createPlainGraph();
-			ExtendedIterator<Node> filters = GraphUtil.listObjects(inner, union, modNode);
+			ExtendedIterator<Node> filters = GraphUtil.listObjects(inner, union, patternNode);
 			ExtendedIterator<Node> cQueries = GraphUtil.listObjects(inner, union, argNode);
 			if (GraphUtil.listObjects(inner, union, argNode).toList().size() > 1){
 				if (filters.hasNext()){
@@ -1256,6 +1474,7 @@ public class RGraph {
 					}
 				}
 				UpdateAction.execute(filterVarsRule,filterGraph);	
+				//printGraph(filterGraph);
 				List<Node> filterVars = GraphUtil.listSubjects(filterGraph, typeNode, varNode).toList();
 				for (Node f : filterVars){
 					filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
@@ -1271,6 +1490,7 @@ public class RGraph {
 						cGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
 						cGraph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 					}
+					//Create a new r-graph based on this conjunctive query.
 					RGraph e = new RGraph(cRoot,cGraph,this.vars);
 					e.graph.add(Triple.create(union, argNode, e.root));
 					e.root = union;
@@ -1284,7 +1504,7 @@ public class RGraph {
 						e.graph.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
 						e.graph.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 					}
-					//Variables in filter clauses are grounded.
+					//Variables in filter, group by, or bind clauses are grounded.
 					for (Node f : filterVars){
 						e.graph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
 						e.graph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
@@ -1301,7 +1521,7 @@ public class RGraph {
 					result.add(a);
 				}
 				for (int i = 0; i < result.size(); i++){
-					for (int j = i+1; j < result.size(); j++){
+					for (int j = i + 1; j < result.size(); j++){
 						RGraph e = result.get(i);
 						RGraph e1 = result.get(j);
 						String askQuery = "ASK\nWHERE{\n";
@@ -1354,8 +1574,8 @@ public class RGraph {
 						GraphUtil.addInto(eg.graph, ge.extract(eRoot, e.graph));				
 						eg.graph.add(Triple.create(subUnion, preUnion, eRoot));
 						if (!filterGraph.isEmpty()){
-							Node fNode = GraphUtil.listSubjects(filterGraph, typeNode, filterNode).next();
-							eg.graph.add(Triple.create(eRoot, modNode, fNode));
+							Node fNode = GraphUtil.listSubjects(filterGraph, typeNode, extraNode).next();
+							eg.graph.add(Triple.create(eRoot, patternNode, fNode));
 						}
 						GraphUtil.addInto(eg.graph, filterGraph);
 						UpdateAction.execute(joinTripleRule, eg.graph);
@@ -1387,8 +1607,8 @@ public class RGraph {
 				}
 				eg.setDistinctNode(true);
 				if (!filterGraph.isEmpty()){
-					Node fNode = GraphUtil.listSubjects(filterGraph, typeNode, filterNode).next();
-					eg.graph.add(Triple.create(uNode, modNode, fNode));
+					Node fNode = GraphUtil.listSubjects(filterGraph, typeNode, extraNode).next();
+					eg.graph.add(Triple.create(uNode, patternNode, fNode));
 					GraphUtil.addInto(eg.graph, filterGraph);
 				}
 				UpdateAction.execute(branchUnionRule,eg.graph);
@@ -1397,6 +1617,405 @@ public class RGraph {
 				return eg;
 			}
 		}	
+		return this;
+	}
+	
+	public RGraph uc2rpqMinimisation() {
+		ExtendedIterator<Node> ucqs = GraphUtil.listSubjects(this.graph, typeNode, unionNode);
+		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
+		if (!ucqs.hasNext()) {
+			if (GraphUtil.listObjects(graph, root, opNode).hasNext()) {
+				Node first = GraphUtil.listObjects(graph, root, opNode).next();
+				ArrayList<PGraph> currentSet = new ArrayList<PGraph>();
+				if (GraphUtil.listObjects(graph, first, typeNode).next().equals(joinNode)) {
+					//===============================================================================
+					Graph g = ge.extract(first, graph);
+					Graph outer = GraphFactory.createPlainGraph();
+					GraphUtil.addInto(outer, graph);
+					GraphUtil.deleteFrom(outer, g);
+					Graph filterGraph = GraphFactory.createPlainGraph();
+					ExtendedIterator<Node> filters = GraphUtil.listObjects(g, first, patternNode);
+					if (filters.hasNext()){
+						filterGraph = ge.extract(filters.next(), g);
+					}
+					GraphUtil.addInto(outer, graph);
+					GraphUtil.deleteFrom(outer, g);
+					outer.remove(root, opNode, first);
+					//Extract all projected variables from projection node.
+					ExtendedIterator<Node> pVars = GraphUtil.listObjects(graph, root, argNode);
+					while (pVars.hasNext()){
+						Node p = pVars.next();
+						outer.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+						outer.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+						outer.add(Triple.create(p, typeNode, varNode));
+						g.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+						g.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+					}
+					ExtendedIterator<Node> orderBy = GraphUtil.listSubjects(graph, typeNode, orderByNode);
+					//Extract all variables in ORDER BY clauses
+					while (orderBy.hasNext()){
+						Node o = orderBy.next();
+						ExtendedIterator<Node> orderVars = GraphUtil.listObjects(graph, o, argNode);
+						while (orderVars.hasNext()){
+							Node v = orderVars.next();
+							Node var = GraphUtil.listObjects(graph, v, varNode).next();
+							outer.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
+							outer.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+							outer.add(Triple.create(var, typeNode, varNode));
+							g.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
+							g.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+						}
+					}
+					UpdateAction.execute(filterVarsRule,filterGraph);	
+					//printGraph(filterGraph);
+					List<Node> filterVars = GraphUtil.listSubjects(filterGraph, typeNode, varNode).toList();
+					for (Node f : filterVars){
+						filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
+						filterGraph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+					}
+					//===============================================================================================================
+					Graph auxGraph = GraphFactory.createPlainGraph();
+					ExtendedIterator<Node> triplePaths = GraphUtil.listObjects(g, first, argNode);
+					List<Node> triplePathsList = triplePaths.toList();
+					BasicPattern bp = new BasicPattern();
+					Map<Node,PGraph> pathMap = new HashMap<Node,PGraph>();
+					Map<Node,BasicPattern> bpMap = new HashMap<Node,BasicPattern>();
+					Map<Node,String> stringMap = new HashMap<Node,String>();
+					ExtendedIterator<Triple> triples = GraphUtil.findAll(g);
+//					while (triples.hasNext()) {
+//						Triple t = triples.next();
+//						Node s = t.getSubject();
+//						Node p = t.getPredicate();
+//						Node o = t.getObject();
+//						if (p.equals(subNode) || p.equals(preNode) || p.equals(objNode)) {
+//							continue;
+//						}
+//						else if (p.equals(tempNode) || p.equals(valueNode)) {
+//							auxGraph.add(Triple.create(s, p, o));
+//							continue;
+//						}
+////						if (s.isBlank()) {
+////							s = Var.alloc(s.getBlankNodeLabel());
+////						}
+////						if (p.isBlank()) {
+////							p = Var.alloc(p.getBlankNodeLabel());
+////						}
+////						if (o.isBlank()) {
+////							o = Var.alloc(o.getBlankNodeLabel());
+////						}
+//						bp.add(Triple.create(s, p, o));
+//						auxGraph.add(Triple.create(s, p, o));
+//					}
+					for (Node tp : triplePathsList) {
+						Node s = GraphUtil.listObjects(g, tp, subNode).next();
+						Node o = GraphUtil.listObjects(g, tp, objNode).next();
+						Node p = GraphUtil.listObjects(g, tp, preNode).next();
+						Node subject = s, predicate = p, object = o;
+						String pathString = GraphUtil.listObjects(g, tp, preNode).next().toString(false);
+						Path path;
+						BasicPattern bp0 = new BasicPattern();
+						if (s.isBlank()) {
+							subject = Var.alloc(s.getBlankNodeLabel());
+							if (g.contains(s, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean))) {
+								bp.add(Triple.create(subject, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								bp.add(Triple.create(subject, valueNode, NodeFactory.createLiteral(s.getBlankNodeLabel())));
+								bp0.add(Triple.create(subject, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								bp0.add(Triple.create(subject, valueNode, NodeFactory.createLiteral(s.getBlankNodeLabel())));
+								auxGraph.add(Triple.create(s, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								auxGraph.add(Triple.create(s, valueNode, NodeFactory.createLiteral(s.getBlankNodeLabel())));
+							}
+						}
+						if (p.isBlank()) {
+							predicate = Var.alloc(p.getBlankNodeLabel());
+							if (g.contains(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean))) {
+								bp.add(Triple.create(predicate, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								bp.add(Triple.create(predicate, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+								bp0.add(Triple.create(predicate, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								bp0.add(Triple.create(predicate, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+								auxGraph.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								auxGraph.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+							}
+						}
+						if (o.isBlank()) {
+							object = Var.alloc(o.getBlankNodeLabel());
+							if (g.contains(o, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean))) {
+								bp.add(Triple.create(object, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								bp.add(Triple.create(object, valueNode, NodeFactory.createLiteral(o.getBlankNodeLabel())));
+								bp0.add(Triple.create(object, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								bp0.add(Triple.create(object, valueNode, NodeFactory.createLiteral(o.getBlankNodeLabel())));
+								auxGraph.add(Triple.create(o, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								auxGraph.add(Triple.create(o, valueNode, NodeFactory.createLiteral(o.getBlankNodeLabel())));
+							}
+						}
+						if (graph.contains(tp, typeNode, triplePathNode)) {
+							path = SSE.parsePath(pathString);
+							TriplePath tPath = new TriplePath(s, path, o);
+							Node blank = NodeFactory.createBlankNode();
+							predicate = Var.alloc(blank.getBlankNodeLabel());
+							PGraph pg = new PGraph(tPath);
+							currentSet.add(pg);
+							pathMap.put(predicate, pg);
+							auxGraph.add(Triple.create(tp, preNode, blank));
+							auxGraph.add(Triple.create(blank, valueNode, p));
+							bp0.add(Triple.create(tp, subNode, subject));
+							bp0.add(Triple.create(tp, preNode, predicate));
+							bp0.add(Triple.create(tp, objNode, object));
+							bpMap.put(predicate, bp0);
+							System.out.println("Path: "+tPath);
+						}
+						else {
+							if (p.isURI()) {
+								path = PathFactory.pathLink(p);
+								TriplePath tPath = new TriplePath(s, path, o);
+								Node blank = NodeFactory.createBlankNode();
+								predicate = Var.alloc(blank.getBlankNodeLabel());
+								PGraph pg = new PGraph(tPath);
+								currentSet.add(pg);
+								pathMap.put(predicate, pg);
+								auxGraph.add(Triple.create(tp, preNode, blank));
+								auxGraph.add(Triple.create(blank, valueNode, p));
+								bp0.add(Triple.create(tp, subNode, subject));
+								bp0.add(Triple.create(tp, preNode, predicate));
+								bp0.add(Triple.create(tp, objNode, object));
+								bpMap.put(predicate, bp0);
+								System.out.println("Path: "+tPath);
+							}
+							else {
+								auxGraph.add(Triple.create(tp, preNode, predicate));
+							}
+						}	
+//						bp.add(Triple.create(subject, predicate, object));
+						auxGraph.add(Triple.create(tp, subNode, s));
+						auxGraph.add(Triple.create(tp, objNode, o));
+						bp.add(Triple.create(Var.alloc(tp.getBlankNodeLabel()), subNode, subject));
+						bp.add(Triple.create(Var.alloc(tp.getBlankNodeLabel()), preNode, predicate));
+						bp.add(Triple.create(Var.alloc(tp.getBlankNodeLabel()), objNode, object));
+					}
+					Op op = new OpBGP(bp);
+					System.out.println("BGP: "+op+"\n");
+					for (Node n : pathMap.keySet()) {
+						Op op0 = new OpBGP(bp);
+						List<Var> vars = new ArrayList<Var>();
+						vars.add(Var.alloc(n));
+						op0 = new OpProject(op0, vars);
+						Query q = OpAsQuery.asQuery(op0);
+						q.setDistinct(true);
+						QueryExecution qe = QueryExecutionFactory.create(q, ModelFactory.createModelForGraph(auxGraph));
+						ResultSet rs = qe.execSelect();
+						while (rs.hasNext()) {
+							System.out.println(rs.next());
+						}
+						System.out.println();
+					}
+					System.out.println();
+					printGraph(auxGraph);
+					for (Node n : bpMap.keySet()) {
+						Op op0 = new OpBGP(bpMap.get(n));
+						List<Var> vars = new ArrayList<Var>();
+						//vars.add(Var.alloc(n));
+						op0 = new OpProject(op0, vars);
+						Query q = OpAsQuery.asQuery(op0);
+						//q.setDistinct(true);
+						QueryExecution qe = QueryExecutionFactory.create(q, ModelFactory.createModelForGraph(auxGraph));
+						ResultSet rs = qe.execSelect();
+						while (rs.hasNext()) {
+							System.out.println(rs.next());
+						}
+						System.out.println();
+					}
+					BasicPattern bp2 = new BasicPattern();
+					bp2.add(Triple.create(Var.alloc("s"), Var.alloc("p"), Var.alloc("o")));
+					Op op2 = new OpBGP(bp2);
+					Query q = OpAsQuery.asQuery(op);
+					Query q2 = OpAsQuery.asQuery(op2);
+					q.setDistinct(true);
+					q2.setDistinct(true);
+					QueryExecution qe = QueryExecutionFactory.create(q, ModelFactory.createModelForGraph(auxGraph));
+					QueryExecution qe2 = QueryExecutionFactory.create(q2, ModelFactory.createModelForGraph(auxGraph));
+					System.out.println();
+					printGraph(auxGraph);
+					ResultSet rs2 = qe2.execSelect();
+					System.out.println();
+					while (rs2.hasNext()) {
+						System.out.println(rs2.next());
+					}
+					System.out.println("End of CQ\n");
+				}
+				for (int i = 0; i < currentSet.size(); i++) {
+					for (int j = 0; j < currentSet.size(); j++) {
+						PGraph pg1 = currentSet.get(i);
+						PGraph pg2 = currentSet.get(j);
+						boolean ans = pg1.containedIn(pg2);
+					}
+				}
+			}
+		}
+		while (ucqs.hasNext()) {
+			List<List<PGraph>> graphs = new ArrayList<List<PGraph>>();
+			Node union = ucqs.next();
+			Node subUnion, preUnion;
+			if (GraphUtil.listSubjects(graph, opNode, union).hasNext()){
+				subUnion = GraphUtil.listSubjects(graph, opNode, union).next();
+				preUnion = opNode;
+			}
+			else if (GraphUtil.listSubjects(graph, leftNode, union).hasNext()){
+				subUnion = GraphUtil.listSubjects(graph, leftNode, union).next();
+				preUnion = leftNode;
+			}
+			else if (GraphUtil.listSubjects(graph, rightNode, union).hasNext()){
+				subUnion = GraphUtil.listSubjects(graph, rightNode, union).next();
+				preUnion = rightNode;
+			}
+			else{
+				subUnion = GraphUtil.listSubjects(graph, argNode, union).next();
+				preUnion = argNode;
+			}
+			Graph inner = ge.extract(union, graph);
+			Graph outer = GraphFactory.createPlainGraph();
+			GraphUtil.addInto(outer, graph);
+			GraphUtil.deleteFrom(outer, inner);
+			Graph filterGraph = GraphFactory.createPlainGraph();
+			ExtendedIterator<Node> filters = GraphUtil.listObjects(inner, union, patternNode);
+			if (filters.hasNext()){
+				filterGraph = ge.extract(filters.next(), inner);
+			}
+			GraphUtil.addInto(outer, graph);
+			GraphUtil.deleteFrom(outer, inner);
+			outer.remove(subUnion, preUnion, union);
+			//Extract all projected variables from projection node.
+			ExtendedIterator<Node> pVars = GraphUtil.listObjects(graph, root, argNode);
+			while (pVars.hasNext()){
+				Node p = pVars.next();
+				outer.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+				outer.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+				outer.add(Triple.create(p, typeNode, varNode));
+				inner.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+				inner.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+			}
+			ExtendedIterator<Node> orderBy = GraphUtil.listSubjects(graph, typeNode, orderByNode);
+			//Extract all variables in ORDER BY clauses
+			while (orderBy.hasNext()){
+				Node o = orderBy.next();
+				ExtendedIterator<Node> orderVars = GraphUtil.listObjects(graph, o, argNode);
+				while (orderVars.hasNext()){
+					Node v = orderVars.next();
+					Node var = GraphUtil.listObjects(graph, v, varNode).next();
+					outer.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
+					outer.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+					outer.add(Triple.create(var, typeNode, varNode));
+					inner.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
+					inner.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+				}
+			}
+			UpdateAction.execute(filterVarsRule,filterGraph);	
+			//printGraph(filterGraph);
+			List<Node> filterVars = GraphUtil.listSubjects(filterGraph, typeNode, varNode).toList();
+			for (Node f : filterVars){
+				filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
+				filterGraph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+			}
+			ExtendedIterator<Node> rpqs = GraphUtil.listObjects(inner, union, argNode);
+			while (rpqs.hasNext()) {
+				ArrayList<PGraph> currentSet = new ArrayList<PGraph>();
+				Node rpq = rpqs.next();
+				Graph g = ge.extract(rpq, inner);
+				ExtendedIterator<Node> triplePaths = GraphUtil.listObjects(g, rpq, argNode);
+				List<Node> triplePathsList = triplePaths.toList();
+				BasicPattern bp = new BasicPattern();
+				Map<Node,PGraph> pathMap = new HashMap<Node,PGraph>();
+				Map<Node,String> stringMap = new HashMap<Node,String>();
+				ExtendedIterator<Triple> triples = GraphUtil.findAll(g);
+				while (triples.hasNext()) {
+					Triple t = triples.next();
+					Node s = t.getSubject();
+					Node p = t.getPredicate();
+					Node o = t.getObject();
+					if (p.equals(subNode) || p.equals(preNode) || p.equals(objNode)) {
+						continue;
+					}
+					if (s.isBlank()) {
+						s = Var.alloc(s.getBlankNodeLabel());
+					}
+					if (p.isBlank()) {
+						p = Var.alloc(p.getBlankNodeLabel());
+					}
+					if (o.isBlank()) {
+						o = Var.alloc(o.getBlankNodeLabel());
+					}
+					bp.add(Triple.create(s, p, o));
+				}
+				for (Node tp : triplePathsList) {
+					Node s = GraphUtil.listObjects(g, tp, subNode).next();
+					Node o = GraphUtil.listObjects(g, tp, objNode).next();
+					Node p = GraphUtil.listObjects(g, tp, preNode).next();
+					Node subject = s, predicate = p, object = o;
+					String pathString = GraphUtil.listObjects(g, tp, preNode).next().toString(false);
+					Path path;
+					if (s.isBlank()) {
+						subject = Var.alloc(s.getBlankNodeLabel());
+					}
+					if (p.isBlank()) {
+						predicate = Var.alloc(p.getBlankNodeLabel());
+					}
+					if (o.isBlank()) {
+						object = Var.alloc(o.getBlankNodeLabel());
+					}
+					if (graph.contains(tp, typeNode, triplePathNode)) {
+						path = SSE.parsePath(pathString);
+						TriplePath tPath = new TriplePath(s, path, o);
+						predicate = Var.alloc(NodeFactory.createBlankNode().getBlankNodeLabel());
+						PGraph pg = new PGraph(tPath);
+						currentSet.add(pg);
+						pathMap.put(predicate, pg);
+						System.out.println("Path: "+tPath);
+					}
+					else {
+						if (p.isURI()) {
+							path = PathFactory.pathLink(p);
+							TriplePath tPath = new TriplePath(s, path, o);
+							predicate = Var.alloc(NodeFactory.createBlankNode().getBlankNodeLabel());
+							PGraph pg = new PGraph(tPath);
+							currentSet.add(pg);
+							pathMap.put(predicate, pg);
+							System.out.println("Path: "+tPath);
+						}
+					}	
+					bp.add(Triple.create(tp, subNode, subject));
+					bp.add(Triple.create(tp, preNode, predicate));
+					bp.add(Triple.create(tp, objNode, object));
+				}
+				Op op = new OpBGP(bp);
+				List<Var> vars = new ArrayList<Var>();
+				for (Node n : pathMap.keySet()) {
+					vars.add(Var.alloc(n));
+				}
+				op = new OpProject(op, vars);
+				Query q = OpAsQuery.asQuery(op);
+				q.setDistinct(true);
+				QueryExecution qe = QueryExecutionFactory.create(q, ModelFactory.createModelForGraph(g));
+				printGraph(g);
+				ResultSet rs = qe.execSelect();
+				System.out.println();
+				while (rs.hasNext()) {
+					System.out.println(rs.next());
+				}
+				System.out.println(bp);
+				System.out.println("End of CQ\n");
+				graphs.add(currentSet);
+			}
+			for (int i = 0; i < graphs.size(); i++) {
+				for (int j = 0; j < graphs.size(); j++) {
+					for (int k = 0; k < graphs.get(i).size(); k++) {
+						for (int h = 0; h < graphs.get(j).size(); h++) {
+							PGraph pg1 = graphs.get(i).get(k);
+							PGraph pg2 = graphs.get(j).get(h);
+							boolean ans = pg1.containedIn(pg2);
+						}
+					}
+				}
+			}
+		}
+		System.out.println("Loaded");
 		return this;
 	}
 	
@@ -1437,5 +2056,75 @@ public class RGraph {
 		return ans;
 		
 	}
-
+	
+	public boolean isWellDesigned() {
+		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
+		ExtendedIterator<Node> optionalPatterns = GraphUtil.listSubjects(graph, typeNode, optionalNode);
+		if (optionalPatterns.hasNext()) {
+			while (optionalPatterns.hasNext()) {
+				Set<Node> leftVars = new HashSet<Node>();
+				Set<Node> rightVars = new HashSet<Node>();
+				Set<Node> outerVars = new HashSet<Node>();
+				Graph g = GraphFactory.createPlainGraph();
+				GraphUtil.addInto(g, graph);
+				Node opt = optionalPatterns.next();
+				Graph inner = ge.extract(opt, g);
+				Node left = GraphUtil.listObjects(inner, opt, leftNode).next();
+				Node right = GraphUtil.listObjects(inner, opt, rightNode).next();
+				Graph leftGraph = ge.extract(left, inner);
+				Graph rightGraph = ge.extract(right, inner);
+				GraphUtil.deleteFrom(g, inner);
+				ExtendedIterator<Node> outerTriples = GraphUtil.listSubjects(g, typeNode, tpNode);
+				ExtendedIterator<Node> leftTriples = GraphUtil.listSubjects(leftGraph, typeNode, tpNode);
+				ExtendedIterator<Node> rightTriples = GraphUtil.listSubjects(rightGraph, typeNode, tpNode);
+				while (leftTriples.hasNext()) {
+					Node leftTriple = leftTriples.next();
+					if (GraphUtil.listObjects(leftGraph, leftTriple, subNode).next().isBlank()) {
+						leftVars.add(GraphUtil.listObjects(leftGraph, leftTriple, subNode).next());
+					}
+					if (GraphUtil.listObjects(leftGraph, leftTriple, preNode).next().isBlank()) {
+						leftVars.add(GraphUtil.listObjects(leftGraph, leftTriple, preNode).next());
+					}
+					if (GraphUtil.listObjects(leftGraph, leftTriple, objNode).next().isBlank()) {
+						leftVars.add(GraphUtil.listObjects(leftGraph, leftTriple, objNode).next());
+					}
+				}
+				while (rightTriples.hasNext()) {
+					Node rightTriple = rightTriples.next();
+					if (GraphUtil.listObjects(rightGraph, rightTriple, subNode).next().isBlank()) {
+						rightVars.add(GraphUtil.listObjects(rightGraph, rightTriple, subNode).next());
+					}
+					if (GraphUtil.listObjects(rightGraph, rightTriple, preNode).next().isBlank()) {
+						rightVars.add(GraphUtil.listObjects(rightGraph, rightTriple, preNode).next());
+					}
+					if (GraphUtil.listObjects(rightGraph, rightTriple, objNode).next().isBlank()) {
+						rightVars.add(GraphUtil.listObjects(rightGraph, rightTriple, objNode).next());
+					}
+				}
+				while (outerTriples.hasNext()) {
+					Node outerTriple = outerTriples.next();
+					if (GraphUtil.listObjects(g, outerTriple, subNode).next().isBlank()) {
+						outerVars.add(GraphUtil.listObjects(g, outerTriple, subNode).next());
+					}
+					if (GraphUtil.listObjects(g, outerTriple, preNode).next().isBlank()) {
+						rightVars.add(GraphUtil.listObjects(g, outerTriple, preNode).next());
+					}
+					if (GraphUtil.listObjects(g, outerTriple, objNode).next().isBlank()) {
+						rightVars.add(GraphUtil.listObjects(g, outerTriple, objNode).next());
+					}
+				}
+				for (Node v : rightVars) {
+					if (outerVars.contains(v)) {
+						if (!leftVars.contains(v)) {
+							return false;
+						}
+					}
+				}
+			}
+			return true;
+		}
+		else {
+			return true;
+		}
+	}
 }

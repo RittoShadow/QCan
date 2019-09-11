@@ -82,7 +82,11 @@ public class QueryFeaturesCounter {
 		this.features.add(ans);
 	}
 	
-	public QueryFeaturesCounter(File f) throws IOException{
+	public QueryFeaturesCounter(File f) throws IOException {
+		new QueryFeaturesCounter(f, true);
+	}
+	
+	public QueryFeaturesCounter(File f, boolean parse) throws IOException{
 		String s;
 		this.file = new File("resultFiles/features/result"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
 		if (!this.file.exists()){
@@ -94,18 +98,20 @@ public class QueryFeaturesCounter {
 			bf = new BufferedReader(new FileReader(f));
 			long t = System.currentTimeMillis();
 			while ((s = bf.readLine())!=null){
-				try{
-					this.parse(s);
-				}
-				catch (UnsupportedOperationException e){
-					unsupportedQueries++;
-				}
-				catch(QueryParseException e){
-					badSyntaxQueries++;
-				} 
-				catch (Exception e) {
-					otherUnspecifiedExceptions++;
-				}
+				if (parse) {
+					try{
+						this.parse(s);
+					}
+					catch (UnsupportedOperationException e){
+						unsupportedQueries++;
+					}
+					catch(QueryParseException e){
+						badSyntaxQueries++;
+					} 
+					catch (Exception e) {
+						otherUnspecifiedExceptions++;
+					}
+				}		
 				totalQueries++;
 			}
 			this.totalTime = System.currentTimeMillis() - t;
@@ -119,6 +125,8 @@ public class QueryFeaturesCounter {
 		bw.append("query parse exception: " + badSyntaxQueries);
 		bw.newLine();
 		bw.append("unspecified exceptions: " + otherUnspecifiedExceptions);
+		bw.newLine();
+		bw.append("total: " + totalQueries);
 		bw.close();
 	}
 	
@@ -128,6 +136,6 @@ public class QueryFeaturesCounter {
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException{
-		QueryFeaturesCounter qp = new QueryFeaturesCounter(new File("testFiles/utfWikiDataQueries/utf8wikiDataQueries.tsv"));
+		QueryFeaturesCounter qp = new QueryFeaturesCounter(new File("testFiles/utf8WikiDataQueries/utf8I7_status2xx_Joined.tsv"), false);
 	}
 }

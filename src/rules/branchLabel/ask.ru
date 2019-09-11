@@ -13,13 +13,13 @@ WHERE {
 	?u ex:type ex:union .	
 	OPTIONAL
 	{
-	?u ex:arg ?t .
-	?t ex:type ex:TP .
+		?u ex:arg ?t .
+		?t ex:type ex:TP .
 	}
 	OPTIONAL
 	{
-	?u ex:arg ?j .
-	?j ex:type ex:join .
-	?j ex:arg ?tp .
+		?u ex:arg ?j .
+		?j ex:type ex:join .
+		?j ex:arg ?tp .
 	}
 }

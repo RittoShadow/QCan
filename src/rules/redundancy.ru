@@ -1,12 +1,12 @@
 PREFIX ex:  <http://example.org/>
 
 DELETE { ?w ex:arg ?a .
-		?w ex:modifier ?f .
+		?w ex:pattern ?f .
 		?w ex:type ex:union .
 		?b0 ex:arg ?w . }
 INSERT {
 	?b0 ex:arg ?a .
-	?b0 ex:modifier ?f .
+	?b0 ex:pattern ?f .
 	}
 WHERE
   { 
@@ -22,7 +22,7 @@ WHERE
 		  		?o ex:type ?t .
 		  		FILTER(?t != ex:union)
 		  	}
-		  	OPTIONAL{ ?w ex:modifier ?f }
+		  	OPTIONAL{ ?w ex:pattern ?f }
 		  } LIMIT 1
 	  }
 	  ?b0 ex:arg ?w .

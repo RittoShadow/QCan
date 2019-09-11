@@ -18,50 +18,14 @@ public class Test {
 		try {
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/test01.txt"));
 			assertTrue(qp.equalQueries(0, 1));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
-	@org.junit.Test
-	public void labelTest2(){
-		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test02.txt"));
+			qp = new QueryParserTest(new File("testFiles/test02.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			assertTrue(qp.equalQueries(1, 2));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
-	@org.junit.Test
-	public void labelTest3(){
-		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test03.txt"));
+			qp = new QueryParserTest(new File("testFiles/test03.txt"));
 			assertTrue(qp.equalQueries(0, 1));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
-	@org.junit.Test
-	public void labelTest4(){
-		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test04.txt"));
+			qp = new QueryParserTest(new File("testFiles/test04.txt"));
 			assertTrue(qp.equalQueries(0, 1));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
-	@org.junit.Test
-	public void labelTest5(){
-		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test08.txt"));
+			qp = new QueryParserTest(new File("testFiles/test08.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			assertTrue(qp.equalQueries(1, 2));
 			assertTrue(qp.equalQueries(3, 4));
@@ -110,6 +74,18 @@ public class Test {
 	}
 	
 	@org.junit.Test
+	public void UCQMinimisationTest() {
+		try {
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/test20.txt"));
+			assertTrue(qp.equalQueries(0, 1));
+			assertTrue(qp.equalQueries(1, 2));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	@org.junit.Test
 	public void namedGraphTest(){
 		try{
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/test13.txt"));
@@ -126,6 +102,8 @@ public class Test {
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/test15.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			assertFalse(qp.equalQueries(1, 2));
+			QueryParserTest qp1 = new QueryParserTest(new File("testFiles/filterTest1"));
+			assertTrue(qp1.equalQueries(0, 1));
 		} catch(IOException e){
 			e.printStackTrace();
 		}
@@ -141,6 +119,29 @@ public class Test {
 			assertTrue(qp.equalQueries(6, 7));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	@org.junit.Test
+	public void propertyPathTest() {
+		QueryParserTest qp;
+		try {
+			qp = new QueryParserTest(new File("testFiles/propertyPathsTest1.txt"));
+			assertTrue(qp.equalQueries(0, 1));
+			assertTrue(qp.equalQueries(1, 2));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	@org.junit.Test
+	public void generalTest() {
+		try {
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/test17.txt"));
+			//qp = new QueryParserTest(new File("testFiles/test24.txt"));
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}

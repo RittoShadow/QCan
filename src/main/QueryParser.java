@@ -50,7 +50,7 @@ public class QueryParser {
 			@Override
 			public void run() {
 				try {
-					SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning);
+					SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning);
 					queryInfo = totalQueries + "\t" + q.getGraphCreationTime() + "\t";
 					queryInfo += q.getCanonicalisationTime() + "\t";
 					queryInfo += q.getInitialTriples() + "\t";
@@ -141,7 +141,7 @@ public class QueryParser {
 				try{
 					if (i == 0){
 						@SuppressWarnings("unused")
-						SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning);
+						SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning);
 					}
 					this.parse(s);
 				}

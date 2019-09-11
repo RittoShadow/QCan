@@ -1,0 +1,4 @@
+PREFIX : <http://example.com/data/#> SELECT ?g (AVG(?p) AS ?avg) ((MIN(?p) + MAX(?p)) / 2 AS ?c) WHERE {  ?g :p ?p . } GROUP BY ?g HAVING(AVG(?p) > 5)
+PREFIX : <http://data.example/> SELECT (AVG(?size) AS ?asize) WHERE {  ?x :size ?size } GROUP BY ?x HAVING(AVG(?size) > 10)
+PREFIX : <http://data.example/> SELECT DISTINCT (AVG(?size) AS ?asize) WHERE {{  ?x :size ?size } UNION { ?x ?y ?size }} GROUP BY ?x HAVING(AVG(?size) > 10)
+PREFIX : <http://data.example/> SELECT DISTINCT (AVG(?size) AS ?asize) WHERE { ?x ?y ?size } GROUP BY ?x HAVING(AVG(?size) > 10)

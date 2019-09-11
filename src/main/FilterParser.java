@@ -15,7 +15,7 @@ public class FilterParser {
 	}
 	
 	public void parse(String s){
-		this.graph.filter(parseRestOfString(s,0), id);
+		this.graph.filter(parseRestOfString(s,0));
 	}
 	
 	public Node parseRestOfString(String s, int openPar){

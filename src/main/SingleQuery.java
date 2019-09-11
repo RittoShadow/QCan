@@ -5,10 +5,12 @@ import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
-import org.apache.jena.sparql.algebra.OpWalker;
+import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
 import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
+import org.apache.jena.sparql.algebra.optimize.TransformPathFlatternStd;
+import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 
@@ -24,8 +26,6 @@ public class SingleQuery {
 	private int nTriples = 0;
 	private RGraph graph;
 	private RGraph canonGraph;
-	private boolean enableFilter = true;
-	private boolean enableOptional = true;
 	private boolean enableLeaning = true;
 	private boolean containsUnion = false;
 	private boolean containsJoin = false;
@@ -35,17 +35,15 @@ public class SingleQuery {
 	private boolean containsNamedGraphs = false;
 	
 	
-	public SingleQuery(String q, boolean enableFilter, boolean enableOptional) throws InterruptedException, HashCollisionException{
-		this(q,enableFilter,enableOptional,true,true);
+	public SingleQuery(String q) throws InterruptedException, HashCollisionException{
+		this(q,true,true);
 	}
 	
-	public SingleQuery(String q, boolean enableFilter, boolean enableOptional, boolean canon, boolean leaning) throws InterruptedException, HashCollisionException{
-		this(q,enableFilter,enableOptional,canon,leaning,false);
+	public SingleQuery(String q, boolean canon, boolean leaning) throws InterruptedException, HashCollisionException{
+		this(q,canon,leaning,false);
 	}
 	
-	public SingleQuery(String q, boolean enableFilter, boolean enableOptional, boolean canon, boolean leaning, boolean verbose) throws InterruptedException, HashCollisionException{
-		setEnableFilter(enableFilter);
-		setEnableOptional(enableOptional);
+	public SingleQuery(String q, boolean canon, boolean leaning, boolean verbose) throws InterruptedException, HashCollisionException{
 		setLeaning(leaning);
 		long t = System.nanoTime();
 		parseQuery(q);
@@ -61,8 +59,16 @@ public class SingleQuery {
 		}
 	}
 	
-	public Op UCQTransformation(Op op){
-		Op op2 = Transformer.transform(new UCQVisitor(), op);
+	public SingleQuery(Op op) throws InterruptedException, HashCollisionException {
+		String q = OpAsQuery.asQuery(op).toString();
+		parseQuery(q);
+		canonicalise();
+	}
+	
+	public static Op UCQTransformation(Op op){
+		Op op2 = Transformer.transform(new TransformPathFlatternStd(), op);
+		op2 = Transformer.transform(new TransformSimplify(), op2);
+		op2 = Transformer.transform(new UCQVisitor(), op2);
 		while (!op.equals(op2)){
 			op = op2;
 			op2 = Transformer.transform(new UCQVisitor(), op2);
@@ -91,37 +97,31 @@ public class SingleQuery {
 	public void parseQuery(String q) throws UnsupportedOperationException, QueryParseException{
 		Query query = QueryFactory.create(q);
 		Op op = Algebra.compile(query);
-		Op op2 = UCQTransformation(op);
-		RGraphBuilder visitor = new RGraphBuilder(query);
-		visitor.setEnableFilter(enableFilter);
-		visitor.setEnableOptional(enableOptional);
-		System.out.println(op2);
-		OpWalker.walk(op2, visitor);
-		graph = visitor.getResult();
-		graph.print();
-		if (!visitor.isDistinct){
-			if (visitor.totalVars.containsAll(visitor.projectionVars) && visitor.projectionVars.containsAll(visitor.totalVars)){
-				if (!checkBranchVars(op2)){
+		RGraphBuilder rgb = new RGraphBuilder(query);
+		graph = rgb.getResult();
+		if (!rgb.isDistinct){
+			if (rgb.totalVars.containsAll(rgb.projectionVars) && rgb.projectionVars.containsAll(rgb.totalVars)){
+				if (!checkBranchVars(op)){
 					graph.setDistinctNode(true);
 				}			
 				else{
-					graph.setDistinctNode(visitor.isDistinct);
+					graph.setDistinctNode(rgb.isDistinct);
 				}
 			}
 			else{
-				graph.setDistinctNode(visitor.isDistinct);
+				graph.setDistinctNode(rgb.isDistinct);
 			}
 		}
 		else{
 			graph.setDistinctNode(true);
 		}
-		nTriples = visitor.nTriples;
-		containsUnion = visitor.getContainsUnion();
-		containsJoin = visitor.getContainsJoin();
-		containsOptional = visitor.getContainsOptional();
-		containsFilter = visitor.getContainsFilter();
-		containsNamedGraphs = visitor.getContainsNamedGraphs();
-		containsSolutionMods = visitor.getContainsSolutionMods();
+		nTriples = rgb.nTriples;
+		containsUnion = rgb.getContainsUnion();
+		containsJoin = rgb.getContainsJoin();
+		containsOptional = rgb.getContainsOptional();
+		containsFilter = rgb.getContainsFilter();
+		containsNamedGraphs = rgb.getContainsNamedGraphs();
+		containsSolutionMods = rgb.getContainsSolutionMods();
 	}
 	
 	public void canonicalise() throws InterruptedException, HashCollisionException{
@@ -204,14 +204,6 @@ public class SingleQuery {
 		return this.canonGraph;
 	}
 	
-	public void setEnableFilter(boolean b){
-		this.enableFilter = b;
-	}
-	
-	public void setEnableOptional(boolean b){
-		this.enableOptional = b;
-	}
-	
 	public boolean getContainsUnion(){
 		return this.containsUnion;
 	}
@@ -237,9 +229,9 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT ?x ?name WHERE { ?x foaf:mbox <mailto:alice@example> .    ?x (foaf:knows|foaf:name)+ ?name .}";
+		String q = "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT DISTINCT ?x WHERE {	{		?x foaf:knows ?y .		?a foaf:knows* ?b .		?n foaf:knows* ?m .		?c (foaf:knows|foaf:knows)* ?d .		?y foaf:knows* ?e . 	}}";
 		@SuppressWarnings("unused")
-		SingleQuery sq = new SingleQuery(q, true, true, true, true, true);
+		SingleQuery sq = new SingleQuery(q,true,true,true);
 		sq.getCanonicalGraph().print();
 		System.out.println(sq.getQuery());
 	}

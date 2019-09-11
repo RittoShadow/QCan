@@ -1,12 +1,18 @@
 package main;
 
+import java.util.List;
+
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.TransformCopy;
+import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpJoin;
 import org.apache.jena.sparql.algebra.op.OpLeftJoin;
+import org.apache.jena.sparql.algebra.op.OpSequence;
+import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.algebra.op.OpUnion;
+import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
 
 public class UCQVisitor extends TransformCopy{
@@ -30,6 +36,22 @@ public class UCQVisitor extends TransformCopy{
         	OpUnion rightAns = new OpUnion(OpJoin.create(leftU.getRight(), rightU.getLeft()), OpJoin.create(leftU.getRight(), rightU.getRight()));
         	return (OpUnion) OpUnion.create(leftAns, rightAns);
         }
+        else if ((left instanceof OpTriple) && (right instanceof OpTriple)) {
+        	BasicPattern bp = new BasicPattern();
+        	bp.add(((OpTriple) left).getTriple());
+        	bp.add(((OpTriple) right).getTriple());
+        	return new OpBGP(bp);
+        }
+        else if ((left instanceof OpTriple) && (right instanceof OpBGP)) {
+        	BasicPattern bp = ((OpBGP) right).getPattern();
+        	bp.add(((OpTriple) left).getTriple());
+        	return new OpBGP(bp);
+        }
+        else if ((right instanceof OpTriple) && (left instanceof OpBGP)) {
+        	BasicPattern bp = ((OpBGP) left).getPattern();
+        	bp.add(((OpTriple) right).getTriple());
+        	return new OpBGP(bp);
+        }
         else{
         	return join;
         }
@@ -44,6 +66,27 @@ public class UCQVisitor extends TransformCopy{
 			return leftJoin;
 		}
 		
+	}
+	
+	public Op transform(OpSequence op, List<Op> elts) {
+		Op ans = null;
+		if (elts.isEmpty()) {
+			return op;
+		}
+		for (Op e : elts) {
+			if (ans == null) {
+				ans = e;
+			}
+			else {
+				if (e instanceof OpTriple) {
+					BasicPattern bp = new BasicPattern();
+					bp.add(((OpTriple) e).getTriple());
+					ans = OpJoin.create(ans, new OpBGP(bp));
+				}
+				ans = OpJoin.create(ans, e);
+			}
+		}
+		return ans;
 	}
 	
 	public static void main(String[] args){

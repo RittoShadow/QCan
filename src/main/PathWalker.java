@@ -1,6 +1,8 @@
 package main;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
 
 import org.apache.jena.graph.Graph;
@@ -35,6 +37,7 @@ public class PathWalker implements PathVisitor {
 	Node epsilon = NodeFactory.createURI("http://example.org/epsilon");
 	Stack<Node> nodeStack = new Stack<Node>();
 	Stack<Triple> tripleStack = new Stack<Triple>();
+	Set<Node> predicates = new HashSet<Node>();
 
 	@Override
 	public void visit(P_Link arg0) {
@@ -44,16 +47,19 @@ public class PathWalker implements PathVisitor {
 		tripleStack.add(t);
 		nodeStack.add(b);
 		graph.add(t);
+		predicates.add(arg0.getNode());
 	}
 
 	@Override
 	public void visit(P_ReverseLink arg0) {
 		Node n = NodeFactory.createBlankNode();
 		Node b = NodeFactory.createBlankNode();
-		Triple t = Triple.create(n, arg0.getNode(), b);
+		Node p = NodeFactory.createLiteral("^"+arg0.getNode().toString());
+		Triple t = Triple.create(n, p, b);
 		tripleStack.add(t);
-		nodeStack.add(n);
+		nodeStack.add(b);
 		graph.add(t);
+		predicates.add(p);
 	}
 
 	@Override
@@ -77,6 +83,7 @@ public class PathWalker implements PathVisitor {
 	@Override
 	public void visit(P_FixedLength arg0) {
 		arg0.getSubPath().visit(this);
+		
 	}
 
 	@Override
@@ -181,6 +188,26 @@ public class PathWalker implements PathVisitor {
 		ExtendedIterator<Triple> et = GraphUtil.findAll(graph);
 		while (et.hasNext()) {
 			System.out.println(et.next());
+		}
+		System.out.println("Start: "+tripleStack.peek().getSubject());
+		System.out.println("End: "+nodeStack.peek());
+	}
+	
+	public Node getStartState() {
+		if (!tripleStack.empty()) {
+			return tripleStack.peek().getSubject();
+		}
+		else {
+			return null;
+		}
+	}
+	
+	public Node getEndState() {
+		if (!nodeStack.empty()) {
+			return nodeStack.peek();
+		}
+		else {
+			return null;
 		}
 	}
 

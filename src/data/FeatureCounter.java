@@ -78,7 +78,6 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpTriple arg0) {
-		features.add("Unsupported");
 		features.add(arg0.getName());
 	}
 
@@ -90,13 +89,11 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpPath arg0) {
-		features.add("Unsupported");
 		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpTable arg0) {
-		features.add("Unsupported");
 		features.add(arg0.getName());
 	}
 
@@ -192,7 +189,6 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpSequence arg0) {
-		features.add("Unsupported");
 		features.add(arg0.getName());
 	}
 
@@ -236,7 +232,6 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpGroup arg0) {
-		features.add("Unsupported");
 		features.add(arg0.getName());
 	}
 

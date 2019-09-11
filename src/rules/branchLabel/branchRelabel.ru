@@ -5,7 +5,7 @@ DELETE {
 }
 INSERT {
  ?tp ?p ?x .
- ?n ex:modifier ?filter .
+ ?n ex:pattern ?filter .
 }
 WHERE {
 	{
@@ -54,6 +54,6 @@ WHERE {
   }
 	}
 	?tp ?p ?v .
-	FILTER( ?p != ex:modifier )
-	OPTIONAL{ ?tp ex:modifier ?filter . ?n ex:arg ?tp . }
+	FILTER( ?p != ex:pattern )
+	OPTIONAL{ ?tp ex:pattern ?filter . ?n ex:arg ?tp . }
 }

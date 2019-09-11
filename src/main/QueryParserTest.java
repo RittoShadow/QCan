@@ -36,7 +36,7 @@ public class QueryParserTest {
 	
 	public void parse(String s) throws Exception{
 		try{
-		SingleQuery q = new SingleQuery(s, enableFilter, enableOptional, enableCanonical, enableLeaning, true);
+		SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning, true);
 		canonQueries.add(q.getQuery());
 		q.getOriginalGraph().print();
 		System.out.println("");
