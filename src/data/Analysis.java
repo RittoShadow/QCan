@@ -54,17 +54,17 @@ public class Analysis {
 			else{
 				String[] params = line.split("\t");
 				for (int i = 0; i < 2; i++){
-					data.get(i).add(new Double(params[i+1]));
+					data.get(i).add(Double.parseDouble(params[i+1]));
 				}
-//				data.get(2).add(new Double(params[4]) - new Double(params[6]));
-//				data.get(3).add(new Double(params[5]) - new Double(params[7]));
-//				data.get(4).add(new Double(params[8]) - new Double(params[9]));
+//				data.get(2).add(Double.parseDouble(params[4]) - Double.parseDouble(params[6]));
+//				data.get(3).add(Double.parseDouble(params[5]) - Double.parseDouble(params[7]));
+//				data.get(4).add(Double.parseDouble(params[8]) - Double.parseDouble(params[9]));
 				
-				data.get(2).add(new Double(params[1])+new Double(params[2]));
+				data.get(2).add(Double.parseDouble(params[1])+Double.parseDouble(params[2]));
 				
-				data.get(3).add(new Double(params[6]));
-				data.get(4).add(new Double(params[7]));
-				data.get(5).add(new Double(params[9]));
+				data.get(3).add(Double.parseDouble(params[6]));
+				data.get(4).add(Double.parseDouble(params[7]));
+				data.get(5).add(Double.parseDouble(params[9]));
 				uniqueQueries++;
 				if (params[10].equals("true")){
 					distinct++;
@@ -116,12 +116,12 @@ public class Analysis {
 			else{
 				String[] params = line.split("\t");
 
-//				data.get(2).add(new Double(params[4]) - new Double(params[6]));
-//				data.get(3).add(new Double(params[5]) - new Double(params[7]));
-//				data.get(4).add(new Double(params[8]) - new Double(params[9]));
+//				data.get(2).add(Double.parseDouble(params[4]) - Double.parseDouble(params[6]));
+//				data.get(3).add(Double.parseDouble(params[5]) - Double.parseDouble(params[7]));
+//				data.get(4).add(Double.parseDouble(params[8]) - Double.parseDouble(params[9]));
 				
-				data.get(0).add(new Double(params[1]));
-				data.get(1).add(new Double(params[2]));
+				data.get(0).add(Double.parseDouble(params[1]));
+				data.get(1).add(Double.parseDouble(params[2]));
 				uniqueQueries++;
 				if (uniqueQueries%10000 == 0){
 					System.out.println(uniqueQueries + " queries read.");

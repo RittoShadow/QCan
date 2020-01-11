@@ -1,25 +1,41 @@
 package main;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
+import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.GraphExtract;
 import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
-import org.apache.jena.sparql.core.PathBlock;
+import org.apache.jena.graph.TripleBoundary;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.graph.GraphFactory;
+import org.apache.jena.sparql.path.P_Alt;
+import org.apache.jena.sparql.path.P_Seq;
+import org.apache.jena.sparql.path.P_ZeroOrMore1;
 import org.apache.jena.sparql.path.Path;
-import org.apache.jena.sparql.path.PathCompiler;
-import org.apache.jena.sparql.path.PathParser;
+import org.apache.jena.sparql.path.PathFactory;
 import org.apache.jena.sparql.sse.SSE;
 import org.apache.jena.util.iterator.ExtendedIterator;
+import org.semanticweb.yars.nx.NodeComparator;
+
+import cl.uchile.dcc.blabel.jena.JenaModelIterator;
+import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
+import cl.uchile.dcc.blabel.label.GraphLabelling;
+import cl.uchile.dcc.blabel.label.GraphLabelling.GraphLabellingArgs;
+import cl.uchile.dcc.blabel.label.GraphLabelling.GraphLabellingResult;
 
 public class PGraph {
 	private Graph nfa;
@@ -52,6 +68,35 @@ public class PGraph {
 		this.endState = pw.getEndState();
 		this.predicates = pw.predicates;
 		this.newStartState = NodeFactory.createBlankNode();		
+		determineEClosures();
+		powerset(eClosures.get(startState));
+		minimisation();
+		complement();
+	}
+	
+	public PGraph(String path) {
+		PathWalker pw = new PathWalker();
+		Path p = SSE.parsePath(path);
+		p.visit(pw);
+		this.nfa = pw.graph;
+		this.startState = pw.getStartState();
+		this.endState = pw.getEndState();
+		this.predicates = pw.predicates;
+		this.newStartState = NodeFactory.createBlankNode();
+		determineEClosures();
+		powerset(eClosures.get(startState));
+		minimisation();
+		complement();
+	}
+	
+	public PGraph(Path path) {
+		PathWalker pw = new PathWalker();
+		path.visit(pw);
+		this.nfa = pw.graph;
+		this.startState = pw.getStartState();
+		this.endState = pw.getEndState();
+		this.predicates = pw.predicates;
+		this.newStartState = NodeFactory.createBlankNode();
 		determineEClosures();
 		powerset(eClosures.get(startState));
 		minimisation();
@@ -254,6 +299,13 @@ public class PGraph {
 			minimalDFA.add(Triple.create(newStartState, preNode, p));
 		}
 		eliminateDeadStates(minimalDFA);		
+		try {
+			minimalDFA = label(minimalDFA);
+			Object[] nodes = predicates.toArray();
+			newStartState = GraphUtil.listSubjects(minimalDFA, preNode, (Node) nodes[0]).next();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 	
 	public boolean distinguishable(Node a, Node b, List<Set<Node>> list) {
@@ -350,37 +402,6 @@ public class PGraph {
 		complementDFA.add(Triple.create(f, typeNode, finalNode));
 	}
 	
-//	public static PGraph union(Graph g1, Graph g2) {
-//		Graph g = GraphFactory.createPlainGraph();
-//		PGraph ans = new PGraph(g);
-//		GraphUtil.addInto(ans.nfa, g1);
-//		GraphUtil.addInto(ans.nfa, g2);
-//		ExtendedIterator<Node> states = GraphUtil.listSubjects(ans.nfa, ans.typeNode, ans.pathNode);
-//		List<List<Node>> predicates = new ArrayList<List<Node>>();
-//		Node newStart = NodeFactory.createBlankNode();
-//		Node newFinalState = NodeFactory.createBlankNode();
-//		while (states.hasNext()) {
-//			Node s = states.next();
-//			Node start = GraphUtil.listObjects(ans.nfa, s, ans.argNode).next();
-//			ans.nfa.add(Triple.create(newStart, ans.epsilon, start));
-//			List<Node> p = GraphUtil.listObjects(ans.nfa, start, ans.preNode).toList();
-//			predicates.add(p);
-//			for (Node n : p) {
-//				ans.nfa.delete(Triple.create(start, ans.preNode, n));
-//			}
-//		}
-//		if (!predicates.get(0).equals(predicates.get(1))) { // No containment possible.
-//			return null;
-//		}
-//		ExtendedIterator<Node> finalStates = GraphUtil.listSubjects(ans.nfa, ans.typeNode, ans.finalNode);
-//		while (finalStates.hasNext()) {
-//			Node f = finalStates.next();
-//			ans.nfa.add(Triple.create(f, ans.epsilon, newFinalState));
-//			ans.nfa.delete(Triple.create(f, ans.typeNode, ans.finalNode));
-//		}
-//		return ans;
-//	}
-	
 	public PGraph intersection(PGraph pg) { // Computes intersection of ¬A and B
 		Graph union = GraphFactory.createPlainGraph();
 		GraphUtil.addInto(union, this.complementDFA);
@@ -442,6 +463,22 @@ public class PGraph {
 			}
 		}
 		return true;
+	}
+	
+	public Graph label(Graph g) throws InterruptedException, HashCollisionException{
+		Model model = ModelFactory.createModelForGraph(g);
+		JenaModelIterator jmi = new JenaModelIterator(model);
+		TreeSet<org.semanticweb.yars.nx.Node[]> triples = new TreeSet<org.semanticweb.yars.nx.Node[]>(NodeComparator.NC);
+		while(jmi.hasNext()){
+			org.semanticweb.yars.nx.Node[] triple = jmi.next();
+			triples.add(new org.semanticweb.yars.nx.Node[]{triple[0],triple[1],triple[2]});
+		}
+		GraphLabellingArgs gla = new GraphLabellingArgs();
+		gla.setDistinguishIsoPartitions(false);
+		GraphLabelling gl = new GraphLabelling(triples,gla);	
+		GraphLabellingResult glr = gl.call();
+		RGraph rg = new RGraph(glr.getGraph());
+		return rg.graph;
 	}
 	
 	public void printNFA() {
@@ -511,9 +548,306 @@ public class PGraph {
 		return this.endStates;
 	}
 	
+	public Path getNormalisedPath() {
+		return this.propertyPathToOp(this.newStartState, minimalDFA);
+	}
+	
+	public Path propertyPathToOp(Node n, Graph graph) {
+		Path ans = null;
+		List<Node> predicates = GraphUtil.listObjects(graph, n, preNode).toList();
+		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
+		Map<Pair<Node,Node>,Path> transitionTable = new HashMap<Pair<Node,Node>,Path>();
+		Graph dfa = ge.extract(n, graph);
+		Node startState = n;
+		Node newFinalState = null;
+		for (Node p : predicates) {
+			dfa.remove(n, preNode, p);
+		}
+		startState = NodeFactory.createBlankNode("start");
+		dfa.add(Triple.create(startState, epsilon, n));
+		List<Node> finalStates = GraphUtil.listSubjects(dfa, typeNode, finalNode).toList();
+		newFinalState = NodeFactory.createBlankNode("final");
+		for (Node finalState : finalStates) {
+			dfa.add(Triple.create(finalState, epsilon, newFinalState));
+			dfa.remove(finalState, typeNode, finalNode);
+		}
+		dfa.add(Triple.create(newFinalState, typeNode, finalNode));
+		Set<Node> states = findStates(dfa);
+		states.remove(startState);
+		states.remove(newFinalState);
+		List<Node> statesList = new ArrayList<Node>();
+		for (Node state : states) {
+			statesList.add(state);
+		}
+		List<List<Node>> statePerm = new ArrayList<List<Node>>();
+		statePerm = permutations2(statesList, statePerm, statesList.size());
+		ExtendedIterator<Triple> transitions = GraphUtil.findAll(dfa);
+		while (transitions.hasNext()) {
+			Triple t = transitions.next();
+			if (!t.getPredicate().equals(typeNode)) {
+				Pair<Node,Node> pair = new Pair<Node,Node>(t.getSubject(),t.getObject());
+				List<Node> transitionList = GraphUtil.listPredicates(dfa, pair.getLeft(), pair.getRight()).toList();
+				if (!transitionTable.containsKey(pair)) {
+					if (transitionList.size() > 1) {
+						Path newPath = null;
+						List<String> pathList = new ArrayList<String>();
+						for (Node path : transitionList) {
+							pathList.add(path.toString());
+						}
+						Collections.sort(pathList);
+						for (String path : pathList) {
+							if (path.startsWith("\"^")) {
+								if (newPath == null) {
+									newPath = PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(path.substring(2, path.length() - 1))));
+								}
+								else {
+									newPath = PathFactory.pathAlt(newPath, PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(path.substring(2, path.length() - 1)))));
+								}
+							}
+							else {
+								if (newPath == null) {
+									newPath = PathFactory.pathLink(NodeFactory.createURI(path));
+								}
+								else {
+									newPath = PathFactory.pathAlt(newPath, PathFactory.pathLink(NodeFactory.createURI(path)));
+								}
+							}
+						}
+						transitionTable.put(pair, newPath);
+					}
+					else {
+						if (t.getPredicate().toString().startsWith("\"^")) {
+							String u = t.getPredicate().toString();
+							u = u.substring(2,u.length()-1);
+							transitionTable.put(pair, PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(u))));
+						}
+						else {
+							transitionTable.put(pair, PathFactory.pathLink(t.getPredicate()));
+						}
+					}
+				}
+			}
+			if (t.getPredicate().equals(epsilon)) {
+				Pair<Node,Node> pair = new Pair<Node,Node>(t.getSubject(),t.getObject());
+				transitionTable.put(pair, PathFactory.pathLink(epsilon));
+			}
+		}
+//		List<Path> possiblePaths = new ArrayList<Path>();
+//		for (List<Node> nodeList : statePerm) {
+//			Path p = dfaToPath(startState, newFinalState, transitionTable, nodeList);
+//			possiblePaths.add(p);
+//		}
+		Set<Node> tempNodes = new HashSet<Node>();
+		for (Node tempN : states) {
+			tempNodes.add(tempN);
+		}
+		Iterator<Node> tempStates = tempNodes.iterator();
+		while (states.size() > 0) { // Should iterate until only the start node and final node remain.
+			Node state = tempStates.next();
+			states.add(startState);
+			states.add(newFinalState);
+			path(state,transitionTable,states);
+			states.remove(state);
+			states.remove(startState);
+			states.remove(newFinalState);
+		}
+		ans = finalState(startState,newFinalState,transitionTable);
+		return ans;
+	}
+	
+	public Path dfaToPath(Node startState, Node finalState, Map<Pair<Node,Node>,Path> startTable, List<Node> states) {
+		Path ans = null;
+		Set<Node> statesSet = new HashSet<Node>();
+		statesSet.addAll(states);
+		statesSet.add(startState);
+		statesSet.add(finalState);
+		Map<Pair<Node,Node>,Path> transitionTable = new HashMap<Pair<Node,Node>,Path>();
+		for (Map.Entry<Pair<Node,Node>, Path> entry : startTable.entrySet()) {
+			transitionTable.put(entry.getKey(), entry.getValue());
+		}
+		for (Node state : states) {
+			path(state, transitionTable, statesSet);
+			statesSet.remove(state);
+		}
+		ans = finalState(startState, finalState, transitionTable);
+		return ans;
+	}
+	
+	public void path(Node n, Map<Pair<Node,Node>,Path> transitionTable, Set<Node> states) {
+		Set<Pair<Pair<Node,Node>,Path>> toUpdate = new HashSet<Pair<Pair<Node,Node>,Path>>();
+		Set<Pair<Node,Node>> toDelete = new HashSet<Pair<Node,Node>>();
+		for (Node n0 : states) {
+			for (Node n1 : states) {
+				if (n0.equals(n) || n1.equals(n)) {
+					continue;
+				}
+				Path ans = null;
+				Path regex0 = null;
+				Path regex1 = null;
+				Path regex2 = null;
+				Path regex3 = null;
+				Pair<Node,Node> pair0 = new Pair<Node,Node>(n0,n);
+				Pair<Node,Node> pair1 = new Pair<Node,Node>(n,n1);
+				Pair<Node,Node> pair2 = new Pair<Node,Node>(n0,n1);
+				Pair<Node,Node> pair3 = new Pair<Node,Node>(n,n);
+				if (transitionTable.containsKey(pair0) && transitionTable.containsKey(pair1)) {
+					regex0 = transitionTable.get(pair0);
+					regex1 = transitionTable.get(pair1);
+					if (transitionTable.containsKey(pair2)) {
+						regex2 = transitionTable.get(pair2);
+					}
+					if (transitionTable.containsKey(pair3)) {
+						regex3 = transitionTable.get(pair3);
+					}
+					ans = newTransition(regex0, regex1, regex2, regex3);
+					toUpdate.add(new Pair<Pair<Node,Node>,Path>(pair2, ans));
+				}	
+				toDelete.add(pair0);
+				toDelete.add(pair1);
+				toDelete.add(pair3);
+			}	
+		}
+		for (Pair<Pair<Node,Node>,Path> pair : toUpdate) {
+			if (transitionTable.containsKey(pair)) {
+				Path p = transitionTable.get(pair.getLeft());
+				p = new P_Alt(p,pair.getRight());
+				transitionTable.put(pair.getLeft(), p);
+			}
+			else {
+				transitionTable.put(pair.getLeft(), pair.getRight());
+			}
+		}
+		for (Pair<Node,Node> pair : toDelete) {
+			transitionTable.remove(pair);
+		}	
+	}
+	
+	public Path newTransition(Path regex0, Path regex1, Path regex2, Path regex3) {
+		Path ans = null;
+		if (regex0 != null && !regex0.equals(PathFactory.pathLink(epsilon))) {
+			ans = regex0;
+		}
+		if (regex3 != null) {
+			if (ans == null) {
+				ans = PathFactory.pathZeroOrMore1(regex3);
+			}
+			else {
+				ans = PathFactory.pathSeq(ans, PathFactory.pathZeroOrMore1(regex3));
+			}
+		}
+		if (regex1 != null) {
+			if (ans == null || ans.equals(PathFactory.pathLink(epsilon))) {
+				ans = regex1;
+			}
+			else {
+				if (!regex1.equals(PathFactory.pathLink(epsilon))) {
+					ans = PathFactory.pathSeq(ans, regex1);
+				}
+			}
+		}
+		if (regex2 != null) {
+			if (ans == null) {
+				ans = regex2;
+			}
+			else if (ans.equals(PathFactory.pathLink(epsilon))) {
+				if (regex2 instanceof P_ZeroOrMore1) {
+					ans = regex2;
+				}
+			}
+			else if (regex2.equals(PathFactory.pathLink(epsilon))) {
+				if (ans instanceof P_ZeroOrMore1) {
+					
+				}
+				else if (ans instanceof P_Seq) { // p / p* | epsilon = p*
+					Path pLeft = ((P_Seq) ans).getLeft();
+					Path pRight = ((P_Seq) ans).getRight();
+					if (pRight instanceof P_ZeroOrMore1) {
+						if (((P_ZeroOrMore1) pRight).getSubPath().equals(pLeft)) {
+							ans = pRight;
+						}
+					}
+				}
+			}
+			else {
+				ans = PathFactory.pathAlt(ans, regex2);
+			}			
+		}
+		return ans;
+	}
+	
+	public Path finalState(Node startState, Node endState, Map<Pair<Node, Node>, Path> transitionTable) {
+		Pair<Node,Node> pair = new Pair<Node,Node>(startState,endState);
+		if (transitionTable.get(pair) == null) {
+//			pair.remove(startState);
+//			pair.add(endState);
+			pair = new Pair<Node,Node>(endState,endState);
+			return PathFactory.pathZeroOrMore1(transitionTable.get(pair));
+		}
+		else {
+			Path p0 = transitionTable.get(pair);
+//			pair.remove(startState);
+//			pair.add(endState);
+			pair = new Pair<Node,Node>(endState,endState);
+			Path p1 = transitionTable.get(pair);
+			if (p1 != null) {
+				return PathFactory.pathSeq(p0, PathFactory.pathZeroOrMore1(p1));
+			}
+			else {
+				return p0;
+			}
+		}
+	}
+	
+	public List<List<Node>> permutations(List<Node> set){
+		List<List<Node>> ans = new ArrayList<List<Node>>();
+		List<Node> s = new ArrayList<Node>();
+		s.addAll(set);
+		if (s.size() == 1) {
+			ans.add(s);
+			return ans;
+		}
+		else {
+			for (Node n : s) {
+				List<List<Node>> aux = permutations(s.subList(1, s.size()));
+				for (List<Node> list : aux) {
+					list.add(n);
+					ans.add(list);
+				}
+			}
+		}
+		return ans;
+	}
+	
+	public List<List<Node>> permutations2(List<Node> set, List<List<Node>> ans, int k){
+		List<Node> s = new ArrayList<Node>();
+		s.addAll(set);
+		Node temp = null;
+		if (k == 1) {
+			ans.add(s);
+			return ans;
+		}
+		else {
+			permutations2(set, ans, k - 1);
+			for (int i = 0; i < k - 1; i++) {
+				if (k % 2 == 0) {
+					temp = set.get(i);
+					set.set(i, set.get(k - 1));
+					set.set(k - 1, temp);
+				}
+				else {
+					temp = set.get(0);
+					set.set(0, set.get(k - 1));
+					set.set(k - 1, temp);
+				}
+				permutations2(set, ans, k - 1);
+			}
+		}
+		return ans;
+	}
+	
 	public static void main(String[] args) {
 		Path path = SSE.parsePath("(path* <http://xmlns.com/foaf/0.1/mbox>)");
-		Path path2 = SSE.parsePath("(path <http://xmlns.com/foaf/0.1/mbox>)");
+		Path path2 = SSE.parsePath("(alt <http://xmlns.com/foaf/0.1/p> (reverse <http://xmlns.com/foaf/0.1/q>))");
 		PathTransform pt = new PathTransform();
 		path = pt.visit(path);
 		path2 = pt.visit(path2);
@@ -525,5 +859,7 @@ public class PGraph {
 		System.out.println(pg2.containedIn(pg));
 		System.out.println();
 		System.out.println(pg2.containedIn(pg2));
+		pg2.printMinimalDFA();
+		System.out.println(pg2.getNormalisedPath());
 	}
 }

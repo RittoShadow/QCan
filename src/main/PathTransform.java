@@ -1,12 +1,18 @@
 package main;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.jena.graph.Node;
+import org.apache.jena.graph.Triple;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.op.OpJoin;
 import org.apache.jena.sparql.algebra.op.OpPath;
+import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.core.TriplePath;
+import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.path.P_Alt;
 import org.apache.jena.sparql.path.P_Distinct;
 import org.apache.jena.sparql.path.P_FixedLength;
@@ -126,20 +132,56 @@ public class PathTransform {
 	}
 	
 	public Path fold(Path path) {
-		if (path instanceof P_Path0) {
-			
-		}
-		else if (path instanceof P_Path1) {
-			
-		}
-		else if (path instanceof P_Path2) {
-			Path left = ((P_Path2) path).getLeft();
-			Path right = ((P_Path2) path).getRight();
-			if (path instanceof P_Seq) {
-				
+		if (path instanceof P_Seq) {
+			List<Path> seq = sequence(path);
+			Path previous = null;
+			int m = seq.size();
+			int[] i = new int[m+1];
+			i[0] = 0;
+			for (int j = 0; j < m; j++) {
+				if (seq.get(j) instanceof P_Inverse) {
+					
+				}
+				else {
+					
+				}
+			}
+			for (Path p : seq) {
+				if (previous == null) {
+					previous = p;
+				}
+				else {
+					if (p.equals(previous)) {
+						
+					}
+				}
 			}
 		}
+		else {
+			return path;
+		}
 		return path;
+	}
+	
+	public List<Path> sequence(Path path) {
+		ArrayList<Path> ans = new ArrayList<Path>();
+		if (path instanceof P_Seq) {
+			Path left = ((P_Seq) path).getLeft();
+			Path right = ((P_Seq) path).getRight();
+			if (left instanceof P_Seq) {
+				ans.addAll(sequence(left));
+			}
+			else {
+				ans.add(left);
+			}
+			if (right instanceof P_Seq) {
+				ans.addAll(sequence(right));
+			}
+			else {
+				ans.add(right);
+			}
+		}
+		return ans;
 	}
 	
 	public void count(Path path) {
@@ -175,12 +217,22 @@ public class PathTransform {
 		Path p = visit(tp.getPath());
 		count(p);
 		if (numberOfInverses < (totalNumberofPaths - numberOfInverses)) {
-			return new OpPath(new TriplePath(s,p,o));
+			if (tp.getPath() instanceof P_Link) {
+				return new OpTriple(Triple.create(s, tp.getPredicate(), o));
+			}
+			else {
+				return new OpPath(new TriplePath(s,p,o));
+			}
 		}
 		else if (numberOfInverses > (totalNumberofPaths - numberOfInverses)) {
 			Path p1 = PathFactory.pathInverse(tp.getPath());
-			p = visit(p1);
-			return new OpPath(new TriplePath(o,p,s));
+			if (tp.getPath() instanceof P_Link) { // i.e a triple pattern
+				return new OpTriple(Triple.create(o, tp.getPredicate(), s));
+			}
+			else {
+				p = visit(p1);
+				return new OpPath(new TriplePath(o,p,s));
+			}
 		}
 		else {
 			PathTransform pt = new PathTransform();
@@ -207,9 +259,11 @@ public class PathTransform {
 		System.out.println(op);
 		Path path = SSE.parsePath("(seq (seq (seq (seq <http://xmlns.com/foaf/0.1/name> <http://xmlns.com/foaf/0.1/name>) (reverse <http://xmlns.com/foaf/0.1/name>)) <http://xmlns.com/foaf/0.1/name>) (reverse <http://xmlns.com/foaf/0.1/name>))");
 		PathTransform pt = new PathTransform();
-		path = pt.visit(path);
+		TriplePath tp = new TriplePath(Var.alloc("x"), path, Var.alloc("y"));
+		pt.getResult(tp);
 		System.out.println(pt.numberOfInverses);
 		System.out.println(pt.totalNumberofPaths);
 		System.out.println(pt.firstInverse);
+		System.out.println(pt.sequence(path));
 	}
 }

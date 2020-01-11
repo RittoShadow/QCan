@@ -33,7 +33,6 @@ import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpGroup;
 import org.apache.jena.sparql.algebra.op.OpProject;
-import org.apache.jena.sparql.algebra.op.OpUnion;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
@@ -45,7 +44,6 @@ import org.apache.jena.sparql.expr.ExprWalker;
 import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.sparql.path.Path;
 import org.apache.jena.sparql.path.PathFactory;
-import org.apache.jena.sparql.path.PathWriter;
 import org.apache.jena.sparql.sse.SSE;
 import org.apache.jena.sparql.sse.writers.WriterPath;
 import org.apache.jena.update.UpdateAction;
@@ -117,6 +115,8 @@ public class RGraph {
 	private final Node extraNode = NodeFactory.createURI(this.URI+"extra");
 	private final Node pathNode = NodeFactory.createURI(this.URI+"path");
 	private final Node triplePathNode = NodeFactory.createURI(this.URI+"triplePath");
+	private final Node serviceNode = NodeFactory.createURI(this.URI+"service");
+	private final Node silentNode = NodeFactory.createURI(this.URI+"silent");
 	@SuppressWarnings("unused")
 	private final Node leafNode = NodeFactory.createURI(this.URI+"leaf");
 	private final UpdateRequest duplicatesRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/duplicates.ru"));
@@ -249,13 +249,13 @@ public class RGraph {
 			if (Pattern.matches("_:.+", node[0].toN3())){
 				subject = NodeFactory.createBlankNode(node[0].toN3().substring(2));
 			}
-			else if (Pattern.matches("<.+://.+>", node[0].toN3())){
+			else if (Pattern.matches("<.+>", node[0].toN3())){
 				subject = NodeFactory.createURI(node[0].toN3().replaceAll("<|>", ""));
 			}
 			else{
 				subject = createLiteralWithType(node[0].toN3());
 			}
-			if (Pattern.matches("<.+://.+>", node[1].toN3())){
+			if (Pattern.matches("<.+>", node[1].toN3())){
 				predicate = NodeFactory.createURI(node[1].toN3().replaceAll("<|>", ""));
 			}
 			else if (Pattern.matches("_:.+", node[1].toN3())){
@@ -267,7 +267,7 @@ public class RGraph {
 			if (Pattern.matches("_:.+", node[2].toN3())){
 				object = NodeFactory.createBlankNode(node[2].toN3().substring(2));
 			}
-			else if (Pattern.matches("<.+://.+>", node[2].toN3())){
+			else if (Pattern.matches("<.+>", node[2].toN3())){
 				object = NodeFactory.createURI(node[2].toN3().replaceAll("<|>", ""));
 			}
 			else{
@@ -439,24 +439,52 @@ public class RGraph {
 			graph.add(Triple.create(root, argNode, arg1.root));
 		}
 		if (type0.equals(joinNode)) {
-			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, this.root, argNode);
-			graph.delete(Triple.create(this.root, typeNode, joinNode));
-			graph.delete(Triple.create(root, argNode, this.root));
-			while (args.hasNext()) {
-				Node n = args.next();
-				graph.add(Triple.create(root, argNode, n));
-				graph.delete(Triple.create(this.root, argNode, n));
+			boolean containsBind = false;
+			Node pattern = GraphUtil.listObjects(this.graph, this.root, patternNode).hasNext() ? GraphUtil.listObjects(this.graph, this.root, patternNode).next() : null;
+			if (pattern != null) {
+				ExtendedIterator<Node> nodes = GraphUtil.listObjects(this.graph, pattern, argNode);
+				while (nodes.hasNext()) {
+					Node n = nodes.next();
+					if (this.graph.contains(Triple.create(n, typeNode, bindNode))) {
+						containsBind = true;
+					}
+				}
 			}
+			if (!containsBind) {
+				ExtendedIterator<Node> args = GraphUtil.listObjects(graph, this.root, argNode);
+				graph.delete(Triple.create(this.root, typeNode, joinNode));
+				graph.delete(Triple.create(root, argNode, this.root));
+				while (args.hasNext()) {
+					Node n = args.next();
+					graph.add(Triple.create(root, argNode, n));
+					graph.delete(Triple.create(this.root, argNode, n));
+				}
+			}
+			
 		}
 		if (type1.equals(joinNode)) {
-			ExtendedIterator<Node> args = GraphUtil.listObjects(arg1.graph, arg1.root, argNode);
-			arg1.graph.delete(Triple.create(arg1.root, typeNode, joinNode));
-			graph.delete(Triple.create(root, argNode, arg1.root));
-			while (args.hasNext()) {
-				Node n = args.next();
-				arg1.graph.add(Triple.create(root, argNode, n));
-				arg1.graph.delete(Triple.create(arg1.root, argNode, n));
+			boolean containsBind = false;
+			Node pattern = GraphUtil.listObjects(arg1.graph, arg1.root, patternNode).hasNext() ? GraphUtil.listObjects(arg1.graph, arg1.root, patternNode).next() : null;
+			if (pattern != null) {
+				ExtendedIterator<Node> nodes = GraphUtil.listObjects(arg1.graph, pattern, argNode);
+				while (nodes.hasNext()) {
+					Node n = nodes.next();
+					if (this.graph.contains(Triple.create(n, typeNode, bindNode))) {
+						containsBind = true;
+					}
+				}
 			}
+			if (!containsBind) {
+				ExtendedIterator<Node> args = GraphUtil.listObjects(arg1.graph, arg1.root, argNode);
+				arg1.graph.delete(Triple.create(arg1.root, typeNode, joinNode));
+				graph.delete(Triple.create(root, argNode, arg1.root));
+				while (args.hasNext()) {
+					Node n = args.next();
+					arg1.graph.add(Triple.create(root, argNode, n));
+					arg1.graph.delete(Triple.create(arg1.root, argNode, n));
+				}
+			}
+			
 		}
 		if (type0.equals(optionalNode) && type1.equals(optionalNode)){  //Joins between operands with optional must be reordered.
 			
@@ -1298,7 +1326,9 @@ public class RGraph {
 				System.out.println("Branch relabelling");
 			}
 			try{
-				branchRelabelling();
+				if (!containsPaths) {
+					branchRelabelling();
+				}
 			}
 			catch (Exception e){
 				e.printStackTrace();
@@ -1309,7 +1339,8 @@ public class RGraph {
 			}
 			RGraph ans;
 			if (containsPaths) {
-				ans = uc2rpqMinimisation();
+				ans = this;
+//				ans = uc2rpqMinimisation();
 			}
 			else {
 				ans = ucqMinimisation();
@@ -1326,9 +1357,9 @@ public class RGraph {
 			
 			if (verbose){
 				System.out.println("Labelling results: \n");
-				System.out.println("Number of blank nodes is: "+glr.getBnodeCount());
-				System.out.println("Number of colouring iterations is: "+glr.getColourIterationCount());
-				System.out.println("Number of partitions found is: "+glr.getPartitionCount());
+				System.out.println("Number of blank nodes: "+glr.getBnodeCount());
+				System.out.println("Number of colouring iterations: "+glr.getColourIterationCount());
+				System.out.println("Number of partitions found: "+glr.getPartitionCount());
 			}
 			ans = new RGraph(glr.getGraph());
 			if (verbose){
@@ -1340,9 +1371,9 @@ public class RGraph {
 			GraphLabellingResult glr = this.label(this.getTriples());
 			if (verbose){
 				System.out.println("Labelling results: \n");
-				System.out.println("Number of blank nodes is: "+glr.getBnodeCount());
-				System.out.println("Number of colouring iterations is: "+glr.getColourIterationCount());
-				System.out.println("Number of partitions found is: "+glr.getPartitionCount());
+				System.out.println("Number of blank nodes: "+glr.getBnodeCount());
+				System.out.println("Number of colouring iterations: "+glr.getColourIterationCount());
+				System.out.println("Number of partitions found: "+glr.getPartitionCount());
 			}
 			RGraph ans = new RGraph(glr.getGraph());
 			return ans;
@@ -1620,6 +1651,7 @@ public class RGraph {
 		return this;
 	}
 	
+	@SuppressWarnings("unused")
 	public RGraph uc2rpqMinimisation() {
 		ExtendedIterator<Node> ucqs = GraphUtil.listSubjects(this.graph, typeNode, unionNode);
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
@@ -2018,6 +2050,8 @@ public class RGraph {
 		System.out.println("Loaded");
 		return this;
 	}
+
+	
 	
 	public int getNumberOfNodes(){
 		return this.graph.size();
@@ -2126,5 +2160,15 @@ public class RGraph {
 		else {
 			return true;
 		}
+	}
+
+
+	public void service(Node service, boolean silent) {
+		Node n = NodeFactory.createBlankNode();
+		graph.add(Triple.create(n, typeNode, serviceNode));
+		graph.add(Triple.create(n, valueNode, service));
+		graph.add(Triple.create(n, silentNode, NodeFactory.createLiteralByValue(silent, XSDDatatype.XSDboolean)));
+		graph.add(Triple.create(n, argNode, root));
+		this.root = n;	
 	}
 }

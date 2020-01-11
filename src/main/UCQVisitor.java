@@ -4,8 +4,10 @@ import java.util.List;
 
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
+import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.TransformCopy;
+import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpJoin;
 import org.apache.jena.sparql.algebra.op.OpLeftJoin;
@@ -90,11 +92,13 @@ public class UCQVisitor extends TransformCopy{
 	}
 	
 	public static void main(String[] args){
-		String s = "SELECT DISTINCT * WHERE {	{ ?x <http://ex.org/a> ?y ; ?p  ?o . }	UNION 	{ ?x <http://ex.org/b> ?y }	?y <http://ex.org/c> ?z .        ?x <http://ex.org/a> ?y .        FILTER(?y > 0) }";
+		String s = "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT DISTINCT ?x WHERE{	?x foaf:p ?z .	?z foaf:p ?y .	?z foaf:q ?y .?y foaf:p/foaf:p/foaf:p ?y .	?y foaf:u/foaf:v ?x . OPTIONAL { ?z foaf:r ?n . ?n foaf:z* ?q . } }";
 		Query query = QueryFactory.create(s);
 		for (Var v : query.getProjectVars()){
 			System.out.println(v);
 		}
-		
+		BGPCollapser bgc = new BGPCollapser(query);
+		Op op = Algebra.compile(query);
+		op = Transformer.transform(bgc, op);
 	}
 }

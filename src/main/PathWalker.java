@@ -72,7 +72,19 @@ public class PathWalker implements PathVisitor {
 
 	@Override
 	public void visit(P_Inverse arg0) {
-		arg0.getSubPath().visit(this);	
+		if (arg0.getSubPath() instanceof P_Link) {
+			Node n = NodeFactory.createBlankNode();
+			Node b = NodeFactory.createBlankNode();
+			Node p = NodeFactory.createLiteral("^"+((P_Path0) arg0.getSubPath()).getNode().toString());
+			Triple t = Triple.create(n, p, b);
+			tripleStack.add(t);
+			nodeStack.add(b);
+			graph.add(t);
+			predicates.add(p);
+		}
+		else {
+			arg0.getSubPath().visit(this);	
+		}
 	}
 
 	@Override

@@ -1,4 +1,4 @@
-package data;
+ package data;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -7,10 +7,17 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import org.apache.jena.ext.com.google.common.collect.HashMultiset;
 import org.apache.jena.ext.com.google.common.collect.Multiset;
@@ -45,17 +52,19 @@ public class QueryFeaturesCounter {
 		if (!q.getGraphURIs().isEmpty() || !q.getNamedGraphURIs().isEmpty()){
 			this.features.add("named");
 		}	
-		FeatureCounter fc = new FeatureCounter();
+		FeatureCounter fc = new FeatureCounter(op);
 		OpWalker.walk(op, fc);
 		HashSet<String> features = fc.getFeatures();
 		for (String f : features){
 			this.features.add(f);
 		}
 		
+		this.features.addAll(fc.getPathFeatures());
 		boolean unions = features.contains("union");
 		boolean joins = features.contains("join");
 		boolean distinct = features.contains("distinct");
 		boolean unsupported = features.contains("Unsupported");
+		boolean paths = features.contains("path");
 		
 		features.remove("union");
 		features.remove("join");
@@ -75,9 +84,30 @@ public class QueryFeaturesCounter {
 			if (distinct){
 				ans += "D";
 			}
+			if (paths) {
+				ans += "P";
+			}
 			if (others){
 				ans += "*";
 			}
+		}
+		if (fc.isCQ()) {
+			this.features.add("CQ");
+		}
+		if (fc.isUCQ()) {
+			this.features.add("UCQ");
+		}
+		if (fc.isC2RPQ()) {
+			this.features.add("C2RPQ");
+		}
+		if (fc.isUC2RPQ()) {
+			this.features.add("UC2RPQ");
+		}
+		if (fc.isMonotone()) {
+			this.features.add("monotone");
+		}
+		if (fc.isM2RPQ()) {
+			this.features.add("M2RPQ");
 		}
 		this.features.add(ans);
 	}
@@ -130,12 +160,62 @@ public class QueryFeaturesCounter {
 		bw.close();
 	}
 	
+	public static void combineFiles(Path f) throws IOException {
+		final Map<String,Integer> featureMap = new HashMap<String,Integer>();
+		FileVisitor<Path> fv = new FileVisitor<Path>(){
+
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+				String s;
+				BufferedReader br = new BufferedReader(new FileReader(file.toFile()));
+				while((s = br.readLine()) != null) {
+					String feature = s.substring(0, s.indexOf(":"));
+					if (feature.isEmpty()) {
+						continue;
+					}
+					String number = s.substring(s.indexOf(":") + 2);
+					int n = Integer.valueOf(number);
+					if (featureMap.containsKey(feature)) {
+						featureMap.put(feature, featureMap.get(feature) + n);
+					}
+					else {
+						featureMap.put(feature, n);
+					}
+				}
+				br.close();
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+				return FileVisitResult.TERMINATE;
+			}
+
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+				return FileVisitResult.CONTINUE;
+			}
+			
+		};
+		Files.walkFileTree(f, fv);
+		System.out.println(featureMap);
+	}
+	
 	public boolean equalQueries(int x, int y){
 		return canonQueries.get(x).equals(canonQueries.get(y));
 	}
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException{
-		QueryFeaturesCounter qp = new QueryFeaturesCounter(new File("testFiles/utf8WikiDataQueries/utf8I7_status2xx_Joined.tsv"), false);
-	}
+//		for (int i = 100; i < 183; i++) {
+//			String n = String.valueOf(i).substring(1);
+//			QueryFeaturesCounter qp = new QueryFeaturesCounter(new File("testFiles/utf8WikiDataQueries/utfWikiData"+n), true);
+//		}
+		QueryFeaturesCounter.combineFiles(new File("resultFiles/features").toPath());
+	}		
 }

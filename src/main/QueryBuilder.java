@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.GraphExtract;
@@ -38,6 +39,8 @@ import org.apache.jena.sparql.algebra.op.OpMinus;
 import org.apache.jena.sparql.algebra.op.OpOrder;
 import org.apache.jena.sparql.algebra.op.OpPath;
 import org.apache.jena.sparql.algebra.op.OpProject;
+import org.apache.jena.sparql.algebra.op.OpSequence;
+import org.apache.jena.sparql.algebra.op.OpService;
 import org.apache.jena.sparql.algebra.op.OpSlice;
 import org.apache.jena.sparql.algebra.op.OpTable;
 import org.apache.jena.sparql.algebra.op.OpUnion;
@@ -122,6 +125,9 @@ import org.apache.jena.sparql.expr.ExprAggregator;
 import org.apache.jena.sparql.expr.ExprList;
 import org.apache.jena.sparql.expr.NodeValue;
 import org.apache.jena.sparql.expr.aggregate.AggregatorFactory;
+import org.apache.jena.sparql.path.P_Alt;
+import org.apache.jena.sparql.path.P_Seq;
+import org.apache.jena.sparql.path.P_ZeroOrMore1;
 import org.apache.jena.sparql.path.Path;
 import org.apache.jena.sparql.path.PathFactory;
 import org.apache.jena.sparql.util.ExprUtils;
@@ -151,7 +157,6 @@ public class QueryBuilder {
 	private final Node orderNode = NodeFactory.createURI(this.URI+"order");
 	private final Node valueNode = NodeFactory.createURI(this.URI+"value");
 	private final Node dirNode = NodeFactory.createURI(this.URI+"direction");
-	private final Node modNode = NodeFactory.createURI(this.URI+"modifier");
 	private final Node patternNode = NodeFactory.createURI(this.URI+"pattern");
 	private final Node filterNode = NodeFactory.createURI(this.URI+"filter");
 	private final Node functionNode = NodeFactory.createURI(this.URI+"function");
@@ -171,25 +176,22 @@ public class QueryBuilder {
 	private final Node minusNode = NodeFactory.createURI(this.URI+"minus");
 	private final Node epsilon = NodeFactory.createURI(this.URI+"epsilon");
 	private final Node finalNode = NodeFactory.createURI(this.URI+"final");
-	private final Node pathNode = NodeFactory.createURI(this.URI+"path");
 	private final Node triplePathNode = NodeFactory.createURI(this.URI+"triplePath");
+	private final Node serviceNode = NodeFactory.createURI(this.URI+"service");
+	private final Node silentNode = NodeFactory.createURI(this.URI+"silent");
 	private Graph graph;
 	private Node root;
 	private Op op;
-	private boolean isDistinct;
+	
 	
 	public QueryBuilder(RGraph e){
 		this.graph = e.graph;
 		this.root = e.root;
-		Node project = GraphUtil.listSubjects(this.graph, typeNode, projectNode).next();
-		this.isDistinct = this.graph.contains(project, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
 	}
 	
 	public QueryBuilder(Graph g, Node root) {
 		this.graph = g;
 		this.root = root;
-		this.isDistinct = true;
-		
 	}
 	
 	public Expr filterOperatorToString(Node n, Expr... exprs){
@@ -439,21 +441,7 @@ public class QueryBuilder {
 					Node t = GraphUtil.listObjects(graph, v, argNode).next();
 					Node first = GraphUtil.listObjects(graph, t, valueNode).next();
 					Op ans = null;
-					if (graph.contains(Triple.create(first, typeNode, unionNode))){
-						ans = unionToOp(first);
-					}
-					else if (graph.contains(Triple.create(first, typeNode, joinNode))){
-						ans = joinToOp(first);
-					}
-					else if (graph.contains(Triple.create(first, typeNode, optionalNode))){
-						ans = optionalToOp(first);
-					}
-					else if (graph.contains(Triple.create(first, typeNode, graphNode))){
-						ans = graphToOp(first);
-					}
-					else if (graph.contains(Triple.create(first, typeNode, tpNode))){
-						ans = tripleToOp(first);
-					}
+					ans = nextOpByType(first);
 					return new E_NotExists(ans);
 				}
 				else if (f.equals("regex")) {
@@ -469,14 +457,12 @@ public class QueryBuilder {
 					return new E_StrReplace(arg0, arg1, arg2, null);
 				}
 				else if (f.equals("if")) {
-					System.out.println(exprs.length);
 					Expr arg0 = exprs[0];
 					Expr arg1 = exprs[1];
 					Expr arg2 = exprs[2];
 					return new E_Conditional(arg0, arg1, arg2);
 				}
 				else {
-					System.out.println(f);
 					return ExprUtils.parse(f);
 				}
 				
@@ -499,7 +485,6 @@ public class QueryBuilder {
 		}
 		if (n.isLiteral()) {
 			String f = (String) n.getLiteralValue();
-			System.out.println(f);
 			if (f.equals("regex")) {
 				Expr arg0 = expr.get(0);
 				Expr arg1 = expr.size() > 1 ? expr.get(1) : null;
@@ -657,43 +642,44 @@ public class QueryBuilder {
 		Op ans = null;
 		ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
 		List<Triple> tripleList = new ArrayList<Triple>();
+		List<Op> opPaths = new ArrayList<Op>();
 		BasicPattern bp = new BasicPattern();
 		while (args.hasNext()){
 			Node arg = args.next();
 			Node type = GraphUtil.listObjects(graph, arg, typeNode).next();
-			if (type.equals(unionNode)){
-				ans = OpJoin.create(ans, unionToOp(arg));
-			}
-			else if (type.equals(joinNode)){
-				ans = OpJoin.create(ans, joinToOp(arg));
-			}
-			else if (type.equals(optionalNode)){
-				ans = OpJoin.create(ans, optionalToOp(arg));
-			}
-			else if (type.equals(tpNode)){
+			if (type.equals(tpNode)) {	
 				tripleList.add(nodeToTriple(arg));
 			}
 			else if (type.equals(triplePathNode)) {
-				ans = OpJoin.create(ans, triplePathToOp(arg));
+				opPaths.add(nextOpByType(arg));
 			}
-			else if (type.equals(graphNode)){
-				ans = OpJoin.create(ans, graphToOp(arg));
-			}
-			else if (type.equals(tableNode)) {
-				ans = OpJoin.create(ans, tableToOp(arg));
-			}
-			else if (type.equals(minusNode)) {
-				ans = OpJoin.create(ans, minusToOp(arg));
+			else {
+				ans = OpJoin.create(ans, nextOpByType(arg));
 			}
 		}
 		Collections.sort(tripleList, new TripleComparator());
 		for (Triple t : tripleList){
 			bp.add(t);
 		}
-		if (!bp.isEmpty()){
-			ans = OpJoin.create(ans, new OpBGP(bp));
+		if (!opPaths.isEmpty()) {
+			if (ans != null) {
+				opPaths.add(ans);
+			}
+			if (!bp.isEmpty()) {
+				opPaths.add(new OpBGP(bp));
+			}
+			OpSequence opS = OpSequence.create();
+			for (Op o : opPaths) {
+				opS.add(o);
+			}
+			ans = filterBindOrGroupToOp(opS, n);
 		}
-		ans = filterBindOrGroupToOp(ans, n);
+		else {
+			if (!bp.isEmpty()){
+				ans = OpJoin.create(ans, new OpBGP(bp));
+			}
+			ans = filterBindOrGroupToOp(ans, n);
+		}
 		return ans;
 	}
 	
@@ -817,60 +803,54 @@ public class QueryBuilder {
 		List<Node> argList = args.toList();
 		Collections.sort(argList, new NodeComparator());
 		Node firstArg = argList.get(0);
-		Node firstType = GraphUtil.listObjects(graph, firstArg, typeNode).next();
-		if (firstType.equals(unionNode)){
-			ans = unionToOp(firstArg);
-		}
-		else if (firstType.equals(joinNode)){
-			ans = joinToOp(firstArg);
-		}
-		else if (firstType.equals(optionalNode)){
-			ans = optionalToOp(firstArg);
-		}
-		else if (firstType.equals(tpNode)){
-			ans = tripleToOp(firstArg);
-		}
-		else if (firstType.equals(triplePathNode)) {
-			ans = triplePathToOp(firstArg);
-		}
-		else if (firstType.equals(graphNode)){
-			ans = graphToOp(firstArg);
-		}
-		else if (firstType.equals(tableNode)) {
-			ans = tableToOp(firstArg);
-		}
-		else if (firstType.equals(minusNode)) {
-			ans = minusToOp(firstArg);
-		}
+		ans = nextOpByType(firstArg);
 		for (int i = 1; i < argList.size(); i++){
 			Node arg = argList.get(i);
-			Node type = GraphUtil.listObjects(graph, arg, typeNode).next();
-			if (type.equals(unionNode)){
-				ans = new OpUnion(ans, unionToOp(arg));
-			}
-			else if (type.equals(joinNode)){
-				ans = new OpUnion(ans, joinToOp(arg));
-			}
-			else if (type.equals(optionalNode)){
-				ans = new OpUnion(ans, optionalToOp(arg));
-			}
-			else if (type.equals(tpNode)){
-				ans = new OpUnion(ans, tripleToOp(arg));
-			}
-			else if (type.equals(triplePathNode)) {
-				ans = new OpUnion(ans, triplePathToOp(arg));
-			}
-			else if (type.equals(graphNode)){
-				ans = new OpUnion(ans, graphToOp(arg));
-			}
-			else if (type.equals(tableNode)) {
-				ans = new OpUnion(ans, tableToOp(arg));
-			}
-			else if (type.equals(minusNode)) {
-				ans = new OpUnion(ans, minusToOp(arg));
-			}
+			ans = new OpUnion(ans, nextOpByType(arg));
 		}
 		ans = filterBindOrGroupToOp(ans, n);
+		return ans;
+	}
+	
+	public Op serviceToOp(Node n) {
+		Op ans = null;
+		Node next = GraphUtil.listObjects(graph, n, argNode).next();
+		Node value = GraphUtil.listObjects(graph, n, valueNode).next();
+		Node silent = GraphUtil.listObjects(graph, n, silentNode).next();
+		ans = nextOpByType(next);
+		ans = new OpService(value, ans, (boolean) silent.getLiteralValue());	
+		return ans;
+	}
+	
+	public Op nextOpByType(Node n) {
+		Op ans = null;
+		if (graph.contains(Triple.create(n, typeNode, unionNode))){
+			ans = unionToOp(n);
+		}
+		else if (graph.contains(Triple.create(n, typeNode, joinNode))){
+			ans = joinToOp(n);
+		}
+		else if (graph.contains(Triple.create(n, typeNode, tpNode))){
+			ans = tripleToOp(n);
+		}
+		else if (graph.contains(Triple.create(n, typeNode, triplePathNode))) {
+			ans = triplePathToOp(n);
+		}
+		else if (graph.contains(Triple.create(n, typeNode, optionalNode))){
+			ans = optionalToOp(n);
+		}
+		else if (graph.contains(Triple.create(n, typeNode, graphNode))){
+			ans = graphToOp(n);
+		}
+		else if (graph.contains(Triple.create(n, typeNode, tableNode))) {
+			ans = tableToOp(n);
+		}
+		else if (graph.contains(Triple.create(n, typeNode, minusNode))) {
+			ans = minusToOp(n);
+		}
+		else if (graph.contains(Triple.create(n, typeNode, serviceNode))) {
+			ans = serviceToOp(n);
+		}
 		return ans;
 	}
 	
@@ -878,55 +858,9 @@ public class QueryBuilder {
 		Op leftOp = null;
 		Op rightOp = null;
 		Node left = GraphUtil.listObjects(graph, n, leftNode).next();
-		if (graph.contains(Triple.create(left, typeNode, unionNode))){
-			leftOp = unionToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, joinNode))){
-			leftOp = joinToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, tpNode))){
-			leftOp = tripleToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, triplePathNode))) {
-			leftOp = triplePathToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, optionalNode))){
-			leftOp = optionalToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, graphNode))){
-			leftOp = graphToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, tableNode))) {
-			leftOp = tableToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, minusNode))) {
-			leftOp = minusToOp(left);
-		}
+		leftOp = nextOpByType(left);
 		Node right = GraphUtil.listObjects(graph, n, rightNode).next();
-		if (graph.contains(Triple.create(right, typeNode, unionNode))){
-			rightOp = unionToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, joinNode))){
-			rightOp = joinToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, tpNode))){
-			rightOp = tripleToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, triplePathNode))) {
-			rightOp = triplePathToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, optionalNode))){
-			rightOp = optionalToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, graphNode))){
-			rightOp = graphToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, tableNode))) {
-			rightOp = tableToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, minusNode))) {
-			rightOp = minusToOp(right);
-		}
+		rightOp = nextOpByType(right);
 		leftOp = filterBindOrGroupToOp(leftOp, n);
 		return OpLeftJoin.createLeftJoin(leftOp, rightOp, null);
 	}
@@ -935,55 +869,9 @@ public class QueryBuilder {
 		Op leftOp = null;
 		Op rightOp = null;
 		Node left = GraphUtil.listObjects(graph, n, leftNode).next();
-		if (graph.contains(Triple.create(left, typeNode, unionNode))){
-			leftOp = unionToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, joinNode))){
-			leftOp = joinToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, tpNode))){
-			leftOp = tripleToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, triplePathNode))) {
-			leftOp = triplePathToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, optionalNode))){
-			leftOp = optionalToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, graphNode))){
-			leftOp = graphToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, minusNode))){
-			leftOp = minusToOp(left);
-		}
-		else if (graph.contains(Triple.create(left, typeNode, tableNode))) {
-			leftOp = tableToOp(left);
-		}
+		leftOp = nextOpByType(left);
 		Node right = GraphUtil.listObjects(graph, n, rightNode).next();
-		if (graph.contains(Triple.create(right, typeNode, unionNode))){
-			rightOp = unionToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, joinNode))){
-			rightOp = joinToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, tpNode))){
-			rightOp = tripleToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, triplePathNode))) {
-			rightOp = triplePathToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, optionalNode))){
-			rightOp = optionalToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, graphNode))){
-			rightOp = graphToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, minusNode))){
-			rightOp = minusToOp(right);
-		}
-		else if (graph.contains(Triple.create(right, typeNode, tableNode))) {
-			rightOp = tableToOp(right);
-		}
+		rightOp = nextOpByType(right);
 		leftOp = filterBindOrGroupToOp(leftOp, n);
 		return OpMinus.create(leftOp, rightOp);
 	}
@@ -995,66 +883,15 @@ public class QueryBuilder {
 		if (val.isBlank()){
 			val = NodeFactory.createVariable(val.getBlankNodeLabel());
 			Var value = Var.alloc(val);
-			if (graph.contains(Triple.create(next, typeNode, unionNode))){
-				ans = new OpGraph(value, unionToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, joinNode))){
-				ans = new OpGraph(value, joinToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, tpNode))){
-				ans = new OpGraph(value, tripleToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, triplePathNode))) {
-				ans = new OpGraph(value, triplePathToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, optionalNode))){
-				ans = new OpGraph(value, optionalToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, graphNode))){
-				ans = new OpGraph(value, graphToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, minusNode))){
-				ans = new OpGraph(value, minusToOp(next));
-			}
+			ans = new OpGraph(value, nextOpByType(next));
 		}
 		else{
 			if (val.isURI()){
 				val = NodeFactory.createURI(val.getURI());
 			}
-			if (graph.contains(Triple.create(next, typeNode, unionNode))){
-			ans = new OpGraph(val, unionToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, joinNode))){
-				ans = new OpGraph(val, joinToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, tpNode))){
-				ans = new OpGraph(val, tripleToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, triplePathNode))) {
-				ans = new OpGraph(val, triplePathToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, optionalNode))){
-				ans = new OpGraph(val, optionalToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, graphNode))){
-				ans = new OpGraph(val, graphToOp(next));
-			}
-			else if (graph.contains(Triple.create(next, typeNode, minusNode))){
-				ans = new OpGraph(val, minusToOp(next));
-			}
+			ans = new OpGraph(val, nextOpByType(next));
 		}
-		ExtendedIterator<Node> filterOrBind = GraphUtil.listObjects(graph, n, patternNode);
-		while (filterOrBind.hasNext()){
-			Node f = filterOrBind.next();
-			Node type = GraphUtil.listObjects(graph, f, typeNode).next();
-			if (type.equals(filterNode)) {
-				ans = OpFilter.filter(filterToOp(GraphUtil.listObjects(graph, f, argNode).next()), ans);
-			}
-			else if (type.equals(bindNode)) {
-				Var var = Var.alloc(GraphUtil.listObjects(graph, f, varNode).next().getBlankNodeLabel());
-				ans = OpExtend.create(ans, var, bindToOp(GraphUtil.listObjects(graph, f, argNode).next()));
-			}
-		}
+		ans = filterBindOrGroupToOp(ans, n);
 		return ans;
 	}
 	
@@ -1231,7 +1068,7 @@ public class QueryBuilder {
 		Path ans = null;
 		List<Node> predicates = GraphUtil.listObjects(graph, n, preNode).toList();
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
-		Map<List<Node>,Path> transitionTable = new HashMap<List<Node>,Path>();
+		Map<Pair<Node,Node>,Path> transitionTable = new HashMap<Pair<Node,Node>,Path>();
 		Graph dfa = ge.extract(n, graph);
 		boolean needStartState = false;
 		Node startState = n;
@@ -1246,29 +1083,22 @@ public class QueryBuilder {
 			dfa.remove(n, preNode, p);
 		}
 		if (needStartState) {
-			startState = NodeFactory.createBlankNode();
+			startState = NodeFactory.createBlankNode("start");
 			dfa.add(Triple.create(startState, epsilon, n));
 		}
 		List<Node> finalStates = GraphUtil.listSubjects(dfa, typeNode, finalNode).toList();
-		if (finalStates.size() > 1) {
-			newFinalState = NodeFactory.createBlankNode();
-			for (Node finalState : finalStates) {
-				dfa.add(Triple.create(finalState, epsilon, newFinalState));
-				dfa.remove(finalState, typeNode, finalNode);
-			}
-			dfa.add(Triple.create(newFinalState, typeNode, finalNode));
-		}	
-		else {
-			newFinalState = finalStates.get(0);
+		newFinalState = NodeFactory.createBlankNode("final");
+		for (Node finalState : finalStates) {
+			dfa.add(Triple.create(finalState, epsilon, newFinalState));
+			dfa.remove(finalState, typeNode, finalNode);
 		}
+		dfa.add(Triple.create(newFinalState, typeNode, finalNode));
 		Set<Node> states = findStates(dfa);
 		ExtendedIterator<Triple> transitions = GraphUtil.findAll(dfa);
 		while (transitions.hasNext()) {
 			Triple t = transitions.next();
 			if (!t.getPredicate().equals(typeNode)) {
-				List<Node> pair = new ArrayList<Node>();
-				pair.add(t.getSubject());
-				pair.add(t.getObject());
+				Pair<Node,Node> pair = new Pair<Node,Node>(t.getSubject(),t.getObject());
 				if (t.getPredicate().toString().startsWith("\"^")) {
 					String u = t.getPredicate().toString();
 					u = u.substring(2,u.length()-1);
@@ -1280,14 +1110,16 @@ public class QueryBuilder {
 				
 			}
 			if (t.getPredicate().equals(epsilon)) {
-				List<Node> pair = new ArrayList<Node>();
-				pair.add(t.getSubject());
-				pair.add(t.getObject());
-				transitionTable.put(pair, null);
+				Pair<Node,Node> pair = new Pair<Node,Node>(t.getSubject(),t.getObject());
+				transitionTable.put(pair, PathFactory.pathLink(epsilon));
 			}
 		}
-		Iterator<Node> tempStates = states.iterator();
-		while (states.size() > 2) {
+		Set<Node> tempNodes = new HashSet<Node>();
+		for (Node tempN : states) {
+			tempNodes.add(tempN);
+		}
+		Iterator<Node> tempStates = tempNodes.iterator();
+		while (states.size() > 2) { // Should iterate until only the start node and final node remain.
 			Node state = tempStates.next();
 			if (state.equals(startState) || state.equals(newFinalState)) {
 				continue;
@@ -1297,9 +1129,6 @@ public class QueryBuilder {
 				states.remove(state);
 			}	
 		}
-		List<Node> finalPair = new ArrayList<Node>();
-		finalPair.add(startState);
-		finalPair.add(newFinalState);
 		ans = finalState(startState,newFinalState,transitionTable);
 		return ans;
 	}
@@ -1321,30 +1150,23 @@ public class QueryBuilder {
 		return ans;
 	}
 	
-	public Path path(Node n, Map<List<Node>,Path> transitionTable, Set<Node> states) {
-		Path ans = null;
-		Set<List<Node>> toDelete = new HashSet<List<Node>>();
+	public void path(Node n, Map<Pair<Node,Node>,Path> transitionTable, Set<Node> states) {
+		Set<Pair<Pair<Node,Node>,Path>> toUpdate = new HashSet<Pair<Pair<Node,Node>,Path>>();
+		Set<Pair<Node,Node>> toDelete = new HashSet<Pair<Node,Node>>();
 		for (Node n0 : states) {
 			for (Node n1 : states) {
 				if (n0.equals(n) || n1.equals(n)) {
 					continue;
 				}
+				Path ans = null;
 				Path regex0 = null;
 				Path regex1 = null;
 				Path regex2 = null;
 				Path regex3 = null;
-				List<Node> pair0 = new ArrayList<Node>();
-				List<Node> pair1 = new ArrayList<Node>();
-				List<Node> pair2 = new ArrayList<Node>();
-				List<Node> pair3 = new ArrayList<Node>();
-				pair0.add(n0);
-				pair0.add(n);
-				pair1.add(n);
-				pair1.add(n1);
-				pair2.add(n0);
-				pair2.add(n1);
-				pair3.add(n);
-				pair3.add(n);
+				Pair<Node,Node> pair0 = new Pair<Node,Node>(n0,n);
+				Pair<Node,Node> pair1 = new Pair<Node,Node>(n,n1);
+				Pair<Node,Node> pair2 = new Pair<Node,Node>(n0,n1);
+				Pair<Node,Node> pair3 = new Pair<Node,Node>(n,n);
 				if (transitionTable.containsKey(pair0) && transitionTable.containsKey(pair1)) {
 					regex0 = transitionTable.get(pair0);
 					regex1 = transitionTable.get(pair1);
@@ -1354,58 +1176,105 @@ public class QueryBuilder {
 					if (transitionTable.containsKey(pair3)) {
 						regex3 = transitionTable.get(pair3);
 					}
-					if (regex0 != null) {
-						ans = regex0;
-					}
-					if (regex3 != null) {
-						if (ans == null) {
-							ans = PathFactory.pathZeroOrMore1(regex3);
-						}
-						else {
-							ans = PathFactory.pathSeq(ans, PathFactory.pathZeroOrMore1(regex3));
-						}
-					}
-					if (regex1 != null) {
-						if (ans == null) {
-							ans = regex1;
-						}
-						else {
-							ans = PathFactory.pathSeq(ans, regex1);
-						}
-					}
-					if (regex2 != null) {
-						if (ans == null) {
-							ans = regex2;
-						}
-						else {
-							ans = PathFactory.pathAlt(ans, regex2);
-						}			
-					}
-					transitionTable.put(pair2, ans);
+					ans = newTransition(regex0, regex1, regex2, regex3);
+					toUpdate.add(new Pair<Pair<Node,Node>,Path>(pair2, ans));
 				}	
 				toDelete.add(pair0);
 				toDelete.add(pair1);
+				toDelete.add(pair3);
 			}	
 		}
-		for (List<Node> pair : toDelete) {
+		for (Pair<Pair<Node,Node>,Path> pair : toUpdate) {
+			if (transitionTable.containsKey(pair.getLeft())) {
+				Path p = transitionTable.get(pair.getLeft());
+				if (p.equals(PathFactory.pathLink(epsilon))) {
+					p = pair.getRight();
+				}
+				else {
+					p = new P_Alt(p,pair.getRight());
+				}
+				transitionTable.put(pair.getLeft(), p);
+			}
+			else {
+				transitionTable.put(pair.getLeft(), pair.getRight());
+			}
+		}
+		for (Pair<Node,Node> pair : toDelete) {
 			transitionTable.remove(pair);
-		}		
+		}	
+	}
+	
+	public Path newTransition(Path regex0, Path regex1, Path regex2, Path regex3) {
+		Path ans = null;
+		if (regex0 != null && !regex0.equals(PathFactory.pathLink(epsilon))) {
+			ans = regex0;
+		}
+		if (regex3 != null) {
+			if (ans == null) {
+				ans = PathFactory.pathZeroOrMore1(regex3);
+			}
+			else {
+				ans = PathFactory.pathSeq(ans, PathFactory.pathZeroOrMore1(regex3));
+			}
+		}
+		if (regex1 != null) {
+			if (ans == null || ans.equals(PathFactory.pathLink(epsilon))) {
+				ans = regex1;
+			}
+			else {
+				if (!regex1.equals(PathFactory.pathLink(epsilon))) {
+					ans = PathFactory.pathSeq(ans, regex1);
+				}
+			}
+		}
+		if (regex2 != null) {
+			if (ans == null) {
+				ans = regex2;
+			}
+			else if (ans.equals(PathFactory.pathLink(epsilon))) {
+				if (regex2 instanceof P_ZeroOrMore1) {
+					ans = regex2;
+				}
+				else {
+					ans = PathFactory.pathAlt(ans, regex2);
+				}
+			}
+			else if (regex2.equals(PathFactory.pathLink(epsilon))) {
+				if (ans instanceof P_ZeroOrMore1) {
+					// do nothing
+				}
+				else if (ans instanceof P_Seq) { // p / p* | epsilon = p*
+					Path pLeft = ((P_Seq) ans).getLeft();
+					Path pRight = ((P_Seq) ans).getRight();
+					if (pRight instanceof P_ZeroOrMore1) {
+						if (((P_ZeroOrMore1) pRight).getSubPath().equals(pLeft)) {
+							ans = pRight;
+						}
+						else {
+							ans = PathFactory.pathAlt(ans, regex2);
+						}
+					}
+					else {
+						ans = PathFactory.pathAlt(ans, regex2);
+					}
+				}
+			}
+			else {
+				ans = PathFactory.pathAlt(ans, regex2);
+			}			
+		}
 		return ans;
 	}
 	
-	public Path finalState(Node startState, Node endState, Map<List<Node>,Path> transitionTable) {
-		List<Node> pair = new ArrayList<Node>();
-		pair.add(startState);
-		pair.add(endState);
+	public Path finalState(Node startState, Node endState, Map<Pair<Node, Node>, Path> transitionTable) {
+		Pair<Node,Node> pair = new Pair<Node,Node>(startState,endState);
 		if (transitionTable.get(pair) == null) {
-			pair.remove(startState);
-			pair.add(endState);
+			pair = new Pair<Node,Node>(endState,endState);
 			return PathFactory.pathZeroOrMore1(transitionTable.get(pair));
 		}
 		else {
 			Path p0 = transitionTable.get(pair);
-			pair.remove(startState);
-			pair.add(endState);
+			pair = new Pair<Node,Node>(endState,endState);
 			Path p1 = transitionTable.get(pair);
 			if (p1 != null) {
 				return PathFactory.pathSeq(p0, PathFactory.pathZeroOrMore1(p1));
@@ -1529,31 +1398,16 @@ public class QueryBuilder {
 			if (graph.contains(Triple.create(first, typeNode, fromNode))){
 				first = m.next();
 			}
+			ExtendedIterator<Node> projectedVariables = GraphUtil.listObjects(graph, root, argNode);
+			while (projectedVariables.hasNext()) {
+				Node pVar = projectedVariables.next();
+				pVariables.add(Var.alloc(pVar.getBlankNodeLabel()));
+			}
 		}
 		else {
 			first = root;
 		}
-		if (graph.contains(Triple.create(first, typeNode, unionNode))){
-			op = unionToOp(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, joinNode))){
-			op = joinToOp(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, optionalNode))){
-			op = optionalToOp(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, minusNode))){
-			op = minusToOp(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, triplePathNode))){
-			op = triplePathToOp(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, graphNode))){
-			op = graphToOp(first);
-		}
-		else if (graph.contains(Triple.create(first, typeNode, tpNode))){
-			op = tripleToOp(first);
-		}
+		op = nextOpByType(first);
 		if (GraphUtil.listSubjects(graph, typeNode, orderByNode).hasNext()){
 			Node orderBy = GraphUtil.listSubjects(graph, typeNode, orderByNode).next();
 			List<Node> args = GraphUtil.listObjects(graph, orderBy, argNode).toList();

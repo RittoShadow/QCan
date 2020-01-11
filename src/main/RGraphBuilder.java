@@ -57,6 +57,7 @@ import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
+import org.apache.jena.sparql.expr.E_LogicalAnd;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprAggregator;
 import org.apache.jena.sparql.expr.ExprWalker;
@@ -169,14 +170,20 @@ public class RGraphBuilder implements OpVisitor {
 			OpPath right = (OpPath) ((OpJoin) o).getRight();
 			TriplePath leftTP = left.getTriplePath();
 			TriplePath rightTP = right.getTriplePath();
-			RGraph leftG = new RGraph(leftTP.getSubject(), leftTP.getObject(), leftTP.getPath());
-			RGraph rightG = new RGraph(rightTP.getSubject(), rightTP.getObject(), rightTP.getPath());
+			PGraph pLeft = new PGraph(leftTP);
+			PGraph pRight = new PGraph(rightTP);
+			RGraph leftG = new RGraph(leftTP.getSubject(), leftTP.getObject(), pLeft);
+			RGraph rightG = new RGraph(rightTP.getSubject(), rightTP.getObject(), pRight);
+//			RGraph leftG = new RGraph(leftTP.getSubject(), leftTP.getObject(), leftTP.getPath());
+//			RGraph rightG = new RGraph(rightTP.getSubject(), rightTP.getObject(), rightTP.getPath());
 			leftG.join(rightG);
 			graphStack.add(leftG);
 		}
 		else {
 			TriplePath tp0 = ((OpPath) o).getTriplePath();
-			RGraph rg = new RGraph(tp0.getSubject(), tp0.getObject(), tp0.getPath());
+			PGraph p = new PGraph(tp0);
+			RGraph rg = new RGraph(tp0.getSubject(), tp0.getObject(), p);
+//			RGraph rg = new RGraph(tp0.getSubject(), tp0.getObject(), tp0.getPath());
 			graphStack.add(rg);		
 		}
 		this.containsPaths = true;
@@ -211,7 +218,14 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpFilter arg0) {
 		containsFilter = true;
 		FilterVisitor fv = new FilterVisitor();
-		ExprWalker.walk(fv, arg0.getExprs().get(0));
+		List<Expr> exprs = arg0.getExprs().getList();
+		Expr expr = exprs.get(0);
+		if (exprs.size() > 1) {
+			for (Expr e : exprs.subList(1, exprs.size())){
+				expr = new E_LogicalAnd(expr, e);
+			}
+		}
+		ExprWalker.walk(fv, expr);
 		if (enableFilter){
 			graphStack.peek().filter(fv.getGraph());
 			filterStack.add(graphStack.peek());
@@ -229,8 +243,8 @@ public class RGraphBuilder implements OpVisitor {
 
 	@Override
 	public void visit(OpService arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
-		
+		System.out.println(arg0.getServiceElement());
+		graphStack.peek().service(arg0.getService(), arg0.getSilent());	
 	}
 
 	@Override
@@ -269,56 +283,56 @@ public class RGraphBuilder implements OpVisitor {
 		if (arg0.getRight() instanceof OpBGP){
 			e2 = graphStack.pop();
 		}
-		else if (arg0.getRight() instanceof OpUnion){
-			e2 = unionStack.pop();
-		}
-		else if (arg0.getRight() instanceof OpLeftJoin){
-			if (enableOptional){
-				e2 = optionalStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-			}
-		}
-		else if (arg0.getRight() instanceof OpJoin){
-			e2 = joinStack.pop();
-		}
-		else if (arg0.getRight() instanceof OpFilter){
-			if (enableFilter){
-				e2 = filterStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-			}
-		}
+//		else if (arg0.getRight() instanceof OpUnion){
+//			e2 = unionStack.pop();
+//		}
+//		else if (arg0.getRight() instanceof OpLeftJoin){
+//			if (enableOptional){
+//				e2 = optionalStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+//			}
+//		}
+//		else if (arg0.getRight() instanceof OpJoin){
+//			e2 = joinStack.pop();
+//		}
+//		else if (arg0.getRight() instanceof OpFilter){
+//			if (enableFilter){
+//				e2 = filterStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+//			}
+//		}
 		else{
 			e2 = graphStack.pop();
 		}
 		if (arg0.getLeft() instanceof OpBGP){
 			e1 = graphStack.pop();
 		}
-		else if (arg0.getLeft() instanceof OpUnion){
-			e1 = unionStack.pop();
-		}
-		else if (arg0.getLeft() instanceof OpLeftJoin){
-			if (enableOptional){
-				e1 = optionalStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-			}
-		}
-		else if (arg0.getLeft() instanceof OpJoin){
-			e1 = joinStack.pop();
-		}
-		else if (arg0.getLeft() instanceof OpFilter){
-			if (enableFilter){
-				e1 = filterStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-			}
-		}
+//		else if (arg0.getLeft() instanceof OpUnion){
+//			e1 = unionStack.pop();
+//		}
+//		else if (arg0.getLeft() instanceof OpLeftJoin){
+//			if (enableOptional){
+//				e1 = optionalStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+//			}
+//		}
+//		else if (arg0.getLeft() instanceof OpJoin){
+//			e1 = joinStack.pop();
+//		}
+//		else if (arg0.getLeft() instanceof OpFilter){
+//			if (enableFilter){
+//				e1 = filterStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+//			}
+//		}
 		else{
 			e1 = graphStack.pop();
 		}
@@ -335,42 +349,42 @@ public class RGraphBuilder implements OpVisitor {
 			if (arg0.getRight() instanceof OpBGP){
 				e2 = new RGraph(((OpBGP)arg0.getRight()).getPattern().getList());
 			}
-			else if (arg0.getRight() instanceof OpUnion){
-				e2 = unionStack.pop();
-			}
-			else if (arg0.getRight() instanceof OpLeftJoin){
-				e2 = optionalStack.pop();
-			}
-			else if (arg0.getRight() instanceof OpFilter){
-				if (enableFilter){
-					e2 = filterStack.pop();
-				}
-				else{
-					throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-				}
-			}
+//			else if (arg0.getRight() instanceof OpUnion){
+//				e2 = unionStack.pop();
+//			}
+//			else if (arg0.getRight() instanceof OpLeftJoin){
+//				e2 = optionalStack.pop();
+//			}
+//			else if (arg0.getRight() instanceof OpFilter){
+//				if (enableFilter){
+//					e2 = filterStack.pop();
+//				}
+//				else{
+//					throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+//				}
+//			}
 			else{
-				e2 = joinStack.pop();
+				e2 = graphStack.pop();
 			}
 			if (arg0.getLeft() instanceof OpBGP){
 				e1 = new RGraph(((OpBGP)arg0.getLeft()).getPattern().getList());
 			}
-			else if (arg0.getLeft() instanceof OpUnion){
-				e1 = unionStack.pop();
-			}
-			else if (arg0.getLeft() instanceof OpLeftJoin){
-				e1 = optionalStack.pop();
-			}
-			else if (arg0.getLeft() instanceof OpFilter){
-				if (enableFilter){
-					e1 = filterStack.pop();
-				}
-				else{
-					throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-				}
-			}
+//			else if (arg0.getLeft() instanceof OpUnion){
+//				e1 = unionStack.pop();
+//			}
+//			else if (arg0.getLeft() instanceof OpLeftJoin){
+//				e1 = optionalStack.pop();
+//			}
+//			else if (arg0.getLeft() instanceof OpFilter){
+//				if (enableFilter){
+//					e1 = filterStack.pop();
+//				}
+//				else{
+//					throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+//				}
+//			}
 			else{
-				e1 = joinStack.pop();
+				e1 = graphStack.pop();
 			}
 			e1.optional(e2);
 			optionalStack.add(e1);
@@ -389,56 +403,56 @@ public class RGraphBuilder implements OpVisitor {
 		if (arg0.getLeft() instanceof OpBGP){
 			e1 = graphStack.pop();
 		}
-		else if (arg0.getLeft() instanceof OpUnion){
-			e1 = unionStack.pop();
-		}
-		else if (arg0.getLeft() instanceof OpLeftJoin){
-			if (enableOptional){
-				e1 = optionalStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-			}
-		}
-		else if (arg0.getLeft() instanceof OpJoin){
-			e1 = joinStack.pop();
-		}
-		else if (arg0.getLeft() instanceof OpFilter){
-			if (enableFilter){
-				e1 = filterStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-			}
-		}
+//		else if (arg0.getLeft() instanceof OpUnion){
+//			e1 = graphStack.pop();
+//		}
+//		else if (arg0.getLeft() instanceof OpLeftJoin){
+//			if (enableOptional){
+//				e1 = optionalStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+//			}
+//		}
+//		else if (arg0.getLeft() instanceof OpJoin){
+//			e1 = joinStack.pop();
+//		}
+//		else if (arg0.getLeft() instanceof OpFilter){
+//			if (enableFilter){
+//				e1 = filterStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+//			}
+//		}
 		else{
 			e1 = graphStack.pop();
 		}
 		if (arg0.getRight() instanceof OpBGP){
 			e2 = graphStack.pop();
 		}
-		else if (arg0.getRight() instanceof OpUnion){
-			e2 = unionStack.pop();
-		}
-		else if (arg0.getRight() instanceof OpLeftJoin){
-			if (enableOptional){
-				e2 = optionalStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-			}
-		}
-		else if (arg0.getRight() instanceof OpJoin){
-			e2 = joinStack.pop();
-		}
-		else if (arg0.getRight() instanceof OpFilter){
-			if (enableFilter){
-				e2 = filterStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-			}
-		}
+//		else if (arg0.getRight() instanceof OpUnion){
+//			e2 = graphStack.pop();
+//		}
+//		else if (arg0.getRight() instanceof OpLeftJoin){
+//			if (enableOptional){
+//				e2 = optionalStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+//			}
+//		}
+//		else if (arg0.getRight() instanceof OpJoin){
+//			e2 = joinStack.pop();
+//		}
+//		else if (arg0.getRight() instanceof OpFilter){
+//			if (enableFilter){
+//				e2 = filterStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+//			}
+//		}
 		else{
 			e2 = graphStack.pop();
 		}
@@ -459,42 +473,42 @@ public class RGraphBuilder implements OpVisitor {
 		if (arg0.getRight() instanceof OpBGP){
 			e2 = new RGraph(((OpBGP)arg0.getRight()).getPattern().getList());
 		}
-		else if (arg0.getRight() instanceof OpUnion){
-			e2 = unionStack.pop();
-		}
-		else if (arg0.getRight() instanceof OpLeftJoin){
-			e2 = optionalStack.pop();
-		}
-		else if (arg0.getRight() instanceof OpFilter){
-			if (enableFilter){
-				e2 = filterStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-			}
-		}
+//		else if (arg0.getRight() instanceof OpUnion){
+//			e2 = unionStack.pop();
+//		}
+//		else if (arg0.getRight() instanceof OpLeftJoin){
+//			e2 = optionalStack.pop();
+//		}
+//		else if (arg0.getRight() instanceof OpFilter){
+//			if (enableFilter){
+//				e2 = filterStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
+//			}
+//		}
 		else{
-			e2 = joinStack.pop();
+			e2 = graphStack.pop();
 		}
 		if (arg0.getLeft() instanceof OpBGP){
 			e1 = new RGraph(((OpBGP)arg0.getLeft()).getPattern().getList());
 		}
-		else if (arg0.getLeft() instanceof OpUnion){
-			e1 = unionStack.pop();
-		}
-		else if (arg0.getLeft() instanceof OpLeftJoin){
-			e1 = optionalStack.pop();
-		}
-		else if (arg0.getLeft() instanceof OpFilter){
-			if (enableFilter){
-				e1 = filterStack.pop();
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-			}
-		}
+//		else if (arg0.getLeft() instanceof OpUnion){
+//			e1 = unionStack.pop();
+//		}
+//		else if (arg0.getLeft() instanceof OpLeftJoin){
+//			e1 = optionalStack.pop();
+//		}
+//		else if (arg0.getLeft() instanceof OpFilter){
+//			if (enableFilter){
+//				e1 = filterStack.pop();
+//			}
+//			else{
+//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
+//			}
+//		}
 		else{
-			e1 = joinStack.pop();
+			e1 = graphStack.pop();
 		}
 		e1.minus(e2);
 		graphStack.add(e1);
@@ -509,14 +523,12 @@ public class RGraphBuilder implements OpVisitor {
 
 	@Override
 	public void visit(OpSequence arg0) {
-		System.out.println(arg0.getElements());
 		List<Op> ops = arg0.getElements();
 		RGraph r = graphStack.pop();
 		for (int i = 1; i < ops.size(); i++) {
 			r.join(graphStack.pop());
 		}
-		graphStack.add(r);
-		graphStack.peek().print();		
+		graphStack.add(r);	
 	}
 
 	@Override
@@ -625,6 +637,7 @@ public class RGraphBuilder implements OpVisitor {
 //			graphStack.peek().groupBy(groupByGraph);
 //		}
 		graphStack.peek().containsPaths = this.containsPaths;
+		graphStack.peek().print();
 		return graphStack.peek();
 	}
 	
@@ -656,20 +669,43 @@ public class RGraphBuilder implements OpVisitor {
 		return this.containsPaths;
 	}
 	
-	public Op UCQTransformation(Op op){
-		Op op2 = Transformer.transform(new TransformPathFlatternStd(), op);
-		op2 = Transformer.transform(new TransformSimplify(), op2);
-		System.out.println(op2);
-		op2 = Transformer.transform(new UCQVisitor(), op2);
-		while (!op.equals(op2)){
-			op = op2;
-			op2 = Transformer.transform(new UCQVisitor(), op2);
+	public Op uC2RPQCollapse(Op op) {
+		Op op1 = op;
+		Op op2 = op;
+		do {
+			op1 = op2;
+			TopDownVisitor tdv = new TopDownVisitor(op1, this.projectionVars);
+			op2 = tdv.getOp();
 		}
-		op2 = Transformer.transform(new FilterTransform(), op2);
+		while (!op1.equals(op2));
+		return op1;
+	}
+	
+	public Op UCQNormalisation(Op op) {
+		Op op1 = op;
+		Op op2 = op;
+		do {
+			op1 = op2;
+			op2 = Transformer.transform(new UCQVisitor(), op1);
+		}
+		while (!op1.equals(op2));
+		return op2;
+	}
+	
+	public Op UCQTransformation(Op op){
+		Op op1 = op;
+		Op op2 = Transformer.transform(new UCQVisitor(), op);
+		op2 = UCQNormalisation(op2);
+		op2 = uC2RPQCollapse(op2);
+//		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
+//		op2 = Transformer.transform(new BGPCollapser(op2,this.projectionVars,false), op2); // transform BGPs
+		op2 = Transformer.transform(new TransformPathFlatternStd(), op2);
+		
+		op2 = Transformer.transform(new TransformSimplify(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
+		op2 = Transformer.transform(new FilterTransform(), op2);
 		op2 = Transformer.transform(new TransformExtendCombine(), op2);
 		op2 = Transformer.transform(new BGPSort(), op2);
-		System.out.println(op2);
 		return op2;
 	}
 
