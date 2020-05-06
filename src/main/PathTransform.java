@@ -184,6 +184,57 @@ public class PathTransform {
 		return ans;
 	}
 	
+	public int minLength(Path path) {
+		if (path instanceof P_Path0) {
+			return 1;
+		}
+		else if (path instanceof P_Path1) {
+			if (path instanceof P_Inverse) {
+				return 0;
+			}
+			else if (path instanceof P_ZeroOrMore1) {
+				return 0;
+			}
+			else {
+				return minLength(((P_Path1) path).getSubPath());
+			}
+		}
+		else if (path instanceof P_Path2) {
+			Path left = ((P_Path2) path).getLeft();
+			Path right = ((P_Path2) path).getRight();
+			if (path instanceof P_Seq) {
+				return minLength(left) + minLength(right);
+			}
+			else if (path instanceof P_Alt) {
+				return Math.min(minLength(left), minLength(right));
+			}
+		}
+		return 0;
+	}
+	
+	public int maxLength(Path path) {
+		if (path instanceof P_Path0) {
+			return 1;
+		}
+		else if (path instanceof P_Path1) {
+			return maxLength(((P_Path1) path).getSubPath());
+		}
+		else if (path instanceof P_Path2) {
+			Path left = ((P_Path2) path).getLeft();
+			Path right = ((P_Path2) path).getRight();
+			if (path instanceof P_Seq) {
+				return maxLength(left) + maxLength(right);
+			}
+			else if (path instanceof P_Alt) {
+				return Math.max(maxLength(left), maxLength(right));
+			}
+		}
+		else {
+			return 0;
+		}
+		return 0;
+	}
+	
 	public void count(Path path) {
 		if (path instanceof P_Path0) {
 			totalNumberofPaths++;
@@ -216,6 +267,7 @@ public class PathTransform {
 		Node o = tp.getObject();
 		Path p = visit(tp.getPath());
 		count(p);
+		System.out.println(maxLength(p));
 		if (numberOfInverses < (totalNumberofPaths - numberOfInverses)) {
 			if (tp.getPath() instanceof P_Link) {
 				return new OpTriple(Triple.create(s, tp.getPredicate(), o));
@@ -265,5 +317,7 @@ public class PathTransform {
 		System.out.println(pt.totalNumberofPaths);
 		System.out.println(pt.firstInverse);
 		System.out.println(pt.sequence(path));
+		System.out.println(pt.minLength(path));
+		System.out.println(pt.maxLength(path));
 	}
 }

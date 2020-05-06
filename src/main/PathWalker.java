@@ -1,10 +1,14 @@
 package main;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Node;
@@ -38,7 +42,8 @@ public class PathWalker implements PathVisitor {
 	Stack<Node> nodeStack = new Stack<Node>();
 	Stack<Triple> tripleStack = new Stack<Triple>();
 	Set<Node> predicates = new HashSet<Node>();
-
+	Map<Pair<Node,Node>, Set<Pair<Node,Integer>>> delta = new HashMap<Pair<Node,Node>, Set<Pair<Node,Integer>>>();
+	
 	@Override
 	public void visit(P_Link arg0) {
 		Node n = NodeFactory.createBlankNode();

@@ -2,12 +2,14 @@ package main;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
@@ -17,6 +19,7 @@ import org.apache.jena.sparql.algebra.OpVisitor;
 import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.algebra.Transformer;
+import org.apache.jena.sparql.algebra.op.Op1;
 import org.apache.jena.sparql.algebra.op.OpAssign;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpConditional;
@@ -61,7 +64,12 @@ import org.apache.jena.sparql.expr.E_LogicalAnd;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprAggregator;
 import org.apache.jena.sparql.expr.ExprWalker;
+import org.apache.jena.sparql.path.P_Alt;
+import org.apache.jena.sparql.path.P_Seq;
+import org.apache.jena.sparql.path.P_ZeroOrMore1;
 import org.apache.jena.sparql.path.Path;
+
+import data.PropertyPathFeatureCounter;
 
 /**
  * This class implements Jena's OpVisitor. It recursively builds an r-graph from a query.
@@ -669,6 +677,122 @@ public class RGraphBuilder implements OpVisitor {
 		return this.containsPaths;
 	}
 	
+	public Op transitiveClosure(Op op) {
+		if (op instanceof OpBGP) {
+			
+		}
+		else if (op instanceof OpSequence) {
+			List<Op> existingOps = new ArrayList<Op>();
+			List<Op> newOps = new ArrayList<Op>();
+			List<HashSet<Node>> partitions = new ArrayList<HashSet<Node>>();
+			Map<Node,Set<Path>> partitionsPaths = new HashMap<Node,Set<Path>>();
+			for (Op o : ((OpSequence) op).getElements()) {
+				existingOps.add(o);
+				if (o instanceof OpPath) {
+					TriplePath tp = ((OpPath) o).getTriplePath();
+					Set<Path> paths = new HashSet<Path>();
+					Node sub = tp.getSubject();
+					Node obj = tp.getObject();
+					if (partitionsPaths.containsKey(sub)) {
+						paths.addAll(partitionsPaths.get(sub));
+						partitionsPaths.put(sub, paths);
+					}
+					else {
+						partitionsPaths.put(sub, paths);
+					}
+					if (PropertyPathFeatureCounter.minLength(tp.getPath()) == 0) {
+						System.out.println(lengthZeroPaths(tp.getPath()));
+						if (sub.isVariable() && obj.isVariable()) {
+							paths.addAll(lengthZeroPaths(tp.getPath()));
+							partitionsPaths.put(sub, paths);
+							if (partitions.isEmpty()) {
+								HashSet<Node> newPart = new HashSet<Node>();
+								newPart.add(sub);
+								newPart.add(obj);
+								partitions.add(newPart);
+							}
+							else {
+								for (HashSet<Node> part : partitions) {
+									if (part.contains(sub)) {
+										part.add(obj);
+										break;
+									}
+									else if (part.contains(obj)) {
+										part.add(sub);
+										break;
+									}
+									else {
+										HashSet<Node> newPart = new HashSet<Node>();
+										newPart.add(sub);
+										newPart.add(obj);
+										partitions.add(newPart);
+									}
+								}
+							}
+						}
+					}
+				}
+				else if (o instanceof OpBGP) {
+
+				}
+				else if (o instanceof OpTriple) {
+
+				}
+			}
+			System.out.println(partitions);
+			for (HashSet<Node> partition : partitions) {
+				for (Node sub : partition) {
+					for (Node obj : partition) {
+						if (sub.equals(obj)) {
+							continue;
+						}
+						for (Path path : partitionsPaths.get(sub)) {
+							OpPath opPath1 = new OpPath(new TriplePath(sub, path, obj));
+							OpPath opPath2 = new OpPath(new TriplePath(obj, path, sub));
+							if (!existingOps.contains(opPath1)){
+								newOps.add(opPath1);
+							}
+							if (!existingOps.contains(opPath2)) {
+								newOps.add(opPath2);
+							}
+						}
+					}
+				}
+			}
+			System.out.println(newOps);
+		}
+		else if (op instanceof OpUnion) {
+			
+		}
+		else {
+			if (op instanceof Op1) {
+				return transitiveClosure(((Op1) op).getSubOp());
+			}
+			return op;
+		}
+		return op;
+	}
+	
+	public List<Path> lengthZeroPaths(Path path){
+		ArrayList<Path> ans = new ArrayList<Path>();
+		int length = PropertyPathFeatureCounter.minLength(path);
+		if (length == 0) {
+			if (path instanceof P_ZeroOrMore1 || path instanceof P_Seq) {
+				ans.add(path);
+			}
+			else if (path instanceof P_Alt) {
+				List<Path> left = lengthZeroPaths(((P_Alt) path).getLeft());
+				List<Path> right = lengthZeroPaths(((P_Alt) path).getRight());
+				ans.addAll(left);
+				ans.addAll(right);
+			}
+			return ans;
+		}
+		else {
+			return ans;
+		}
+	}
+	
 	public Op uC2RPQCollapse(Op op) {
 		Op op1 = op;
 		Op op2 = op;
@@ -695,12 +819,12 @@ public class RGraphBuilder implements OpVisitor {
 	public Op UCQTransformation(Op op){
 		Op op1 = op;
 		Op op2 = Transformer.transform(new UCQVisitor(), op);
+		op1 = transitiveClosure(op1);
 		op2 = UCQNormalisation(op2);
 		op2 = uC2RPQCollapse(op2);
 //		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
 //		op2 = Transformer.transform(new BGPCollapser(op2,this.projectionVars,false), op2); // transform BGPs
 		op2 = Transformer.transform(new TransformPathFlatternStd(), op2);
-		
 		op2 = Transformer.transform(new TransformSimplify(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
 		op2 = Transformer.transform(new FilterTransform(), op2);

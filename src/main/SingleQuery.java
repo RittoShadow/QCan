@@ -229,7 +229,8 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "prefix : <http://example.org/> SELECT DISTINCT ?x WHERE { ?x :a ?w . ?w :a* ?y . ?x :a* ?z . ?z :a ?c . }";
+		String q = "prefix : <http://example.org/> SELECT DISTINCT ?x WHERE { ?x (:p|:q)+ ?y . ?x :p+ ?z . }";
+		q = "prefix : <http://example.org/> SELECT DISTINCT ?x WHERE { ?x :p1 ?n1 . ?n1 :a* ?n2 . ?n2 :a* ?n1 . ?y :p2 ?n2 . ?n2 :a*/:b* ?n3 . ?n3 :a*|:c* ?n2 . ?z :p3 ?n3 .  }";
 		@SuppressWarnings("unused")
 		SingleQuery sq = new SingleQuery(q,true,true,true);
 		sq.getCanonicalGraph().print();

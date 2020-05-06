@@ -12,6 +12,9 @@ import org.apache.jena.sparql.path.P_Multi;
 import org.apache.jena.sparql.path.P_NegPropSet;
 import org.apache.jena.sparql.path.P_OneOrMore1;
 import org.apache.jena.sparql.path.P_OneOrMoreN;
+import org.apache.jena.sparql.path.P_Path0;
+import org.apache.jena.sparql.path.P_Path1;
+import org.apache.jena.sparql.path.P_Path2;
 import org.apache.jena.sparql.path.P_ReverseLink;
 import org.apache.jena.sparql.path.P_Seq;
 import org.apache.jena.sparql.path.P_Shortest;
@@ -28,6 +31,14 @@ public class PropertyPathFeatureCounter implements PathVisitor {
 	boolean containsStar = false;
 	boolean containsNPS = false;
 	boolean containsZeroOrOne = false;
+	int minLength = 0;
+	int maxLength = 0;
+	
+	public PropertyPathFeatureCounter(Path path) {
+		path.visit(this);
+		minLength = minLength(path);
+		maxLength = maxLength(path);
+	}
 
 	@Override
 	public void visit(P_Link arg0) {
@@ -130,11 +141,63 @@ public class PropertyPathFeatureCounter implements PathVisitor {
 		features.add("P_Seq");
 	}
 	
+	public static int minLength(Path path) {
+		if (path instanceof P_Path0) {
+			return 1;
+		}
+		else if (path instanceof P_Path1) {
+			if (path instanceof P_Inverse) {
+				return 1;
+			}
+			else if (path instanceof P_ZeroOrMore1) {
+				return 0;
+			}
+			else {
+				return minLength(((P_Path1) path).getSubPath());
+			}
+		}
+		else if (path instanceof P_Path2) {
+			Path left = ((P_Path2) path).getLeft();
+			Path right = ((P_Path2) path).getRight();
+			if (path instanceof P_Seq) {
+				return minLength(left) + minLength(right);
+			}
+			else if (path instanceof P_Alt) {
+				return Math.min(minLength(left), minLength(right));
+			}
+		}
+		return 0;
+	}
+	
+	public int maxLength(Path path) {
+		if (path instanceof P_Path0) {
+			return 1;
+		}
+		else if (path instanceof P_Path1) {
+			return maxLength(((P_Path1) path).getSubPath());
+		}
+		else if (path instanceof P_Path2) {
+			Path left = ((P_Path2) path).getLeft();
+			Path right = ((P_Path2) path).getRight();
+			if (path instanceof P_Seq) {
+				return maxLength(left) + maxLength(right);
+			}
+			else if (path instanceof P_Alt) {
+				return Math.max(maxLength(left), maxLength(right));
+			}
+		}
+		else {
+			return 0;
+		}
+		return 0;
+	}
+	
 	public static void main(String[] args) {
-		PropertyPathFeatureCounter ppfc = new PropertyPathFeatureCounter();
 		Path path2 = SSE.parsePath("(alt <http://xmlns.com/foaf/0.1/p> (reverse <http://xmlns.com/foaf/0.1/q>))");
-		path2.visit(ppfc);
+		PropertyPathFeatureCounter ppfc = new PropertyPathFeatureCounter(path2);
 		System.out.println(ppfc.features);
+		System.out.println(ppfc.maxLength);
+		System.out.println(ppfc.minLength);
 	}
 
 }

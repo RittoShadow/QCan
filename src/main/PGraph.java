@@ -1,6 +1,7 @@
 package main;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,6 +52,8 @@ public class PGraph {
 	private Map<Node,Set<Node>> eClosures = new HashMap<Node,Set<Node>>();
 	private Map<Set<Node>,Node> newNodes = new HashMap<Set<Node>,Node>();
 	private List<List<Set<Node>>> partitions = new ArrayList<List<Set<Node>>>();
+	private int minLength = 0;
+	private int maxLength = 0;
 	final String URI = "http://example.org/";
 	private final Node preNode = NodeFactory.createURI(this.URI+"predicate");
 	private final Node typeNode = NodeFactory.createURI(this.URI+"type");
@@ -299,13 +302,13 @@ public class PGraph {
 			minimalDFA.add(Triple.create(newStartState, preNode, p));
 		}
 		eliminateDeadStates(minimalDFA);		
-		try {
-			minimalDFA = label(minimalDFA);
-			Object[] nodes = predicates.toArray();
-			newStartState = GraphUtil.listSubjects(minimalDFA, preNode, (Node) nodes[0]).next();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+//		try {
+//			minimalDFA = label(minimalDFA);
+//			Object[] nodes = predicates.toArray();
+//			newStartState = GraphUtil.listSubjects(minimalDFA, preNode, (Node) nodes[0]).next();
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
 	}
 	
 	public boolean distinguishable(Node a, Node b, List<Set<Node>> list) {
@@ -402,12 +405,16 @@ public class PGraph {
 		complementDFA.add(Triple.create(f, typeNode, finalNode));
 	}
 	
-	public PGraph intersection(PGraph pg) { // Computes intersection of ¬A and B
+	public PGraph intersection(PGraph pg) { // Computes intersection of A and ¬B
 		Graph union = GraphFactory.createPlainGraph();
 		GraphUtil.addInto(union, this.complementDFA);
 		GraphUtil.addInto(union, pg.minimalDFA);
 		if (!this.predicates.equals(pg.predicates)) {
-			return null;
+			for (Node p : this.predicates) {
+				if (!pg.predicates.contains(p)) {
+					return null;
+				}
+			}
 		}
 		Node start = NodeFactory.createBlankNode();
 		Node end = NodeFactory.createBlankNode();
@@ -560,6 +567,7 @@ public class PGraph {
 		Graph dfa = ge.extract(n, graph);
 		Node startState = n;
 		Node newFinalState = null;
+		List<Node> states = orderedStates(dfa, n);
 		for (Node p : predicates) {
 			dfa.remove(n, preNode, p);
 		}
@@ -572,15 +580,6 @@ public class PGraph {
 			dfa.remove(finalState, typeNode, finalNode);
 		}
 		dfa.add(Triple.create(newFinalState, typeNode, finalNode));
-		Set<Node> states = findStates(dfa);
-		states.remove(startState);
-		states.remove(newFinalState);
-		List<Node> statesList = new ArrayList<Node>();
-		for (Node state : states) {
-			statesList.add(state);
-		}
-		List<List<Node>> statePerm = new ArrayList<List<Node>>();
-		statePerm = permutations2(statesList, statePerm, statesList.size());
 		ExtendedIterator<Triple> transitions = GraphUtil.findAll(dfa);
 		while (transitions.hasNext()) {
 			Triple t = transitions.next();
@@ -655,6 +654,47 @@ public class PGraph {
 		return ans;
 	}
 	
+	public Path ardensTheorem() {
+		Path ans = null;
+		Set<Node> states = findStates(this.minimalDFA);
+		for (Node state : states) {
+			if (newStartState.equals(state)) {
+				
+			}
+			else {
+				
+			}
+		}
+		return ans;
+	}
+	
+	public List<Node> orderedStates(Graph g, Node n) {
+		ArrayList<Node> ans = new ArrayList<Node>();
+		Node current = n;
+		ArrayList<Node> orderedPredicates = new ArrayList<Node>();
+		for (Node p : this.predicates) {
+			orderedPredicates.add(p);
+		}
+		Collections.sort(orderedPredicates, new tools.NodeComparator());
+		ans.add(current);
+		orderedStates(current, g, orderedPredicates, ans);
+		return ans;
+	}
+	
+	public List<Node> orderedStates(Node n, Graph g, List<Node> predicates, List<Node> ordered) {
+		Node current = n;
+		for (Node p : predicates) {
+			if (GraphUtil.listObjects(g, current, p).hasNext()) {
+				Node next = GraphUtil.listObjects(g, current, p).next();
+				if (!ordered.contains(next)) {
+					ordered.add(next);
+					orderedStates(next, g, predicates, ordered);
+				}
+			}
+		}
+		return ordered;
+	}
+	
 	public Path dfaToPath(Node startState, Node finalState, Map<Pair<Node,Node>,Path> startTable, List<Node> states) {
 		Path ans = null;
 		Set<Node> statesSet = new HashSet<Node>();
@@ -673,7 +713,7 @@ public class PGraph {
 		return ans;
 	}
 	
-	public void path(Node n, Map<Pair<Node,Node>,Path> transitionTable, Set<Node> states) {
+	public void path(Node n, Map<Pair<Node,Node>,Path> transitionTable, Collection<Node> states) {
 		Set<Pair<Pair<Node,Node>,Path>> toUpdate = new HashSet<Pair<Pair<Node,Node>,Path>>();
 		Set<Pair<Node,Node>> toDelete = new HashSet<Pair<Node,Node>>();
 		for (Node n0 : states) {
@@ -845,21 +885,26 @@ public class PGraph {
 		return ans;
 	}
 	
+	public void setMinimumLength(Node n) {
+		
+	}
+	
 	public static void main(String[] args) {
-		Path path = SSE.parsePath("(path* <http://xmlns.com/foaf/0.1/mbox>)");
-		Path path2 = SSE.parsePath("(alt <http://xmlns.com/foaf/0.1/p> (reverse <http://xmlns.com/foaf/0.1/q>))");
+		Path path2 = SSE.parsePath("(seq <http://xmlns.com/foaf/0.1/p> (path* <http://xmlns.com/foaf/0.1/p>))");
+		Path path = SSE.parsePath("(seq (seq <http://xmlns.com/foaf/0.1/p> (reverse <http://xmlns.com/foaf/0.1/p>) ) <http://xmlns.com/foaf/0.1/p> )");
 		PathTransform pt = new PathTransform();
 		path = pt.visit(path);
-		path2 = pt.visit(path2);
 		TriplePath tp = new TriplePath(NodeFactory.createBlankNode(),path,NodeFactory.createBlankNode());
-		TriplePath tp2 = new TriplePath(NodeFactory.createBlankNode(),path2,NodeFactory.createBlankNode());
 		PGraph pg = new PGraph(tp);
-		PGraph pg2 = new PGraph(tp2);
-		System.out.println(pg.containedIn(pg2));
-		System.out.println(pg2.containedIn(pg));
+		pg.printMinimalDFA();
+		System.out.println(pg.getNormalisedPath());
+		System.out.println(pg.orderedStates(pg.minimalDFA, pg.getStartState()));
+		PGraph pg1 = new PGraph(path);
+		PGraph pg2 = new PGraph(path2);
+		System.out.println(pg1.containedIn(pg2));
+		System.out.println(pg2.containedIn(pg1));
+		pg1.printMinimalDFA();
 		System.out.println();
-		System.out.println(pg2.containedIn(pg2));
 		pg2.printMinimalDFA();
-		System.out.println(pg2.getNormalisedPath());
 	}
 }

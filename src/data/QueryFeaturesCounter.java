@@ -46,6 +46,41 @@ public class QueryFeaturesCounter {
 	int otherUnspecifiedExceptions = 0;
 	int numberOfDuplicates = 0;
 	
+	
+	public String pathFeatures(String s) throws Exception {
+		String ans = "{ ";
+		Query q = QueryFactory.create(s);
+		Op op = Algebra.compile(q);
+		FeatureCounter fc = new FeatureCounter(op);
+		OpWalker.walk(op, fc);
+		if (fc.getContainsPaths()) {
+			for (String f : fc.getPathStats()) {
+				ans += f + "\n";
+			}
+			ans = ans.substring(0, ans.length() - 1) + "} : " + fc.nPaths;
+		}
+		else {
+			return null;
+		}
+		return ans;
+	}
+	public String parsePaths(String s) throws Exception {
+		Query q = QueryFactory.create(s);
+		Op op = Algebra.compile(q);
+		if (!q.getGraphURIs().isEmpty() || !q.getNamedGraphURIs().isEmpty()){
+			this.features.add("named");
+		}	
+		FeatureCounter fc = new FeatureCounter(op);
+		OpWalker.walk(op, fc);
+		HashSet<String> features = fc.getFeatures();
+		if (features.contains("path")) {
+			return s;
+		}
+		else {
+			return null;
+		}
+	}
+	
 	public void parse(String s) throws Exception{
 		Query q = QueryFactory.create(s);
 		Op op = Algebra.compile(q);
@@ -116,6 +151,57 @@ public class QueryFeaturesCounter {
 		new QueryFeaturesCounter(f, true);
 	}
 	
+	public QueryFeaturesCounter(File f, boolean parse, boolean paths) throws IOException {
+		if (paths) {
+			String s;
+			if (parse) {
+				this.file = new File("resultFiles/features/paths/wikiPaths"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+			}
+			else {
+				this.file = new File("resultFiles/features/paths/pathFeatures"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+			}
+			if (!this.file.exists()) {
+				this.file.createNewFile();
+			}
+			fw = new FileWriter(this.file, true);
+			bw = new BufferedWriter(fw);
+			try {
+				bf = new BufferedReader(new FileReader(f));
+				while ((s = bf.readLine()) != null) {
+					try {
+						String ans;
+						if (parse) {
+							ans = parsePaths(s);
+						}
+						else {
+							ans = pathFeatures(s);
+						}
+						if (ans != null) {
+							bw.append(ans);
+							bw.newLine();
+						}
+					}
+					catch (UnsupportedOperationException e){
+						unsupportedQueries++;
+					}
+					catch(QueryParseException e){
+						badSyntaxQueries++;
+					} 
+					catch (Exception e) {
+						otherUnspecifiedExceptions++;
+					}
+				}
+			}
+			catch (FileNotFoundException e) {
+				
+			}
+			bw.close();
+		}
+		else {
+			new QueryFeaturesCounter(f,parse);
+		}
+	}
+	
 	public QueryFeaturesCounter(File f, boolean parse) throws IOException{
 		String s;
 		this.file = new File("resultFiles/features/result"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
@@ -127,8 +213,8 @@ public class QueryFeaturesCounter {
 		try {
 			bf = new BufferedReader(new FileReader(f));
 			long t = System.currentTimeMillis();
-			while ((s = bf.readLine())!=null){
-				if (parse) {
+			if (parse){
+				while ((s = bf.readLine())!=null) {
 					try{
 						this.parse(s);
 					}
@@ -206,16 +292,232 @@ public class QueryFeaturesCounter {
 		System.out.println(featureMap);
 	}
 	
+	public static void pathFiles(File f) throws Exception {
+		pathFiles(f, -1);
+	}
+	
+	public static void pathFiles(File f, int k) throws Exception {
+		String s;
+		BufferedReader br = new BufferedReader(new FileReader(f));
+		int i = 0;
+		int nLines = 0;
+		int minNPaths = 0;
+		int maxNPaths = 0;
+		HashMap<String,Integer> instances = new HashMap<String,Integer>();
+		HashMap<String,Integer> normalInstances = new HashMap<String,Integer>();
+		long lengths = 0;
+		long normalLengths = 0;
+		long totalNPaths = 0;
+		long minTime = 0;
+		long maxTime = 0;
+		long totalTime = 0;
+		int different = 0;
+		int minLength = 0, minNormalLength = 0, maxLength = 0, maxNormalLength = 0;
+		while ((s = br.readLine()) != null) {
+			nLines++;
+			if (i == k) {
+				break;
+			}
+			if (s.startsWith("{")) {
+				i++;
+				s = s.substring(1).trim();
+				if (s.contains(":")) {
+					int nPaths = Integer.parseInt(s.substring(s.indexOf(":") + 1).trim());
+					try {
+						s = s.substring(0, s.indexOf("}") - 1).trim();
+					}
+					catch (StringIndexOutOfBoundsException e) {
+						continue;
+					}
+					totalNPaths += nPaths;
+					if (minNPaths == 0) {
+						minNPaths = nPaths;
+					}
+					else {
+						minNPaths = Math.min(minNPaths, nPaths);
+					}
+					if (maxNPaths == 0) {
+						maxNPaths = nPaths;
+					}
+					else {
+						maxNPaths = Math.max(maxNPaths, nPaths);
+					}
+				}
+				String[] params = s.split("\t");
+				if (params.length == 5) {
+					String features1 = params[0];
+					int size1 = Integer.parseInt(params[1]);
+					String features2 = params[2];
+					int size2 = Integer.parseInt(params[3]);
+					long time = Long.parseLong(params[4]);
+					if (instances.containsKey(features1)) {
+						instances.put(features1, instances.get(features1) + 1);
+					}
+					else {
+						instances.put(features1, 1);
+					}
+					if (normalInstances.containsKey(features2)) {
+						normalInstances.put(features2, normalInstances.get(features2) + 1);
+					}
+					else {
+						normalInstances.put(features2, 1);
+					}
+					if (minLength == 0) {
+						minLength = size1;
+					}
+					else {
+						minLength = Math.min(minLength, size1);
+					}
+					if (maxLength == 0) {
+						maxLength = size1;
+					}
+					else {
+						maxLength = Math.max(maxLength, size1);
+					}
+					if (minNormalLength == 0) {
+						minNormalLength = size2;
+					}
+					else {
+						minNormalLength = Math.min(minNormalLength, size2);
+					}
+					if (maxNormalLength == 0) {
+						maxNormalLength = size2;
+					}
+					else {
+						maxNormalLength = Math.max(maxNormalLength, size2);
+					}
+					if (minTime == 0) {
+						minTime = time;
+					}
+					else {
+						minTime = Math.min(minTime, time);
+					}
+					if (maxTime == 0) {
+						maxTime = time;
+					}
+					else {
+						maxTime = Math.max(maxTime, time);
+					}
+					totalTime += time;
+					lengths += size1;
+					normalLengths += size2;
+					if (size1 != size2) {
+						different++;
+					}
+				}
+				else {
+					continue;
+				}
+			}
+			else {
+				if (s.contains(":")) {
+					int nPaths = Integer.parseInt(s.substring(s.indexOf(":") + 1).trim());
+					s = s.substring(0, s.indexOf("}") - 1).trim();
+					totalNPaths += nPaths;
+					if (minNPaths == 0) {
+						minNPaths = nPaths;
+					}
+					else {
+						minNPaths = Math.min(minNPaths, nPaths);
+					}
+					if (maxNPaths == 0) {
+						maxNPaths = nPaths;
+					}
+					else {
+						maxNPaths = Math.max(maxNPaths, nPaths);
+					}
+				}
+				String[] params = s.split("\t");
+				if (params.length != 5) {
+					continue;
+				}
+				String features1 = params[0];
+				int size1 = Integer.parseInt(params[1]);
+				String features2 = params[2];
+				int size2 = Integer.parseInt(params[3]);
+				long time = Long.parseLong(params[4]);
+				if (instances.containsKey(features1)) {
+					instances.put(features1, instances.get(features1) + 1);
+				}
+				else {
+					instances.put(features1, 1);
+				}
+				if (normalInstances.containsKey(features2)) {
+					normalInstances.put(features2, normalInstances.get(features2) + 1);
+				}
+				else {
+					normalInstances.put(features2, 1);
+				}
+				if (minLength == 0) {
+					minLength = size1;
+				}
+				else {
+					minLength = Math.min(minLength, size1);
+				}
+				if (maxLength == 0) {
+					maxLength = size1;
+				}
+				else {
+					maxLength = Math.max(maxLength, size1);
+				}
+				if (minNormalLength == 0) {
+					minNormalLength = size2;
+				}
+				else {
+					minNormalLength = Math.min(minNormalLength, size2);
+				}
+				if (maxNormalLength == 0) {
+					maxNormalLength = size2;
+				}
+				else {
+					maxNormalLength = Math.max(maxNormalLength, size2);
+				}
+				if (maxTime == 0) {
+					maxTime = time;
+				}
+				else {
+					maxTime = Math.max(maxTime, time);
+				}
+				totalTime += time;
+				lengths += size1;
+				normalLengths += size2;
+				if (size1 != size2) {
+					different++;
+				}
+			}
+		}
+		double avgTime = (double) totalTime/nLines;
+		double avgNPaths = (double) totalNPaths/i;
+		double avgLengths = (double) lengths/nLines;
+		double avgNormalLengths = (double) normalLengths/nLines;
+		System.out.println("Number of queries: " + i);
+		System.out.println("Average time: " + avgTime + " ns");
+		System.out.println("Average paths in each query: " + avgNPaths);
+		System.out.println("Average length of paths: " + avgLengths);
+		System.out.println("Average length of normalised paths: " + avgNormalLengths);
+		System.out.println("Min time: " + minTime + " ns");
+		System.out.println("Max time: " + maxTime + " ns");
+		System.out.println("Min length of paths: " + minLength);
+		System.out.println("Max length of paths: " + maxLength);
+		System.out.println("Min length of normalised paths: " + minNormalLength);
+		System.out.println("Max length of normalised paths: " + maxNormalLength);
+		System.out.println("Number of different paths: " + different);
+		for (String str : instances.keySet()) {
+			System.out.println(str + ": " + instances.get(str));
+		}
+		System.out.println("");
+		for (String str : normalInstances.keySet()) {
+			System.out.println(str + ": " + normalInstances.get(str));
+		}
+		br.close();
+	}
+	
 	public boolean equalQueries(int x, int y){
 		return canonQueries.get(x).equals(canonQueries.get(y));
 	}
 	
 	@SuppressWarnings("unused")
-	public static void main(String[] args) throws IOException{
-//		for (int i = 100; i < 183; i++) {
-//			String n = String.valueOf(i).substring(1);
-//			QueryFeaturesCounter qp = new QueryFeaturesCounter(new File("testFiles/utf8WikiDataQueries/utfWikiData"+n), true);
-//		}
-		QueryFeaturesCounter.combineFiles(new File("resultFiles/features").toPath());
+	public static void main(String[] args) throws Exception{
+			QueryFeaturesCounter.pathFiles(new File("resultFiles/features/paths/pathFeatures20200326_195951.log"), 1000000);
 	}		
 }

@@ -1119,6 +1119,7 @@ public class BGPCollapser extends TransformCopy {
 			int minNodes = 0;
 			while (rs.hasNext()) {
 				QuerySolution qs = rs.nextSolution();
+				System.out.println(qs);
 				Set<Node> nodes = new HashSet<Node>();
 				Set<Node> paths = new HashSet<Node>();
 				boolean isValid = true;

@@ -44,10 +44,14 @@ import org.apache.jena.sparql.algebra.op.OpTable;
 import org.apache.jena.sparql.algebra.op.OpTopN;
 import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.algebra.op.OpUnion;
+import org.apache.jena.sparql.path.Path;
+
+import main.PGraph;
 
 public class FeatureCounter implements OpVisitor {
 	
 	public int nTriples = 0;
+	public int nPaths = 0;
 	private boolean containsUnion = false;
 	private boolean containsJoin = false;
 	private boolean containsOptional = false;
@@ -63,6 +67,7 @@ public class FeatureCounter implements OpVisitor {
 	private boolean isM2RPQ = false;
 	private HashSet<String> features = new HashSet<String>();
 	private HashSet<String> pathFeatures = new HashSet<String>();
+	private HashSet<String> pathStats = new HashSet<String>();
 	
 	public FeatureCounter(){
 		
@@ -117,9 +122,40 @@ public class FeatureCounter implements OpVisitor {
 	public void visit(OpPath arg0) {
 		features.add(arg0.getName());
 		containsPaths = true;
-		PropertyPathFeatureCounter ppfc = new PropertyPathFeatureCounter();
-		arg0.getTriplePath().getPath().visit(ppfc);
+		Path p = arg0.getTriplePath().getPath();
+		PropertyPathFeatureCounter ppfc = new PropertyPathFeatureCounter(p);
 		pathFeatures.addAll(ppfc.features);
+		nPaths++;
+		boolean path = true;
+		if (path) {
+			String pFeatures = "[";
+			for (String f : ppfc.features) {
+				pFeatures += f + ", ";
+			}
+			pFeatures = pFeatures.substring(0, pFeatures.length() - 1) + "]\t";
+			pFeatures += ppfc.maxLength + "\t";
+			if (ppfc.features.contains("P_NegPropSet") || ppfc.features.contains("P_Mod") || ppfc.features.contains("P_Distinct") || ppfc.features.contains("P_ZeroOrOne") || ppfc.features.contains("P_Multi") || ppfc.features.contains("P_Shortest")) {
+				pFeatures += "unsupported";
+				return;
+			}
+			else {
+				PGraph pg = new PGraph(p);
+				long t = System.nanoTime();
+				Path normal = pg.getNormalisedPath();
+				PropertyPathFeatureCounter ppfc2 = new PropertyPathFeatureCounter(normal);
+				t = System.nanoTime() - t;
+				pFeatures += "[";
+				for (String f : ppfc2.features) {
+					pFeatures += f + ", ";
+				}
+				pFeatures = pFeatures.substring(0, pFeatures.length() - 1) + "]\t";
+				pFeatures += ppfc2.maxLength + "\t";
+				pFeatures += t;
+				System.out.println(t);
+				pathStats.add(pFeatures);
+			}
+			
+		}
 	}
 
 	@Override
@@ -598,6 +634,10 @@ public class FeatureCounter implements OpVisitor {
 		}
 	}
 	
+	public HashSet<String> getPathStats() { 
+		return this.pathStats;
+	}
+	
 	public static void main(String[] args) {
 		Query q = QueryFactory.create("SELECT  *\r\n" + 
 				"WHERE\r\n" + 
@@ -608,6 +648,7 @@ public class FeatureCounter implements OpVisitor {
 		FeatureCounter fc = new FeatureCounter(op);
 		OpWalker.walk(op, fc);
 		System.out.println(fc.features);
+		System.out.println(fc.pathStats);
 	}
 
 }
