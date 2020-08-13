@@ -1,18 +1,26 @@
 package main;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpAsQuery;
+import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
 import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
 import org.apache.jena.sparql.algebra.optimize.TransformPathFlatternStd;
 import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
+import org.apache.jena.sparql.core.Var;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
+import data.FeatureCounter;
+import transformers.FilterTransform;
+import transformers.UCQTransformer;
 
 /**
  * A class that takes a query as an input, performs a canonicalisation and measures how long it takes.
@@ -21,11 +29,15 @@ import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
  */
 public class SingleQuery {
 	
-	private long time = 0;
-	private long canonTime = 0;
+	private long graphTime = 0;
+	private long labelTime = 0;
+	private long rewriteTime = 0;
+	private long minimisationTime = 0;
 	private int nTriples = 0;
 	private RGraph graph;
 	private RGraph canonGraph;
+	private Set<Var> vars = new HashSet<Var>();
+	private Set<Var> canonVars = new HashSet<Var>();
 	private boolean enableLeaning = true;
 	private boolean containsUnion = false;
 	private boolean containsJoin = false;
@@ -33,7 +45,12 @@ public class SingleQuery {
 	private boolean containsFilter = false;
 	private boolean containsSolutionMods = false;
 	private boolean containsNamedGraphs = false;
-	
+	private boolean pathNormalisation = false;
+	private boolean containsPaths = false;
+	private boolean containsMinus = false;
+	private boolean containsBind = false;
+	private boolean containsGroupBy = false;
+	private boolean containsTable = false;
 	
 	public SingleQuery(String q) throws InterruptedException, HashCollisionException{
 		this(q,true,true);
@@ -44,18 +61,21 @@ public class SingleQuery {
 	}
 	
 	public SingleQuery(String q, boolean canon, boolean leaning, boolean verbose) throws InterruptedException, HashCollisionException{
+		this(q,canon,leaning,verbose,false);
+	}
+	
+	public SingleQuery(String q, boolean canon, boolean leaning, boolean verbose, boolean pathNormalisation) throws InterruptedException, HashCollisionException{
 		setLeaning(leaning);
+		this.pathNormalisation  = pathNormalisation;
 		long t = System.nanoTime();
 		parseQuery(q);
-		time = System.nanoTime() - t;
+		graphTime = System.nanoTime() - t;
 		if (canon){
-			t = System.nanoTime();
 			canonicalise(verbose);
-			canonTime = System.nanoTime() - t;
 		}
 		else{
 			canonGraph = this.graph;
-			canonTime = time;
+			minimisationTime = graphTime;
 		}
 	}
 	
@@ -68,10 +88,10 @@ public class SingleQuery {
 	public static Op UCQTransformation(Op op){
 		Op op2 = Transformer.transform(new TransformPathFlatternStd(), op);
 		op2 = Transformer.transform(new TransformSimplify(), op2);
-		op2 = Transformer.transform(new UCQVisitor(), op2);
+		op2 = Transformer.transform(new UCQTransformer(), op2);
 		while (!op.equals(op2)){
 			op = op2;
-			op2 = Transformer.transform(new UCQVisitor(), op2);
+			op2 = Transformer.transform(new UCQTransformer(), op2);
 		}
 		op2 = Transformer.transform(new FilterTransform(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
@@ -97,10 +117,13 @@ public class SingleQuery {
 	public void parseQuery(String q) throws UnsupportedOperationException, QueryParseException{
 		Query query = QueryFactory.create(q);
 		Op op = Algebra.compile(query);
-		RGraphBuilder rgb = new RGraphBuilder(query);
+		RGraphBuilder rgb = new RGraphBuilder(query,pathNormalisation);
 		graph = rgb.getResult();
+		graphTime = rgb.graphTime;
+		rewriteTime = rgb.rewriteTime;
+		vars = rgb.varsContainedIn(op);
 		if (!rgb.isDistinct){
-			if (rgb.totalVars.containsAll(rgb.projectionVars) && rgb.projectionVars.containsAll(rgb.totalVars)){
+			if (vars.containsAll(rgb.projectionVars) && rgb.projectionVars.containsAll(vars)){
 				if (!checkBranchVars(op)){
 					graph.setDistinctNode(true);
 				}			
@@ -115,23 +138,31 @@ public class SingleQuery {
 		else{
 			graph.setDistinctNode(true);
 		}
-		nTriples = rgb.nTriples;
-		containsUnion = rgb.getContainsUnion();
-		containsJoin = rgb.getContainsJoin();
-		containsOptional = rgb.getContainsOptional();
-		containsFilter = rgb.getContainsFilter();
-		containsNamedGraphs = rgb.getContainsNamedGraphs();
-		containsSolutionMods = rgb.getContainsSolutionMods();
+		FeatureCounter fc = new FeatureCounter(op);
+		OpWalker.walk(op, fc);
+		nTriples = graph.getNumberOfTriples();
+		containsUnion = fc.getContainsUnion();
+		containsJoin = fc.getContainsJoin();
+		containsOptional = fc.getContainsOptional();
+		containsFilter = fc.getContainsFilter();
+		containsNamedGraphs = fc.getContainsNamedGraphs();
+		containsSolutionMods = fc.getContainsSolutionMods();
+		setContainsPaths(fc.getContainsPaths());
+		setContainsMinus(fc.getPathFeatures().contains("minus"));
+		setContainsBind(fc.getPathFeatures().contains("extend"));
+		setContainsGroupBy(fc.getPathFeatures().contains("group"));
+		setContainsTable(fc.getPathFeatures().contains("table"));
 	}
 	
 	public void canonicalise() throws InterruptedException, HashCollisionException{
-		this.graph.setLeaning(enableLeaning);
-		canonGraph = this.graph.getCanonicalForm(false);
+		canonicalise(false);
 	}
 	
 	public void canonicalise(boolean verbose) throws InterruptedException, HashCollisionException{
 		this.graph.setLeaning(enableLeaning);
 		canonGraph = this.graph.getCanonicalForm(verbose);
+		this.labelTime = canonGraph.getLabelTime();
+		this.minimisationTime = canonGraph.getMinimisationTime();
 	}
 	
 	public boolean determineSemantics(){
@@ -144,11 +175,19 @@ public class SingleQuery {
 	}
 	
 	public long getGraphCreationTime(){
-		return this.time;
+		return this.graphTime;
+	}
+	
+	public long getRewriteTime() {
+		return this.rewriteTime;
+	}
+	
+	public long getLabelTime() {
+		return this.labelTime;
 	}
 	
 	public long getCanonicalisationTime(){
-		return this.canonTime;
+		return this.minimisationTime;
 	}
 	
 	public int getInitialTriples(){
@@ -172,15 +211,16 @@ public class SingleQuery {
 	}
 	
 	public int getVarsIn(){
-		return graph.getNumberOfVars();
+		return this.vars.size();
 	}
 	
 	public int getVarsOut(){
-		return canonGraph.getNumberOfVars();
+		return this.canonVars.size();
 	}
 	
 	public String getQuery(){
 		QueryBuilder qb = new QueryBuilder(this.canonGraph);
+		this.canonVars = qb.getVars();
 		return qb.getQuery();
 	}
 	
@@ -229,11 +269,53 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "prefix : <http://example.org/> SELECT DISTINCT ?x WHERE { ?x (:p|:q)+ ?y . ?x :p+ ?z . }";
-		q = "prefix : <http://example.org/> SELECT DISTINCT ?x WHERE { ?x :p1 ?n1 . ?n1 :a* ?n2 . ?n2 :a* ?n1 . ?y :p2 ?n2 . ?n2 :a*/:b* ?n3 . ?n3 :a*|:c* ?n2 . ?z :p3 ?n3 .  }";
-		@SuppressWarnings("unused")
-		SingleQuery sq = new SingleQuery(q,true,true,true);
+		String q = "SELECT * WHERE {  {    ?var1  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var3  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var4  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var5  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var6  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var7  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   VALUES (  ?var1  ) {    (  <http://www.wikidata.org/entity/Q43361>  )    (  <http://www.wikidata.org/entity/Q46751>  )    (  <http://www.wikidata.org/entity/Q46750>  )    (  <http://www.wikidata.org/entity/Q47209>  )   }   VALUES (  ?var3  ) {    (  <http://www.wikidata.org/entity/Q46751>  )   }   VALUES (  ?var4  ) {    (  <http://www.wikidata.org/entity/Q46758>  )   }   VALUES (  ?var5  ) {    (  <http://www.wikidata.org/entity/Q46887>  )   }   VALUES (  ?var6  ) {    (  <http://www.wikidata.org/entity/Q47210>  )   }   VALUES (  ?var7  ) {    (  <http://www.wikidata.org/entity/Q47598>  )   } } ";
+		SingleQuery sq = new SingleQuery(q,true,true,true,true);
 		sq.getCanonicalGraph().print();
 		System.out.println(sq.getQuery());
+		System.out.println(sq.graphTime/Math.pow(10, 9));
+		System.out.println(sq.rewriteTime/Math.pow(10, 9));
+		System.out.println(sq.labelTime/Math.pow(10, 9));
+		System.out.println(sq.minimisationTime/Math.pow(10, 9));
+	}
+
+	public boolean containsPaths() {
+		return containsPaths;
+	}
+
+	public void setContainsPaths(boolean containsPaths) {
+		this.containsPaths = containsPaths;
+	}
+
+	public boolean containsMinus() {
+		return containsMinus;
+	}
+
+	public void setContainsMinus(boolean containsMinus) {
+		this.containsMinus = containsMinus;
+	}
+
+	public boolean containsBind() {
+		return containsBind;
+	}
+
+	public void setContainsBind(boolean containsBind) {
+		this.containsBind = containsBind;
+	}
+
+	public boolean containsGroupBy() {
+		return containsGroupBy;
+	}
+
+	public void setContainsGroupBy(boolean containsGroupBy) {
+		this.containsGroupBy = containsGroupBy;
+	}
+
+	public boolean containsTable() {
+		return containsTable;
+	}
+
+	public void setContainsTable(boolean containsTable) {
+		this.containsTable = containsTable;
 	}
 }

@@ -135,7 +135,7 @@ public class MultipleGenerator implements FileVisitor<Path> {
 			Path p = new File(commandLine.getOptionValue("x")).toPath();
 			MultipleGenerator mg = new MultipleGenerator(p);
 			if (commandLine.hasOption("t")){
-				mg.setTimeout(new Long(commandLine.getOptionValue("t")));
+				mg.setTimeout(Long.parseLong(commandLine.getOptionValue("t")));
 			}
 			mg.start();
 			mg.done();

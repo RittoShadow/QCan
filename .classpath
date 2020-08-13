@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src"/>
 	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
 		<attributes>
 			<attribute name="module" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.USER_LIBRARY/JenaLibs"/>
-	<classpathentry exported="true" kind="lib" path="lib/nxparser-1.2.3.jar"/>
-	<classpathentry exported="true" kind="lib" path="lib/guava-18.0.jar"/>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="eval"/>
+	<classpathentry kind="src" path="testFiles"/>
+	<classpathentry exported="true" kind="lib" path="lib/blabel.jar" sourcepath="lib/blabel.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/commons-cli-1.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="lib/blabel.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
-	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.module.container"/>
-	<classpathentry kind="output" path="target/classes"/>
+	<classpathentry exported="true" kind="lib" path="lib/guava-18.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/nxparser-1.2.3.jar"/>
+	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.USER_LIBRARY/junit"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/junit"/>
+	<classpathentry kind="output" path="target/production/QCan"/>
 </classpath>

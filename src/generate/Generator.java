@@ -36,8 +36,8 @@ public class Generator {
 		while ((s = br.readLine()) != null){
 			String[] coords = s.split(" ");
 			int r = Math.abs(rng.nextInt((int) Math.pow(2, 20)));
-			int v0 = new Integer(coords[1]);
-			int v1 = new Integer(coords[2]);
+			int v0 = Integer.parseInt(coords[1]);
+			int v1 = Integer.parseInt(coords[2]);
 			if (!hm.containsKey(v0)){
 				hm.put(v0, NodeFactory.createVariable("v"+(v0+r)));
 				vars.add(Var.alloc("v"+(v0+r)));		

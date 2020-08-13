@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component inherit-compiler-output="true" jdk="12" jdk_type="JavaSDK">
+	<output-test url="file://$MODULE_DIR$/target/test/QCan"/>
+	<exclude-output/>
+	<contentEntry url="file://$MODULE_DIR$">
+		<testFolder url="file://$MODULE_DIR$/testFiles"/>
+	</contentEntry>
+	<lib name="blabel.jar" scope="COMPILE">
+		<srcroot url="jar://$MODULE_DIR$/lib/blabel.jar!/"/>
+		<relative-module-src project-related="jar://$PROJECT_DIR$/lib/blabel.jar!/"/>
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/lib/blabel.jar!/"/>
+	</lib>
+	<lib name="commons-cli-1.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/lib/commons-cli-1.1.jar!/"/>
+	</lib>
+	<lib name="guava-18.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/lib/guava-18.0.jar!/"/>
+	</lib>
+	<lib name="nxparser-1.2.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/lib/nxparser-1.2.3.jar!/"/>
+	</lib>
+	<lib name="junit" scope="TEST"/>
+	<levels>
+		<level name="junit" value="project"/>
+	</levels>
+</component>

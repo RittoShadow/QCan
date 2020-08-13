@@ -106,10 +106,10 @@ public class UCQGeneratorTest {
 		    int conjunctions = 3;
 		    int unions = 3;
 		    if (commandLine.hasOption("c")){
-				conjunctions = new Integer(commandLine.getOptionValue("c"));
+				conjunctions = Integer.valueOf(commandLine.getOptionValue("c"));
 			}
 			if (commandLine.hasOption("u")){
-				unions = new Integer(commandLine.getOptionValue("u"));
+				unions = Integer.valueOf(commandLine.getOptionValue("u"));
 			}
 			UCQGeneratorTest test = new UCQGeneratorTest();
 			test.testAll(conjunctions,unions);

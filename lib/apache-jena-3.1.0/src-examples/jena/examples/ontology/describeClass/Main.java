@@ -82,7 +82,7 @@ public class Main {
     //////////////////////////////////
 
     /**
-     * Add alternate paths to save downloading the default ontologies from the Web
+     * Add alternate paths.paths to save downloading the default ontologies from the Web
      */
     protected static void addFoodWineAltPaths( OntDocumentManager odm ) {
         odm.addAltEntry( "http://www.w3.org/2001/sw/WebOnt/guide-src/wine",

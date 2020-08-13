@@ -18,7 +18,7 @@ public class DuplicatesCounter {
 		while ((s = br.readLine()) != null){
 			if (Pattern.matches("\\s:\\s\\d+", s)){
 				s = s.substring(s.lastIndexOf(":")+1).trim();
-				int i = new Integer(s);
+				int i = Integer.parseInt(s);
 				duplicates.add(i);
 				total += (i-1);
 			}

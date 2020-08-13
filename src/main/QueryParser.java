@@ -42,6 +42,8 @@ public class QueryParser {
 	boolean enableOptional = true;
 	boolean enableCanonical = true;
 	boolean enableLeaning = true;
+	boolean verbose = false;
+	protected boolean pathNormalisation = false;
 	
 	public void parse(final String s) throws Exception{
 		System.out.println("Begin parsing.");
@@ -50,16 +52,19 @@ public class QueryParser {
 			@Override
 			public void run() {
 				try {
-					SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning);
-					queryInfo = totalQueries + "\t" + q.getGraphCreationTime() + "\t";
-					queryInfo += q.getCanonicalisationTime() + "\t";
-					queryInfo += q.getInitialTriples() + "\t";
-					queryInfo += q.triplePatternsIn() + "\t";
-					queryInfo += q.getVarsIn() + "\t";
-					queryInfo += q.triplePatternsOut() + "\t";
-					queryInfo += q.getVarsOut() + "\t";
-					queryInfo += q.graphSizeIn() + "\t";
-					queryInfo += q.graphSizeOut() + "\t";
+					queryInfo = "";
+					SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning, verbose, pathNormalisation );
+					queryInfo = totalQueries + "\t" + q.getGraphCreationTime() + "\t"; //1
+					queryInfo += q.getRewriteTime() + "\t"; //2
+					queryInfo += q.getLabelTime() + "\t"; //3
+					queryInfo += q.getCanonicalisationTime() + "\t"; //4
+					queryInfo += q.getInitialTriples() + "\t"; //5
+					queryInfo += q.triplePatternsIn() + "\t"; //6
+					queryInfo += q.getVarsIn() + "\t"; //7
+					queryInfo += q.triplePatternsOut() + "\t"; //8
+					queryInfo += q.getVarsOut() + "\t"; //9
+					queryInfo += q.graphSizeIn() + "\t"; //10
+					queryInfo += q.graphSizeOut() + "\t"; //11
 					queryInfo += q.isDistinct() + "\t";
 					queryInfo += q.hasJoin() + "\t";
 					queryInfo += q.hasUnion() + "\t";
@@ -67,10 +72,19 @@ public class QueryParser {
 					queryInfo += q.getContainsFilter() + "\t";
 					queryInfo += q.getContainsNamedGraphs() + "\t";
 					queryInfo += q.getContainsSolutionMods() + "\t";
-					System.out.println("Adding to set");
+					queryInfo += q.containsBind() + "\t";
+					queryInfo += q.containsGroupBy() + "\t";
+					queryInfo += q.containsMinus() +"\t";
+					queryInfo += q.containsPaths() + "\t";
+					queryInfo += q.containsTable();
+					if (verbose) {
+						System.out.println("Adding to set");
+					}
 					canonQueries.add(q.getQuery());
-					System.out.println("Added to set");
-					System.out.println("Writing to file");
+					if (verbose) {
+						System.out.println("Added to set");
+						System.out.println("Writing to file");
+					}
 				} catch (InterruptedException | HashCollisionException e) {
 					interruptedExceptions++;
 					unsupportedQueriesList.add(s);
@@ -78,7 +92,9 @@ public class QueryParser {
 				}
 				catch (UnsupportedOperationException | NullPointerException e){
 					unsupportedQueries++;
-					uQ.add(e.getMessage());
+					Query q = QueryFactory.create(s);
+					canonQueries.add(q.toString());
+					unsupportedQueriesList.add(e.getMessage() + ": " + s);
 				}
 				catch(QueryParseException e){
 					badSyntaxQueries++;
@@ -94,11 +110,13 @@ public class QueryParser {
 		slave.start();
 		try{
 			slave.join(1000*1*60);
-			System.out.println("Parsing done");
-			bw.append(queryInfo);
-			bw.newLine();
-			bw.flush();
-			System.out.println("Flushed");
+			if (!queryInfo.equals("")) {
+				System.out.println("Parsing done");
+				bw.append(queryInfo);
+				bw.newLine();
+				bw.flush();
+				System.out.println("Flushed");
+			}
 			supportedQueries++;
 		}
 		catch(InterruptedException e){
@@ -108,7 +126,6 @@ public class QueryParser {
 			bw.newLine();
 			bw.flush();
 		}
-		
 	}
 	
 	public QueryParser(File f, File out, int upTo, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanon) throws IOException{
@@ -147,7 +164,9 @@ public class QueryParser {
 				}
 				catch (UnsupportedOperationException e){
 					unsupportedQueries++;
-					uQ.add(e.getMessage());
+					Query q = QueryFactory.create(s);
+					canonQueries.add(q.toString());
+					unsupportedQueriesList.add(e.getMessage() + ": " +s);
 				}
 				catch(QueryParseException e){
 					badSyntaxQueries++;
@@ -163,6 +182,64 @@ public class QueryParser {
 			this.totalTime = System.currentTimeMillis() - t;
 			bw.write(getQueryInfo());
 			bw.close();
+			this.outputUnsupportedQueries();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}		
+	}
+	
+	public QueryParser(File f, File out, int upTo, int offset, boolean paths) throws IOException{
+		String s;
+		int i = 0;
+		this.enableFilter = true;
+		this.enableOptional = true;
+		this.pathNormalisation = paths;
+		this.enableLeaning(true);
+		this.enableCanonicalisation(true);
+		try {
+			bf = new BufferedReader(new FileReader(f));
+			fw = new FileWriter(out);
+			bw = new BufferedWriter(fw);
+			long t = System.currentTimeMillis();
+			while ((s = bf.readLine())!=null){
+				if (i == upTo){
+					break;
+				}
+				if (i % 1000 == 0){
+					System.out.println(i + " queries read.");
+				}
+				if (i < offset){
+					i++;
+					continue;
+				}
+				try{
+					if (i == 0){
+						@SuppressWarnings("unused")
+						SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning, verbose, paths);
+					}
+					this.parse(s);
+				}
+				catch (UnsupportedOperationException e){
+					unsupportedQueries++;
+					Query q = QueryFactory.create(s);
+					canonQueries.add(q.toString());
+					unsupportedQueriesList.add(e.getMessage() + ": " +s);
+				}
+				catch(QueryParseException e){
+					badSyntaxQueries++;
+					unsupportedQueriesList.add("Bad syntax: "+s);
+				} 
+				catch (Exception e) {
+					otherUnspecifiedExceptions++;
+					unsupportedQueriesList.add(s + ":" +e.getMessage());
+				}
+				totalQueries++;
+				i++;
+			}
+			this.totalTime = System.currentTimeMillis() - t;
+			bw.write(getQueryInfo());
+			bw.close();
+			bf.close();
 			this.outputUnsupportedQueries();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -228,10 +305,10 @@ public class QueryParser {
 		this.enableLeaning = b;
 	}
 	
-	public void getDistributionInfo() throws IOException{
+	public void getDistributionInfo(String filename) throws IOException{
 		int i = 0;
 		int max = 0;
-		File file = new File("resultFiles/dist"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+		File file = new File("resultFiles/" + filename + "_dist"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
 		FileWriter fw = new FileWriter(file);
 		BufferedWriter bw = new BufferedWriter(fw);
 		bw.append("Distribution of canonicalised queries: \n");

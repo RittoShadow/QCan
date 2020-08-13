@@ -6,8 +6,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
+import java.util.regex.Pattern;
 
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
@@ -20,6 +22,7 @@ import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.op.Op1;
+import org.apache.jena.sparql.algebra.op.Op2;
 import org.apache.jena.sparql.algebra.op.OpAssign;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpConditional;
@@ -36,6 +39,7 @@ import org.apache.jena.sparql.algebra.op.OpLabel;
 import org.apache.jena.sparql.algebra.op.OpLeftJoin;
 import org.apache.jena.sparql.algebra.op.OpList;
 import org.apache.jena.sparql.algebra.op.OpMinus;
+import org.apache.jena.sparql.algebra.op.OpN;
 import org.apache.jena.sparql.algebra.op.OpNull;
 import org.apache.jena.sparql.algebra.op.OpOrder;
 import org.apache.jena.sparql.algebra.op.OpPath;
@@ -61,8 +65,10 @@ import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
 import org.apache.jena.sparql.expr.E_LogicalAnd;
+import org.apache.jena.sparql.expr.E_NotExists;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprAggregator;
+import org.apache.jena.sparql.expr.ExprList;
 import org.apache.jena.sparql.expr.ExprWalker;
 import org.apache.jena.sparql.path.P_Alt;
 import org.apache.jena.sparql.path.P_Seq;
@@ -70,6 +76,14 @@ import org.apache.jena.sparql.path.P_ZeroOrMore1;
 import org.apache.jena.sparql.path.Path;
 
 import data.PropertyPathFeatureCounter;
+import paths.PGraph;
+import paths.PathTransform;
+import transformers.FilterTransform;
+import transformers.NotOneOfTransform;
+import transformers.UCQTransformer;
+import visitors.BindVisitor;
+import visitors.FilterVisitor;
+import visitors.TopDownVisitor;
 
 /**
  * This class implements Jena's OpVisitor. It recursively builds an r-graph from a query.
@@ -78,13 +92,9 @@ import data.PropertyPathFeatureCounter;
  */
 public class RGraphBuilder implements OpVisitor {
 	
-	private Stack<RGraph> graphStack = new Stack<RGraph>();
-	private Stack<RGraph> unionStack = new Stack<RGraph>();
-	private Stack<RGraph> joinStack = new Stack<RGraph>();
-	private Stack<RGraph> optionalStack = new Stack<RGraph>();
-	private Stack<RGraph> filterStack = new Stack<RGraph>();
+	private final Stack<RGraph> graphStack = new Stack<>();
 	List<Var> projectionVars;
-	Set<Var> totalVars = new HashSet<Var>();
+	Set<Var> totalVars = new HashSet<>();
 	private List<String> graphURI = Collections.emptyList();
 	private List<String> namedGraphURI = Collections.emptyList();
 	public int nTriples = 0;
@@ -98,24 +108,40 @@ public class RGraphBuilder implements OpVisitor {
 	private boolean containsSolutionMods = false;
 	private boolean containsNamedGraphs = false;
 	private boolean containsPaths = false;
+	private boolean pathNormalisation = false;
+	private int projectedQueries = 0;
+	private int queryType;
+	long rewriteTime = 0;
+	long graphTime = 0;
 	
 	public RGraphBuilder(){
 		
 	}
 	
 	public RGraphBuilder(Op op) {
-
+		
 	}
 	
-	public RGraphBuilder(Query query){
+	public RGraphBuilder(Query query) {
+		this(query,false);
+	}
+	
+	public RGraphBuilder(Query query, boolean pathNormalisation){
+		this.queryType = query.getQueryType();
 		this.projectionVars = query.getProjectVars();
 		graphURI = query.getGraphURIs();
 		namedGraphURI = query.getNamedGraphURIs();
+		this.pathNormalisation = pathNormalisation;
 		Op op = Algebra.compile(query);
+		long normalTime = System.nanoTime();
 		op = UCQTransformation(op);
+		this.rewriteTime = System.nanoTime() - normalTime;
+		this.totalVars = varsContainedIn(op);
 		this.setEnableFilter(true);
 		this.setEnableOptional(true);
+		long graphTime = System.nanoTime();
 		OpWalker.walk(op, this);
+		this.graphTime = System.nanoTime() - graphTime;
 	}
 
 	@Override
@@ -226,17 +252,33 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpFilter arg0) {
 		containsFilter = true;
 		FilterVisitor fv = new FilterVisitor();
-		List<Expr> exprs = arg0.getExprs().getList();
+		List<Expr> exprs = new ArrayList<>(arg0.getExprs().getList());
+		if (arg0.getSubOp() instanceof OpLeftJoin) {
+			ExprList eList = ((OpLeftJoin) arg0.getSubOp()).getExprs();
+			if (eList != null) {
+				exprs.addAll(eList.getList());
+			}
+		}
 		Expr expr = exprs.get(0);
+		if (expr instanceof E_NotExists) {
+			Op right = OpJoin.create(((E_NotExists) expr).getGraphPattern(), arg0.getSubOp());
+			RGraphBuilder rgb = new RGraphBuilder(right);
+			OpWalker.walk(right, rgb);
+			RGraph e = rgb.getResult();
+			RGraph e1 = graphStack.pop();
+			e1.minus(e);
+			graphStack.add(e1);
+			return;
+		}
 		if (exprs.size() > 1) {
 			for (Expr e : exprs.subList(1, exprs.size())){
 				expr = new E_LogicalAnd(expr, e);
 			}
 		}
+		totalVars.addAll(expr.getVarsMentioned());
 		ExprWalker.walk(fv, expr);
 		if (enableFilter){
 			graphStack.peek().filter(fv.getGraph());
-			filterStack.add(graphStack.peek());
 		}
 		else{
 			throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
@@ -247,11 +289,13 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpGraph arg0) {
 		containsNamedGraphs = true;
 		graphStack.peek().graphOp(arg0.getNode());
+		if (arg0.getNode().isVariable()) {
+			totalVars.add(Var.alloc(arg0.getNode()));
+		}
 	}
 
 	@Override
 	public void visit(OpService arg0) {
-		System.out.println(arg0.getServiceElement());
 		graphStack.peek().service(arg0.getService(), arg0.getSilent());	
 	}
 
@@ -278,6 +322,8 @@ public class RGraphBuilder implements OpVisitor {
 		VarExprList ve = arg0.getVarExprList();
 		Map<Var,Expr> map = ve.getExprs();
 		for (Map.Entry<Var, Expr> m : map.entrySet()) {
+			totalVars.add(m.getKey());
+			totalVars.addAll(m.getValue().getVarsMentioned());
 			BindVisitor bv = new BindVisitor(m.getKey());
 			ExprWalker.walk(bv, m.getValue());
 			graphStack.peek().bind(bv.getGraph());
@@ -345,7 +391,6 @@ public class RGraphBuilder implements OpVisitor {
 			e1 = graphStack.pop();
 		}
 		e1.join(e2);
-		joinStack.add(e1);
 		graphStack.add(e1);		
 	}
 
@@ -354,48 +399,21 @@ public class RGraphBuilder implements OpVisitor {
 		RGraph e1, e2;
 		containsOptional = true;
 		if (enableOptional){
-			if (arg0.getRight() instanceof OpBGP){
-				e2 = new RGraph(((OpBGP)arg0.getRight()).getPattern().getList());
-			}
-//			else if (arg0.getRight() instanceof OpUnion){
-//				e2 = unionStack.pop();
+//			if (arg0.getRight() instanceof OpBGP){
+//				e2 = new RGraph(((OpBGP)arg0.getRight()).getPattern().getList());
 //			}
-//			else if (arg0.getRight() instanceof OpLeftJoin){
-//				e2 = optionalStack.pop();
+//			else{
+//				e2 = graphStack.pop();
 //			}
-//			else if (arg0.getRight() instanceof OpFilter){
-//				if (enableFilter){
-//					e2 = filterStack.pop();
-//				}
-//				else{
-//					throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-//				}
+//			if (arg0.getLeft() instanceof OpBGP){
+//				e1 = new RGraph(((OpBGP)arg0.getLeft()).getPattern().getList());
 //			}
-			else{
-				e2 = graphStack.pop();
-			}
-			if (arg0.getLeft() instanceof OpBGP){
-				e1 = new RGraph(((OpBGP)arg0.getLeft()).getPattern().getList());
-			}
-//			else if (arg0.getLeft() instanceof OpUnion){
-//				e1 = unionStack.pop();
+//			else{
+//				e1 = graphStack.pop();
 //			}
-//			else if (arg0.getLeft() instanceof OpLeftJoin){
-//				e1 = optionalStack.pop();
-//			}
-//			else if (arg0.getLeft() instanceof OpFilter){
-//				if (enableFilter){
-//					e1 = filterStack.pop();
-//				}
-//				else{
-//					throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-//				}
-//			}
-			else{
-				e1 = graphStack.pop();
-			}
+			e2 = graphStack.pop();
+			e1 = graphStack.pop();
 			e1.optional(e2);
-			optionalStack.add(e1);
 			graphStack.add(e1);
 		}
 		else{
@@ -408,64 +426,9 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpUnion arg0) {
 		RGraph e1, e2;
 		containsUnion = true;
-		if (arg0.getLeft() instanceof OpBGP){
-			e1 = graphStack.pop();
-		}
-//		else if (arg0.getLeft() instanceof OpUnion){
-//			e1 = graphStack.pop();
-//		}
-//		else if (arg0.getLeft() instanceof OpLeftJoin){
-//			if (enableOptional){
-//				e1 = optionalStack.pop();
-//			}
-//			else{
-//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-//			}
-//		}
-//		else if (arg0.getLeft() instanceof OpJoin){
-//			e1 = joinStack.pop();
-//		}
-//		else if (arg0.getLeft() instanceof OpFilter){
-//			if (enableFilter){
-//				e1 = filterStack.pop();
-//			}
-//			else{
-//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-//			}
-//		}
-		else{
-			e1 = graphStack.pop();
-		}
-		if (arg0.getRight() instanceof OpBGP){
-			e2 = graphStack.pop();
-		}
-//		else if (arg0.getRight() instanceof OpUnion){
-//			e2 = graphStack.pop();
-//		}
-//		else if (arg0.getRight() instanceof OpLeftJoin){
-//			if (enableOptional){
-//				e2 = optionalStack.pop();
-//			}
-//			else{
-//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-//			}
-//		}
-//		else if (arg0.getRight() instanceof OpJoin){
-//			e2 = joinStack.pop();
-//		}
-//		else if (arg0.getRight() instanceof OpFilter){
-//			if (enableFilter){
-//				e2 = filterStack.pop();
-//			}
-//			else{
-//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-//			}
-//		}
-		else{
-			e2 = graphStack.pop();
-		}
+		e1 = graphStack.pop();
+		e2 = graphStack.pop();
 		e2.union(e1);
-		unionStack.add(e2);
 		graphStack.add(e2);	
 	}
 
@@ -478,49 +441,39 @@ public class RGraphBuilder implements OpVisitor {
 	@Override
 	public void visit(OpMinus arg0) {
 		RGraph e1, e2;
-		if (arg0.getRight() instanceof OpBGP){
-			e2 = new RGraph(((OpBGP)arg0.getRight()).getPattern().getList());
+		Set<Var> leftVars = varsContainedIn(arg0.getLeft());
+		Set<Var> rightVars = varsContainedIn(arg0.getRight());
+		boolean shared = false;
+		for (Var v : rightVars) {
+			if (leftVars.contains(v)) {
+				shared = true;
+				break;
+			}
 		}
-//		else if (arg0.getRight() instanceof OpUnion){
-//			e2 = unionStack.pop();
-//		}
-//		else if (arg0.getRight() instanceof OpLeftJoin){
-//			e2 = optionalStack.pop();
-//		}
-//		else if (arg0.getRight() instanceof OpFilter){
-//			if (enableFilter){
-//				e2 = filterStack.pop();
-//			}
-//			else{
-//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getRight().getName());
-//			}
-//		}
-		else{
+		if (shared) {
+			if (arg0.getRight() instanceof OpBGP){
+				e2 = new RGraph(((OpBGP)arg0.getRight()).getPattern().getList());
+			}
+			else{
+				e2 = graphStack.pop();
+			}
+			if (arg0.getLeft() instanceof OpBGP){
+				e1 = new RGraph(((OpBGP)arg0.getLeft()).getPattern().getList());
+			}
+			else{
+				e1 = graphStack.pop();
+			}
+			e1.minus(e2);
+		}
+		else if (rightVars.isEmpty()) {
 			e2 = graphStack.pop();
-		}
-		if (arg0.getLeft() instanceof OpBGP){
-			e1 = new RGraph(((OpBGP)arg0.getLeft()).getPattern().getList());
-		}
-//		else if (arg0.getLeft() instanceof OpUnion){
-//			e1 = unionStack.pop();
-//		}
-//		else if (arg0.getLeft() instanceof OpLeftJoin){
-//			e1 = optionalStack.pop();
-//		}
-//		else if (arg0.getLeft() instanceof OpFilter){
-//			if (enableFilter){
-//				e1 = filterStack.pop();
-//			}
-//			else{
-//				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getLeft().getName());
-//			}
-//		}
-		else{
 			e1 = graphStack.pop();
 		}
-		e1.minus(e2);
+		else {
+			e2 = graphStack.pop();
+			e1 = graphStack.pop();
+		}
 		graphStack.add(e1);
-		
 	}
 
 	@Override
@@ -555,28 +508,26 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpOrder arg0) {
 		containsSolutionMods = true;
 		List<SortCondition> cond = arg0.getConditions();
-		List<Var> vars = new ArrayList<Var>();
-		List<Integer> dir = new ArrayList<Integer>();
+		List<Expr> exprs = new ArrayList<>();
+		List<Integer> dir = new ArrayList<>();
 		for (SortCondition c : cond){
-			if (c.getExpression().isVariable()){
-				vars.add(c.getExpression().asVar());
-				dir.add(c.getDirection() == -1 ? -1 : 1);
-			}
-			else{
-				throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
-			}
+			exprs.add(c.getExpression());
+			dir.add(c.getDirection() == -1 ? -1 : 1);
 		}
-		graphStack.peek().orderBy(vars, dir);
+		graphStack.peek().orderBy(exprs, dir);
 	}
 
 	@Override
 	public void visit(OpProject arg0) {
+		projectedQueries++;
+		if (projectedQueries > 1) {
+			throw new UnsupportedOperationException("Nested queries.");
+		}
 		graphStack.peek().project(arg0.getVars());
 	}
 
 	@Override
 	public void visit(OpReduced arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
 		
 	}
 
@@ -593,6 +544,7 @@ public class RGraphBuilder implements OpVisitor {
 		long limit = arg0.getLength();
 		if (!graphStack.peek().containsProjection()){
 			graphStack.peek().project(projectionVars);
+			projectedQueries++;
 		}
 		graphStack.peek().slice((int)offset, (int)limit);
 		
@@ -602,7 +554,7 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpGroup arg0) {
 		RGraph r = RGraph.group(arg0);
 		List<ExprAggregator> agg = arg0.getAggregators();
-		List<RGraph> rGraphs = new ArrayList<RGraph>();
+		List<RGraph> rGraphs = new ArrayList<>();
 		for (ExprAggregator a : agg) {
 			FilterVisitor fv = new FilterVisitor();
 			ExprWalker.walk(fv, a);
@@ -629,9 +581,23 @@ public class RGraphBuilder implements OpVisitor {
 	
 	public RGraph getResult(){
 		if (!graphStack.peek().containsProjection()){
-			if (projectionVars != null) {
-				graphStack.peek().project(projectionVars);
-			}	
+			if (this.queryType == Query.QueryTypeAsk){
+				graphStack.peek().ask();
+			}
+			else if (this.queryType == Query.QueryTypeConstruct){
+				graphStack.peek().construct();
+			}
+			else if (this.queryType == Query.QueryTypeDescribe){
+				graphStack.peek().describe();
+			}
+			else if (this.queryType == Query.QueryTypeSelect) {
+				if (projectedQueries == 0) {
+					projectionVars = List.copyOf(totalVars);
+				}
+				if (projectionVars != null) {
+					graphStack.peek().project(projectionVars);
+				}	
+			}
 		}
 		if (!this.graphURI.isEmpty()){
 			containsNamedGraphs = true;
@@ -645,38 +611,9 @@ public class RGraphBuilder implements OpVisitor {
 //			graphStack.peek().groupBy(groupByGraph);
 //		}
 		graphStack.peek().containsPaths = this.containsPaths;
-		graphStack.peek().print();
 		return graphStack.peek();
 	}
-	
-	public boolean getContainsUnion(){
-		return this.containsUnion;
-	}
-	
-	public boolean getContainsJoin(){
-		return this.containsJoin;
-	}
-	
-	public boolean getContainsOptional(){
-		return this.containsOptional;
-	}
-	
-	public boolean getContainsFilter(){
-		return this.containsFilter;
-	}
-	
-	public boolean getContainsSolutionMods(){
-		return this.containsSolutionMods;
-	}
-	
-	public boolean getContainsNamedGraphs(){
-		return this.containsNamedGraphs;
-	}
-	
-	public boolean getContainsPaths() {
-		return this.containsPaths;
-	}
-	
+
 	public Op transitiveClosure(Op op) {
 		if (op instanceof OpBGP) {
 			
@@ -684,13 +621,13 @@ public class RGraphBuilder implements OpVisitor {
 		else if (op instanceof OpSequence) {
 			List<Op> existingOps = new ArrayList<Op>();
 			List<Op> newOps = new ArrayList<Op>();
-			List<HashSet<Node>> partitions = new ArrayList<HashSet<Node>>();
-			Map<Node,Set<Path>> partitionsPaths = new HashMap<Node,Set<Path>>();
+			List<HashSet<Node>> partitions = new ArrayList<>();
+			Map<Node,Set<Path>> partitionsPaths = new HashMap<>();
 			for (Op o : ((OpSequence) op).getElements()) {
 				existingOps.add(o);
 				if (o instanceof OpPath) {
 					TriplePath tp = ((OpPath) o).getTriplePath();
-					Set<Path> paths = new HashSet<Path>();
+					Set<Path> paths = new HashSet<>();
 					Node sub = tp.getSubject();
 					Node obj = tp.getObject();
 					if (partitionsPaths.containsKey(sub)) {
@@ -701,12 +638,11 @@ public class RGraphBuilder implements OpVisitor {
 						partitionsPaths.put(sub, paths);
 					}
 					if (PropertyPathFeatureCounter.minLength(tp.getPath()) == 0) {
-						System.out.println(lengthZeroPaths(tp.getPath()));
 						if (sub.isVariable() && obj.isVariable()) {
 							paths.addAll(lengthZeroPaths(tp.getPath()));
 							partitionsPaths.put(sub, paths);
 							if (partitions.isEmpty()) {
-								HashSet<Node> newPart = new HashSet<Node>();
+								HashSet<Node> newPart = new HashSet<>();
 								newPart.add(sub);
 								newPart.add(obj);
 								partitions.add(newPart);
@@ -739,11 +675,11 @@ public class RGraphBuilder implements OpVisitor {
 
 				}
 			}
-			System.out.println(partitions);
+//			System.out.println(partitions);
 			for (HashSet<Node> partition : partitions) {
 				for (Node sub : partition) {
 					for (Node obj : partition) {
-						if (sub.equals(obj)) {
+						if (sub.equals(obj) || !partitionsPaths.containsKey(sub)) {
 							continue;
 						}
 						for (Path path : partitionsPaths.get(sub)) {
@@ -759,7 +695,7 @@ public class RGraphBuilder implements OpVisitor {
 					}
 				}
 			}
-			System.out.println(newOps);
+//			System.out.println(newOps);
 		}
 		else if (op instanceof OpUnion) {
 			
@@ -774,7 +710,7 @@ public class RGraphBuilder implements OpVisitor {
 	}
 	
 	public List<Path> lengthZeroPaths(Path path){
-		ArrayList<Path> ans = new ArrayList<Path>();
+		ArrayList<Path> ans = new ArrayList<>();
 		int length = PropertyPathFeatureCounter.minLength(path);
 		if (length == 0) {
 			if (path instanceof P_ZeroOrMore1 || path instanceof P_Seq) {
@@ -796,12 +732,14 @@ public class RGraphBuilder implements OpVisitor {
 	public Op uC2RPQCollapse(Op op) {
 		Op op1 = op;
 		Op op2 = op;
-		do {
-			op1 = op2;
-			TopDownVisitor tdv = new TopDownVisitor(op1, this.projectionVars);
-			op2 = tdv.getOp();
+		if (pathNormalisation) {
+			do {
+				op1 = op2;
+				TopDownVisitor tdv = new TopDownVisitor(op1, this.projectionVars);
+				op2 = tdv.getOp();
+			}
+			while (!op1.equals(op2));
 		}
-		while (!op1.equals(op2));
 		return op1;
 	}
 	
@@ -810,24 +748,110 @@ public class RGraphBuilder implements OpVisitor {
 		Op op2 = op;
 		do {
 			op1 = op2;
-			op2 = Transformer.transform(new UCQVisitor(), op1);
+			op2 = Transformer.transform(new UCQTransformer(), op1);
+			op2 = Transformer.transform(new TransformPathFlatternStd(), op2);
+			op2 = Transformer.transform(new NotOneOfTransform(), op2);
+			op2 = Transformer.transform(new FilterTransform(), op2);
 		}
 		while (!op1.equals(op2));
 		return op2;
 	}
+
+	public Set<Var> varsContainedIn(Op op) {
+		Set<Var> ans = new HashSet<>();
+		if (op instanceof OpTriple) {
+			Triple t = ((OpTriple) op).getTriple();
+			if (t.getSubject().isVariable()) {
+				ans.add(Var.alloc(t.getSubject().getName()));
+			}
+			if (t.getPredicate().isVariable()) {
+				ans.add(Var.alloc(t.getPredicate().getName()));
+
+			}
+			if (t.getObject().isVariable()) {
+				ans.add(Var.alloc(t.getObject().getName()));
+			}
+		}
+		else if (op instanceof OpBGP) {
+			for (Triple t : ((OpBGP) op).getPattern().getList()) {
+				if (t.getSubject().isVariable()) {
+					ans.add(Var.alloc(t.getSubject().getName()));
+				}
+				if (t.getPredicate().isVariable()) {
+					ans.add(Var.alloc(t.getPredicate().getName()));
+				}
+				if (t.getObject().isVariable()) {
+					ans.add(Var.alloc(t.getObject().getName()));
+				}
+			}
+		}
+		else if (op instanceof OpPath) {
+			TriplePath tp = ((OpPath) op).getTriplePath();
+			if (tp.getSubject().isVariable()) {
+				ans.add(Var.alloc(tp.getSubject().getName()));
+			}
+			if (tp.getObject().isVariable()) {
+				ans.add(Var.alloc(tp.getObject().getName()));
+			}
+		}
+		else if (op instanceof OpGraph) {
+			Node n = ((OpGraph) op).getNode();
+			if (n.isVariable()) {
+				ans.add(Var.alloc(n.getName()));
+			}
+			ans.addAll(varsContainedIn(((OpGraph) op).getSubOp()));
+		}
+		else if (op instanceof OpFilter) {
+			ExprList eList = ((OpFilter) op).getExprs();
+			ans.addAll(eList.getVarsMentioned());
+			ans.addAll(varsContainedIn(((OpFilter) op).getSubOp()));
+		}
+		else if (op instanceof OpExtend) {
+			Map<Var,Expr> map = ((OpExtend) op).getVarExprList().getExprs();
+			for (Entry<Var, Expr> entry : map.entrySet()) {
+				ans.add(entry.getKey());
+				ans.addAll(entry.getValue().getVarsMentioned());
+			}
+			ans.addAll(varsContainedIn(((OpExtend) op).getSubOp()));
+		}
+		else if (op instanceof OpAssign) {
+			Map<Var,Expr> map = ((OpAssign) op).getVarExprList().getExprs();
+			for (Entry<Var, Expr> entry : map.entrySet()) {
+				ans.add(entry.getKey());
+				ans.addAll(entry.getValue().getVarsMentioned());
+			}
+			ans.addAll(varsContainedIn(((OpAssign) op).getSubOp()));
+		}
+		else if (op instanceof OpTable) {
+			ans.addAll(((OpTable) op).getTable().getVars());
+		}
+		else if (op instanceof Op1) {
+			Op subOp = ((Op1) op).getSubOp();
+			ans.addAll(varsContainedIn(subOp));
+		}
+		else if (op instanceof Op2) {
+			Op left = ((Op2) op).getLeft();
+			Op right = ((Op2) op).getRight();
+			ans.addAll(varsContainedIn(left));
+			ans.addAll(varsContainedIn(right));
+		}
+		else if (op instanceof OpN) {
+			for (Op o : ((OpN) op).getElements()) {
+				ans.addAll(varsContainedIn(o));
+			}
+		}
+		return ans;
+	}
 	
-	public Op UCQTransformation(Op op){
-		Op op1 = op;
-		Op op2 = Transformer.transform(new UCQVisitor(), op);
-		op1 = transitiveClosure(op1);
+	public Op UCQTransformation(Op op) {
+		Op op2 = Transformer.transform(new UCQTransformer(), op);
+//		op1 = transitiveClosure(op1);
 		op2 = UCQNormalisation(op2);
 		op2 = uC2RPQCollapse(op2);
 //		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
 //		op2 = Transformer.transform(new BGPCollapser(op2,this.projectionVars,false), op2); // transform BGPs
-		op2 = Transformer.transform(new TransformPathFlatternStd(), op2);
 		op2 = Transformer.transform(new TransformSimplify(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
-		op2 = Transformer.transform(new FilterTransform(), op2);
 		op2 = Transformer.transform(new TransformExtendCombine(), op2);
 		op2 = Transformer.transform(new BGPSort(), op2);
 		return op2;

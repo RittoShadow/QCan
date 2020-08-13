@@ -1,37 +1,24 @@
 package main;
 
+import cl.uchile.dcc.blabel.label.GraphColouring;
+import org.apache.commons.cli.*;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.jena.ext.com.google.common.collect.HashMultiset;
-import org.apache.jena.ext.com.google.common.collect.Multiset;
-
-import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
-
 public class Benchmark {
 	public File f;
-	public int queriesRead;
-	public int queriesCanon;
-	public int unsupportedQueries;
-	public int badSyntaxQueries;
 	public QueryParser pq;
 	public JenaParser jp;
-	public Multiset<String> canonQueries = HashMultiset.create();
 	public boolean enableFilter = false;
 	public boolean enableOptional = false;
 	public boolean enableLeaning = false;
 	public boolean enableCanonicalisation = false;
 	public boolean enableTrimming = false;
+	public boolean pathNormalisation = false;
 	
 	public Benchmark(String path) throws IOException{
 		f = new File(path);
@@ -43,20 +30,35 @@ public class Benchmark {
 	}
 	
 	public Benchmark(String path, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanonicalisation){
+		this(path,enableFilter,enableOptional,enableLeaning,enableCanonicalisation,false);
+	}
+
+	
+	public Benchmark(String path, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanonicalisation, boolean pathNormalisation){
 		f = new File(path);
 		this.enableFilter = enableFilter;
 		this.enableOptional = enableOptional;
 		this.enableLeaning = enableLeaning;
 		this.enableCanonicalisation = enableCanonicalisation;
+		this.pathNormalisation = pathNormalisation;
 	}
 	
-	public void execute(int upTo, int offset, boolean printDist) throws IOException, InterruptedException, HashCollisionException{
+	public void execute(int upTo, int offset, boolean printDist) throws IOException {
 		File out;
+		String filename = f.getName();
+		if (filename.contains(".")) {
+			filename = filename.substring(0,filename.lastIndexOf("."));
+		}
 		if (enableLeaning){
-			out = new File("resultFiles/results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+			out = new File("resultFiles/" + filename + "_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
 		}
 		else{
-			out = new File("resultFiles/labelOnly_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+			if (enableTrimming) {
+				out = new File("resultFiles/jena/" + filename + "_labelOnly_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+			}
+			else {
+				out = new File("resultFiles/" + filename + "_labelOnly_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+			}
 		}
 		if (!out.exists()){
 			out.createNewFile();
@@ -64,13 +66,18 @@ public class Benchmark {
 		if (enableTrimming){
 			jp = new JenaParser(f, out, upTo, true, true);
 			if (printDist){
-				jp.getDistributionInfo();
+				jp.getDistributionInfo(filename);
 			}
 		}
 		else{
-			pq = new QueryParser(f, out, upTo, offset, enableFilter, enableOptional, enableLeaning, enableCanonicalisation);
+			if (pathNormalisation) {
+				pq = new QueryParser(f, out, upTo, offset, pathNormalisation);
+			}
+			else {
+				pq = new QueryParser(f, out, upTo, offset, enableFilter, enableOptional, enableLeaning, enableCanonicalisation);
+			}
 			if (printDist){
-				pq.getDistributionInfo();
+				pq.getDistributionInfo(filename);
 			}
 		}
 //		writeToFile("resultFiles/canon"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log", thirdOutput);
@@ -99,7 +106,7 @@ public class Benchmark {
 		}
 	}
 	
-	public static void main(String[] args) throws IOException, InterruptedException, HashCollisionException{
+	public static void main(String[] args) throws IOException {
 		CommandLine commandLine;
 	    Option option_W = new Option("w", false, "Set to remove queries with bad syntax from file.");
 	    Option option_C = new Option("c", false, "Set to enable canonicalisation.");
@@ -113,6 +120,7 @@ public class Benchmark {
 	    Option option_F = new Option("f", false, "Set to enable canonicalisation of FILTER terms.");
 	    Option option_L = new Option("l", false, "Set to enable leaning of graphs.");
 	    Option option_J = new Option("j", false, "Set to enable the Jena parser. If set as well as -c, it overrides the option.");
+	    Option option_P = new Option("p", false, "Set to enable path normalisation.");
 	    option_F.setArgName("file");
 	    Options options = new Options();
 	    CommandLineParser parser = new DefaultParser();
@@ -126,6 +134,7 @@ public class Benchmark {
 	    options.addOption(option_O);
 	    options.addOption(option_L);
 	    options.addOption(option_J);
+	    options.addOption(option_P);
 	    options.addOption(option_OFF);
 
 	    String header = "";
@@ -134,6 +143,7 @@ public class Benchmark {
 	    boolean enableOptional = false;
 	    boolean enableLeaning = false;
 	    boolean enableCanonicalisation = false;
+	    boolean pathNormalisation = false;
 	    HelpFormatter formatter = new HelpFormatter();
 	    formatter.printHelp("benchmark", header, options, footer, true);    
 	    try{
@@ -165,13 +175,17 @@ public class Benchmark {
 	        	if (commandLine.hasOption("c")){
 	        		enableCanonicalisation = true;
 	        	}
+	        	if (commandLine.hasOption("p")) {
+	        		pathNormalisation = true;
+	        	}
 	        	if (commandLine.hasOption("j")){
 	        		b = new Benchmark(file, true);
 	        	}
 	        	else{
-	        		b = new Benchmark(file, enableFilter, enableOptional, enableLeaning, enableCanonicalisation);
+	        		b = new Benchmark(file, enableFilter, enableOptional, enableLeaning, enableCanonicalisation, pathNormalisation);
 	        	}
 	    		b.execute(upTo, offset, commandLine.hasOption("d"));
+	    		System.exit(0);
 	        }
 	    }
 	    catch (ParseException exception){

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,18 +35,15 @@ import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpJoin;
 import org.apache.jena.sparql.algebra.op.OpN;
 import org.apache.jena.sparql.algebra.op.OpPath;
-import org.apache.jena.sparql.algebra.op.OpProject;
 import org.apache.jena.sparql.algebra.op.OpSequence;
 import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.algebra.op.OpUnion;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
-import org.apache.jena.sparql.engine.binding.Binding;
 import org.apache.jena.sparql.graph.GraphFactory;
-import org.apache.jena.sparql.path.P_Inverse;
 import org.apache.jena.sparql.path.P_Link;
-import org.apache.jena.sparql.path.P_Seq;
+import org.apache.jena.sparql.path.P_NegPropSet;
 import org.apache.jena.sparql.path.P_ZeroOrMore1;
 import org.apache.jena.sparql.path.Path;
 import org.apache.jena.sparql.path.PathFactory;
@@ -63,7 +59,10 @@ import com.google.common.collect.HashBiMap;
 import cl.uchile.dcc.blabel.jena.JenaModelIterator;
 import cl.uchile.dcc.blabel.lean.DFSGraphLeaning;
 import cl.uchile.dcc.blabel.lean.GraphLeaning.GraphLeaningResult;
+import paths.PGraph;
+import visitors.TopDownVisitor;
 
+@SuppressWarnings("unused")
 public class BGPCollapser extends TransformCopy {
 	List<Var> projectedVars;
 	Set<Node> namedVars = new HashSet<Node>();
@@ -74,6 +73,7 @@ public class BGPCollapser extends TransformCopy {
 	BiMap<Var,Node> varMap = HashBiMap.create();
 	boolean sequenceMode = true;
 	boolean setSemantics = false;
+	boolean enableUnion = true;
 	
 	public BGPCollapser(Query q) {
 		projectedVars = q.getProjectVars();
@@ -84,6 +84,11 @@ public class BGPCollapser extends TransformCopy {
 		this.projectedVars = projectedVars;
 		this.op = op;
 		this.sequenceMode = sequence;
+	}
+	
+	public BGPCollapser(Op op, List<Var> projectedVars, boolean sequence, boolean union) {
+		this(op, projectedVars, sequence);
+		this.enableUnion = union;
 	}
 	
 	public void computeEdges(Graph g) {
@@ -189,130 +194,143 @@ public class BGPCollapser extends TransformCopy {
 			return op;
 		}
 		Graph g = GraphFactory.createPlainGraph();
-		List<Node> namedVariables = new ArrayList<Node>();
+//		List<Node> namedVariables = new ArrayList<Node>();
 		BasicPattern bp = op.getPattern();
-		Op ans = OpSequence.create();
+		BasicPattern ansBp = new BasicPattern();
 		List<Triple> triples = bp.getList();
 		List<Triple> otherTriples = new ArrayList<Triple>();
 		for (Triple t : triples) {
-			Node s = t.getSubject();
-			Node p = t.getPredicate();
-			Node o = t.getObject();
-			if (s.isURI() || s.isLiteral() || o.isURI() || o.isLiteral()) {
-				otherTriples.add(Triple.create(s, p, o));
+			Node s = getValidNode(t.getSubject());
+			Node p = getValidNode(t.getPredicate());
+			Node o = getValidNode(t.getObject());
+//			if (s.isURI() || s.isLiteral() || o.isURI() || o.isLiteral()) {
+//				otherTriples.add(Triple.create(s, p, o));
+//			}
+			if (t.getSubject().isVariable()) {
+				varMap.put((Var) t.getSubject(), s);
 			}
-			else {
-				if (s.isVariable()) {
-					s = NodeFactory.createBlankNode(t.getSubject().getName());
-					varMap.put((Var) t.getSubject(), s);
-				}
-				if (p.isVariable()) {
-					p = NodeFactory.createBlankNode(t.getPredicate().getName());
-					varMap.put((Var) t.getPredicate(), p); 
-				}
-				if (o.isVariable()) {
-					o = NodeFactory.createBlankNode(t.getObject().getName());
-					varMap.put((Var) t.getObject(), o);
-				}
-				g.add(Triple.create(s, p, o));
+			if (t.getPredicate().isVariable()) {
+				varMap.put((Var) t.getPredicate(), p); 
 			}
+			if (t.getObject().isVariable()) {
+				varMap.put((Var) t.getObject(), o);
+			}
+			g.add(Triple.create(s, p, o));
 		}
 		try {
 			g = getLeanForm(g);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		computeEdges(g);
-		determineNamedVariables();
-		namedVariables.addAll(namedVars);
-		for (int j = 0; j < namedVariables.size(); j++) {
-			Node n = namedVariables.get(j);
-			for (int k = 0; k <= j; k++) {
-				Node m = namedVariables.get(k);
-				List<List<Node>> paths = pathsBetween(n,m);
-				for (List<Node> path : paths) {
-					if (path.isEmpty()) {
-						ExtendedIterator<Node> triplePaths = GraphUtil.listPredicates(g, n, m);
-						ExtendedIterator<Node> reversePaths = GraphUtil.listPredicates(g, m, n);
-						while (triplePaths.hasNext()) {
-							pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), new P_Link(triplePaths.next())));
-						}
-						while (reversePaths.hasNext()) {
-							pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(m,n), new P_Link(reversePaths.next())));
-						}
-						
-					}
-					else if (n.equals(m) && path.size() == 1) { //Obscure case when there's a two node loop.
-						List<Node> triplePaths = GraphUtil.listPredicates(g, n, path.get(0)).toList();
-						List<Node> reversePaths = GraphUtil.listPredicates(g, path.get(0), n).toList();
-						Path p = null;
-						List<Path> twoPaths = new ArrayList<Path>();
-						for (Node t : triplePaths) {
-							twoPaths.add(PathFactory.pathLink(t));
-						}
-						for (Node t : reversePaths) {
-							twoPaths.add(PathFactory.pathInverse(PathFactory.pathLink(t)));
-						}
-						p = PathFactory.pathSeq(twoPaths.get(0), PathFactory.pathInverse(twoPaths.get(1)));
-						pathEdges.add(new Pair<Pair<Node,Node>,Path>(new Pair<Node,Node>(n,m),p));
-					}
-					else {
-						Node current = n;
-						Path p = null;
-						for (int i = 0; i < path.size() + 1; i++) {
-							Node next;
-							if (i == path.size()) {
-								next = m;
-							}
-							else {
-								next = path.get(i);
-							}
-							ExtendedIterator<Node> triplePaths = GraphUtil.listPredicates(g, current, next);
-							ExtendedIterator<Node> reversePaths = GraphUtil.listPredicates(g, next, current);
-							current = next;
-							while (triplePaths.hasNext()) {
-								if (i == 0) {
-									p = new P_Link(triplePaths.next());
-								}
-								else {
-									p = new P_Seq(p, new P_Link(triplePaths.next()));
-								}
-							}
-							while (reversePaths.hasNext()) {
-								if (i == 0) {
-									p = new P_Inverse(new P_Link(reversePaths.next()));
-								}
-								else {
-									p = new P_Seq(p, new P_Inverse(new P_Link(reversePaths.next())));
-								}
-							}
-						}
-						pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), p));
-					}
-				}
+		ExtendedIterator<Triple> gTriples = GraphUtil.findAll(g);
+		while (gTriples.hasNext()) {
+			Triple t = gTriples.next();
+			Node s = t.getSubject();
+			Node p = t.getPredicate();
+			Node o = t.getObject();
+			if (s.isBlank()) {
+				s = Var.alloc(s.getBlankNodeLabel());
 			}
-		}
-		for (Pair<Pair<Node,Node>,Path> pathEdge : pathEdges) {
-			Pair<Node,Node> subjectObject = pathEdge.getLeft();
-			Path p = pathEdge.getRight();
-			Node s = varMap.containsValue(subjectObject.getLeft()) ? varMap.inverse().get(subjectObject.getLeft()) : NodeFactory.createBlankNode();
-			Node ob = varMap.containsValue(subjectObject.getRight()) ? varMap.inverse().get(subjectObject.getRight()) : NodeFactory.createBlankNode();
-			TriplePath tp = new TriplePath(s, p, ob);
-			PathTransform pt = new PathTransform();
-			Op o = pt.getResult(tp);
-			((OpSequence) ans).add(o);
-		}
-		if (!otherTriples.isEmpty()) {
-			BasicPattern bp1 = new BasicPattern();
-			for (Triple t : otherTriples) {
-				bp1.add(t);
+			if (p.isBlank()) {
+				p = Var.alloc(p.getBlankNodeLabel());
 			}
-			((OpSequence) ans).add(new OpBGP(bp1));
+			if (o.isBlank()) {
+				o = Var.alloc(o.getBlankNodeLabel());
+			}
+			ansBp.add(Triple.create(s, p, o));
 		}
-		if (((OpSequence) ans).getElements().size() == 1){
-			ans = ((OpSequence) ans).get(0);
-		}
+//		computeEdges(g);
+//		determineNamedVariables();
+//		namedVariables.addAll(namedVars);
+//		for (int j = 0; j < namedVariables.size(); j++) {
+//			Node n = namedVariables.get(j);
+//			for (int k = 0; k <= j; k++) {
+//				Node m = namedVariables.get(k);
+//				List<List<Node>> paths.paths = pathsBetween(n,m);
+//				for (List<Node> path : paths.paths) {
+//					if (path.isEmpty()) {
+//						ExtendedIterator<Node> triplePaths = GraphUtil.listPredicates(g, n, m);
+//						ExtendedIterator<Node> reversePaths = GraphUtil.listPredicates(g, m, n);
+//						while (triplePaths.hasNext()) {
+//							pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), new P_Link(triplePaths.next())));
+//						}
+//						while (reversePaths.hasNext()) {
+//							pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(m,n), new P_Link(reversePaths.next())));
+//						}
+//						
+//					}
+//					else if (n.equals(m) && path.size() == 1) { //Obscure case when there's a two node loop.
+//						List<Node> triplePaths = GraphUtil.listPredicates(g, n, path.get(0)).toList();
+//						List<Node> reversePaths = GraphUtil.listPredicates(g, path.get(0), n).toList();
+//						Path p = null;
+//						List<Path> twoPaths = new ArrayList<Path>();
+//						for (Node t : triplePaths) {
+//							twoPaths.add(PathFactory.pathLink(t));
+//						}
+//						for (Node t : reversePaths) {
+//							twoPaths.add(PathFactory.pathInverse(PathFactory.pathLink(t)));
+//						}
+//						p = PathFactory.pathSeq(twoPaths.get(0), PathFactory.pathInverse(twoPaths.get(1)));
+//						pathEdges.add(new Pair<Pair<Node,Node>,Path>(new Pair<Node,Node>(n,m),p));
+//					}
+//					else {
+//						Node current = n;
+//						Path p = null;
+//						for (int i = 0; i < path.size() + 1; i++) {
+//							Node next;
+//							if (i == path.size()) {
+//								next = m;
+//							}
+//							else {
+//								next = path.get(i);
+//							}
+//							ExtendedIterator<Node> triplePaths = GraphUtil.listPredicates(g, current, next);
+//							ExtendedIterator<Node> reversePaths = GraphUtil.listPredicates(g, next, current);
+//							current = next;
+//							while (triplePaths.hasNext()) {
+//								if (i == 0) {
+//									p = new P_Link(triplePaths.next());
+//								}
+//								else {
+//									p = new P_Seq(p, new P_Link(triplePaths.next()));
+//								}
+//							}
+//							while (reversePaths.hasNext()) {
+//								if (i == 0) {
+//									p = new P_Inverse(new P_Link(reversePaths.next()));
+//								}
+//								else {
+//									p = new P_Seq(p, new P_Inverse(new P_Link(reversePaths.next())));
+//								}
+//							}
+//						}
+//						pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), p));
+//					}
+//				}
+//			}
+//		}
+//		for (Pair<Pair<Node,Node>,Path> pathEdge : pathEdges) {
+//			Pair<Node,Node> subjectObject = pathEdge.getLeft();
+//			Path p = pathEdge.getRight();
+//			Node s = varMap.containsValue(subjectObject.getLeft()) ? varMap.inverse().get(subjectObject.getLeft()) : NodeFactory.createBlankNode();
+//			Node ob = varMap.containsValue(subjectObject.getRight()) ? varMap.inverse().get(subjectObject.getRight()) : NodeFactory.createBlankNode();
+//			TriplePath tp = new TriplePath(s, p, ob);
+//			PathTransform pt = new PathTransform();
+//			Op o = pt.getResult(tp);
+//			((OpSequence) ans).add(o);
+//		}
+//		if (!otherTriples.isEmpty()) {
+//			BasicPattern bp1 = new BasicPattern();
+//			for (Triple t : otherTriples) {
+//				bp1.add(t);
+//			}
+//			((OpSequence) ans).add(new OpBGP(bp1));
+//		}
+//		if (((OpSequence) ans).getElements().size() == 1){
+//			ans = ((OpSequence) ans).get(0);
+//		}
 		clean();
+		Op ans = new OpBGP(ansBp);
 		return ans;	
 	}
 	
@@ -321,7 +339,7 @@ public class BGPCollapser extends TransformCopy {
 			return op;
 		}
 		Graph g = GraphFactory.createPlainGraph();
-		List<Node> namedVariables = new ArrayList<Node>();
+//		List<Node> namedVariables = new ArrayList<Node>();
 		List<Triple> triples = new ArrayList<Triple>();
 		for (Op o : listOp) {
 			if (o instanceof OpBGP) { // Add all triples in BGPs to graph
@@ -333,18 +351,23 @@ public class BGPCollapser extends TransformCopy {
 			}
 			else if (o instanceof OpPath) { // Paths
 				TriplePath tp = ((OpPath) o).getTriplePath();
-				PGraph pg = new PGraph(tp);
-				Path p = pg.getNormalisedPath();
-				if (tp.getSubject().equals(tp.getObject())) {
-					if (tp.getPath() instanceof P_ZeroOrMore1) {
-						
+				if (tp.getPath() instanceof P_NegPropSet) {
+					triples.add(Triple.create(tp.getSubject(), NodeFactory.createLiteral(WriterPath.asString(tp.getPath())), tp.getObject()));
+				}
+				else {
+					PGraph pg = new PGraph(tp);
+					Path p = pg.getNormalisedPath();
+					if (tp.getSubject().equals(tp.getObject())) {
+						if (tp.getPath() instanceof P_ZeroOrMore1) {
+							
+						}
+						else {
+							triples.add(Triple.create(tp.getSubject(), NodeFactory.createLiteral(WriterPath.asString(p)), tp.getObject()));
+						}
 					}
 					else {
 						triples.add(Triple.create(tp.getSubject(), NodeFactory.createLiteral(WriterPath.asString(p)), tp.getObject()));
 					}
-				}
-				else {
-					triples.add(Triple.create(tp.getSubject(), NodeFactory.createLiteral(WriterPath.asString(p)), tp.getObject()));
 				}
 			}
 			else if (o instanceof OpJoin) {
@@ -354,171 +377,198 @@ public class BGPCollapser extends TransformCopy {
 		Op ans = OpSequence.create();
 		List<Triple> otherTriples = new ArrayList<Triple>();
 		for (Triple t : triples) {
-			Node s = t.getSubject();
-			Node p = t.getPredicate();
-			Node o = t.getObject();
-			if (s.isURI() || s.isLiteral() || o.isURI() || o.isLiteral()) {
-				otherTriples.add(Triple.create(s, p, o));
+			Node s = getValidNode(t.getSubject());
+			Node p = getValidNode(t.getPredicate());
+			Node o = getValidNode(t.getObject());
+//			if (s.isURI() || s.isLiteral() || o.isURI() || o.isLiteral()) {
+//				otherTriples.add(Triple.create(s, p, o));
+//			}
+			if (t.getSubject().isVariable()) {
+				varMap.put((Var) t.getSubject(), s);
 			}
-			else {
-				if (s.isVariable()) {
-					s = NodeFactory.createBlankNode(t.getSubject().getName());
-					varMap.put((Var) t.getSubject(), s);
-				}
-				if (p.isVariable()) {
-					p = NodeFactory.createBlankNode(t.getPredicate().getName());
-					varMap.put((Var) t.getPredicate(), p); 
-				}
-				if (o.isVariable()) {
-					o = NodeFactory.createBlankNode(t.getObject().getName());
-					varMap.put((Var) t.getObject(), o);
-				}
-				g.add(Triple.create(s, p, o));
+			if (t.getPredicate().isVariable()) {
+				varMap.put((Var) t.getPredicate(), p); 
 			}
+			if (t.getObject().isVariable()) {
+				varMap.put((Var) t.getObject(), o);
+			}
+			g.add(Triple.create(s, p, o));
 		}
 		try {
 			g = getLeanForm(g);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		computeEdges(g);
-		determineNamedVariables();
-		namedVariables.addAll(namedVars);
-		for (int i = 0 ; i < namedVariables.size(); i++) {
-			Node n = namedVariables.get(i);
-			for (int j = 0; j <= i; j++) {
-				Node m = namedVariables.get(j);
-				List<List<Node>> paths = pathsBetween(n,m);
-				for (List<Node> path : paths) {
-					if (path.isEmpty()) {
-						ExtendedIterator<Node> triplePaths = GraphUtil.listPredicates(g, n, m);
-						ExtendedIterator<Node> reversePaths = GraphUtil.listPredicates(g, m, n);
-						while (triplePaths.hasNext()) {
-							Node triplePath = triplePaths.next();
-							if (triplePath.isLiteral()) {
-								pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), SSE.parsePath(triplePath.getLiteralLexicalForm())));
-							}
-							else {
-								pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), new P_Link(triplePath)));
-							}
-						}
-						if (!n.equals(m)) {
-							while (reversePaths.hasNext()) {
-								Node reversePath = reversePaths.next();
-								if (reversePath.isLiteral()) {
-									pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(m,n), SSE.parsePath(reversePath.getLiteralLexicalForm())));
-								}
-								else {
-									pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(m,n), new P_Link(reversePath)));
-								}
-							}
-						}		
-					}
-					else if (n.equals(m) && path.size() == 1) { //Obscure case when there's a two node loop.
-						List<Node> triplePaths = GraphUtil.listPredicates(g, n, path.get(0)).toList();
-						List<Node> reversePaths = GraphUtil.listPredicates(g, path.get(0), n).toList();
-						Path p = null;
-						List<Path> twoPaths = new ArrayList<Path>();
-						for (Node t : triplePaths) {
-							if (t.isLiteral()) {
-								twoPaths.add(SSE.parsePath(t.getLiteralLexicalForm()));
-							}
-							else {
-								twoPaths.add(PathFactory.pathLink(t));
-							}
-						}
-						for (Node t : reversePaths) {
-							if (t.isLiteral()) {
-								twoPaths.add(SSE.parsePath(t.getLiteralLexicalForm()));
-							}
-							else {
-								twoPaths.add(PathFactory.pathInverse(PathFactory.pathLink(t)));
-							}
-						}
-						p = PathFactory.pathSeq(twoPaths.get(0), PathFactory.pathInverse(twoPaths.get(1)));
-						if (twoPaths.get(0) instanceof P_ZeroOrMore1 && twoPaths.get(1) instanceof P_ZeroOrMore1) {
-							//do nothing
-						}
-						else {
-							pathEdges.add(new Pair<Pair<Node,Node>,Path>(new Pair<Node,Node>(n,m),p));
-						}
-						
-					}
-					else {
-						Node current = n;
-						Path p = null;
-						for (int k = 0; k < path.size() + 1; k++) {
-							Node next;
-							if (k == path.size()) {
-								next = m;
-							}
-							else {
-								next = path.get(k);
-							}
-							ExtendedIterator<Node> triplePaths = GraphUtil.listPredicates(g, current, next);
-							ExtendedIterator<Node> reversePaths = GraphUtil.listPredicates(g, next, current);
-							current = next;
-							while (triplePaths.hasNext()) {
-								Node triplePath = triplePaths.next();
-								if (k == 0) {
-									if (triplePath.isLiteral()) {
-										p = SSE.parsePath(triplePath.getLiteralLexicalForm());
-									}
-									else {
-										p = new P_Link(triplePath);
-									}
-								}
-								else {
-									if (triplePath.isLiteral()) {
-										p = new P_Seq(p, SSE.parsePath(triplePath.getLiteralLexicalForm()));
-									}
-									else {
-										p = new P_Seq(p, new P_Link(triplePath));
-									}
-								}
-							}
-							while (reversePaths.hasNext()) {
-								Node reversePath = reversePaths.next();
-								if (k == 0) {
-									if (reversePath.isLiteral()) {
-										p = new P_Inverse(SSE.parsePath(reversePath.getLiteralLexicalForm()));
-									}
-									else {
-										p = new P_Inverse(new P_Link(reversePath));
-									}
-								}
-								else {
-									if (reversePath.isLiteral()) {
-										p = new P_Seq(p, new P_Inverse(SSE.parsePath(reversePath.getLiteralLexicalForm())));
-									}
-									else {
-										p = new P_Seq(p, new P_Inverse(new P_Link(reversePath)));
-									}
-								}
-							}
-							
-						}
-						pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), p));
-					}
-				}
+		ExtendedIterator<Triple> gTriples = GraphUtil.findAll(g);
+		List<TriplePath> finalTriples = new ArrayList<TriplePath>();
+		while (gTriples.hasNext()) {
+			Triple t = gTriples.next();
+			Node s = t.getSubject();
+			Node p = t.getPredicate();
+			Node o = t.getObject();
+			Path pre = null;
+			if (s.isVariable()) {
+				s = NodeFactory.createBlankNode(t.getSubject().getName());
+			}
+			if (p.isVariable()) {
+				p = NodeFactory.createBlankNode(t.getPredicate().getName());
+			}
+			else if (p.isLiteral()) {
+				pre = SSE.parsePath(p.getLiteralLexicalForm());
+			}
+			if (o.isVariable()) {
+				o = NodeFactory.createBlankNode(t.getObject().getName());
+			}
+			if (pre == null) {
+				otherTriples.add(t);
+			}
+			else {
+				finalTriples.add(new TriplePath(s, pre, o));
 			}
 		}
-		for (Pair<Pair<Node,Node>,Path> pathEdge : pathEdges) {
-			Pair<Node,Node> subjectObject = pathEdge.getLeft();
-			Path p = pathEdge.getRight();
-			Node s = varMap.containsValue(subjectObject.getLeft()) ? varMap.inverse().get(subjectObject.getLeft()) : NodeFactory.createBlankNode();
-			Node ob = varMap.containsValue(subjectObject.getRight()) ? varMap.inverse().get(subjectObject.getRight()) : NodeFactory.createBlankNode();
-			TriplePath tp = new TriplePath(s, p, ob);
-			PathTransform pt = new PathTransform();
-			Op o = pt.getResult(tp);
-			((OpSequence) ans).add(o);
-		}
+//		computeEdges(g);
+//		determineNamedVariables();
+//		namedVariables.addAll(namedVars);
+//		for (int i = 0 ; i < namedVariables.size(); i++) {
+//			Node n = namedVariables.get(i);
+//			for (int j = 0; j <= i; j++) {
+//				Node m = namedVariables.get(j);
+//				List<List<Node>> paths.paths = pathsBetween(n,m);
+//				for (List<Node> path : paths.paths) {
+//					if (path.isEmpty()) {
+//						ExtendedIterator<Node> triplePaths = GraphUtil.listPredicates(g, n, m);
+//						ExtendedIterator<Node> reversePaths = GraphUtil.listPredicates(g, m, n);
+//						while (triplePaths.hasNext()) {
+//							Node triplePath = triplePaths.next();
+//							if (triplePath.isLiteral()) {
+//								pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), SSE.parsePath(triplePath.getLiteralLexicalForm())));
+//							}
+//							else {
+//								pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), new P_Link(triplePath)));
+//							}
+//						}
+//						if (!n.equals(m)) {
+//							while (reversePaths.hasNext()) {
+//								Node reversePath = reversePaths.next();
+//								if (reversePath.isLiteral()) {
+//									pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(m,n), SSE.parsePath(reversePath.getLiteralLexicalForm())));
+//								}
+//								else {
+//									pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(m,n), new P_Link(reversePath)));
+//								}
+//							}
+//						}		
+//					}
+//					else if (n.equals(m) && path.size() == 1) { //Obscure case when there's a two node loop.
+//						List<Node> triplePaths = GraphUtil.listPredicates(g, n, path.get(0)).toList();
+//						List<Node> reversePaths = GraphUtil.listPredicates(g, path.get(0), n).toList();
+//						Path p = null;
+//						List<Path> twoPaths = new ArrayList<Path>();
+//						for (Node t : triplePaths) {
+//							if (t.isLiteral()) {
+//								twoPaths.add(SSE.parsePath(t.getLiteralLexicalForm()));
+//							}
+//							else {
+//								twoPaths.add(PathFactory.pathLink(t));
+//							}
+//						}
+//						for (Node t : reversePaths) {
+//							if (t.isLiteral()) {
+//								twoPaths.add(SSE.parsePath(t.getLiteralLexicalForm()));
+//							}
+//							else {
+//								twoPaths.add(PathFactory.pathInverse(PathFactory.pathLink(t)));
+//							}
+//						}
+//						p = PathFactory.pathSeq(twoPaths.get(0), PathFactory.pathInverse(twoPaths.get(1)));
+//						if (twoPaths.get(0) instanceof P_ZeroOrMore1 && twoPaths.get(1) instanceof P_ZeroOrMore1) {
+//							//do nothing
+//						}
+//						else {
+//							pathEdges.add(new Pair<Pair<Node,Node>,Path>(new Pair<Node,Node>(n,m),p));
+//						}
+//						
+//					}
+//					else {
+//						Node current = n;
+//						Path p = null;
+//						for (int k = 0; k < path.size() + 1; k++) {
+//							Node next;
+//							if (k == path.size()) {
+//								next = m;
+//							}
+//							else {
+//								next = path.get(k);
+//							}
+//							ExtendedIterator<Node> triplePaths = GraphUtil.listPredicates(g, current, next);
+//							ExtendedIterator<Node> reversePaths = GraphUtil.listPredicates(g, next, current);
+//							current = next;
+//							while (triplePaths.hasNext()) {
+//								Node triplePath = triplePaths.next();
+//								if (k == 0) {
+//									if (triplePath.isLiteral()) {
+//										p = SSE.parsePath(triplePath.getLiteralLexicalForm());
+//									}
+//									else {
+//										p = new P_Link(triplePath);
+//									}
+//								}
+//								else {
+//									if (triplePath.isLiteral()) {
+//										p = new P_Seq(p, SSE.parsePath(triplePath.getLiteralLexicalForm()));
+//									}
+//									else {
+//										p = new P_Seq(p, new P_Link(triplePath));
+//									}
+//								}
+//							}
+//							while (reversePaths.hasNext()) {
+//								Node reversePath = reversePaths.next();
+//								if (k == 0) {
+//									if (reversePath.isLiteral()) {
+//										p = new P_Inverse(SSE.parsePath(reversePath.getLiteralLexicalForm()));
+//									}
+//									else {
+//										p = new P_Inverse(new P_Link(reversePath));
+//									}
+//								}
+//								else {
+//									if (reversePath.isLiteral()) {
+//										p = new P_Seq(p, new P_Inverse(SSE.parsePath(reversePath.getLiteralLexicalForm())));
+//									}
+//									else {
+//										p = new P_Seq(p, new P_Inverse(new P_Link(reversePath)));
+//									}
+//								}
+//							}
+//							
+//						}
+//						pathEdges.add(new Pair<Pair<Node, Node>, Path>(new Pair<Node, Node>(n,m), p));
+//					}
+//				}
+//			}
+//		}
+//		for (Pair<Pair<Node,Node>,Path> pathEdge : pathEdges) {
+//			Pair<Node,Node> subjectObject = pathEdge.getLeft();
+//			Path p = pathEdge.getRight();
+//			Node s = varMap.containsValue(subjectObject.getLeft()) ? varMap.inverse().get(subjectObject.getLeft()) : NodeFactory.createBlankNode();
+//			Node ob = varMap.containsValue(subjectObject.getRight()) ? varMap.inverse().get(subjectObject.getRight()) : NodeFactory.createBlankNode();
+//			TriplePath tp = new TriplePath(s, p, ob);
+//			PathTransform pt = new PathTransform();
+//			Op o = pt.getResult(tp);
+//			((OpSequence) ans).add(o);
+//		}
 		if (!otherTriples.isEmpty()) {
 			BasicPattern bp1 = new BasicPattern();
 			for (Triple t : otherTriples) {
 				bp1.add(t);
 			}
 			((OpSequence) ans).add(new OpBGP(bp1));
+		}
+		if (!finalTriples.isEmpty()) {
+			for (TriplePath tp : finalTriples) {
+				((OpSequence) ans).add(new OpPath(tp));
+			}
 		}
 		if (((OpSequence) ans).getElements().size() == 1){
 			ans = ((OpSequence) ans).get(0);
@@ -538,96 +588,104 @@ public class BGPCollapser extends TransformCopy {
 	}
 	
 	public Op transform(OpUnion op, Op left, Op right) {
-		List<Op> ops = opsInUnion(op);
-		List<Op> newOps = new ArrayList<Op>();
-		for (Op o : ops) {
-			Op newAns = null;
-			if (o instanceof OpBGP) {
-				sequenceMode = false;
-				newAns = transform((OpBGP) o);
-				sequenceMode = true;
-			}
-			else if (o instanceof OpTriple) {
-				Triple t = ((OpTriple) o).getTriple();
-				if (t.getPredicate().isURI()) {
-					newAns = new OpPath(new TriplePath(t.getSubject(), PathFactory.pathLink(t.getPredicate()), t.getObject()));
-					newOps.add(newAns);
+		if (enableUnion) {
+			List<Op> ops = allOpsInUnion(op);
+			List<Op> newOps = new ArrayList<Op>();
+			for (Op o : ops) {
+				Op newAns = null;
+				if (o instanceof OpBGP) {
+					sequenceMode = false;
+					newAns = transform((OpBGP) o);
+					sequenceMode = true;
+				}
+				else if (o instanceof OpTriple) {
+					Triple t = ((OpTriple) o).getTriple();
+//					if (t.getPredicate().isURI()) {
+//						newAns = new OpPath(new TriplePath(t.getSubject(), PathFactory.pathLink(t.getPredicate()), t.getObject()));
+//					}
+//					else {
+//						newAns = o;
+//					}
+					newAns = o;
+				}
+				else if (o instanceof OpJoin) {
+					TopDownVisitor tdv = new TopDownVisitor(o, this.projectedVars);
+					newAns = tdv.getOp();
+				}
+				else if (o instanceof OpSequence) {
+					TopDownVisitor tdv = new TopDownVisitor(o, this.projectedVars);
+					newAns = tdv.getOp();
 				}
 				else {
 					newAns = o;
 				}
-			}
-			else if (o instanceof OpJoin) {
-				newAns = transform((OpJoin) o, ((OpJoin) o).getLeft(), ((OpJoin) o).getRight());
-			}
-			else if (o instanceof OpSequence) {
-				newAns = transform((OpSequence) o, ((OpSequence) o).getElements());
-			}
-			else {
-				newAns = o;
-			}
-			if (newAns instanceof OpPath) {
-				newOps.add(newAns);
-			}
-			else if (newAns instanceof OpTriple) {
-				Triple t = ((OpTriple) newAns).getTriple();
-				if (t.getPredicate().isURI()) {
-					newAns = new OpPath(new TriplePath(t.getSubject(), PathFactory.pathLink(t.getPredicate()), t.getObject()));
+				if (newAns instanceof OpPath) {
+					newOps.add(newAns);
+				}
+				else if (newAns instanceof OpTriple) {
+					Triple t = ((OpTriple) newAns).getTriple();
+//					if (t.getPredicate().isURI()) {
+//						newAns = new OpPath(new TriplePath(t.getSubject(), PathFactory.pathLink(t.getPredicate()), t.getObject()));
+//						newOps.add(newAns);
+//					}
+					newOps.add(newAns);
+				}
+				else {
 					newOps.add(newAns);
 				}
 			}
-			else {
-				newOps.add(newAns);
-			}
-		}
-		List<Op> copyOps = new ArrayList<Op>();
-		Map<Pair<Node,Node>,Path> partitions = new HashMap<Pair<Node,Node>,Path>();
-		Node auxSubject = Var.alloc(NodeFactory.createBlankNode().getBlankNodeLabel());
-		Node auxObject = Var.alloc(NodeFactory.createBlankNode().getBlankNodeLabel());
-		copyOps.addAll(newOps);
-		for (int i = 0; i < copyOps.size(); i++) {
-			if (copyOps.get(i) instanceof OpPath) {
-				OpPath opA = (OpPath) copyOps.get(i);
-				newOps.remove(opA);
-				TriplePath tpA = opA.getTriplePath();
-				Node subjectA = tpA.getSubject();
-				Node objectA = tpA.getObject();
-				if (!projectedVars.contains(subjectA)) {
-					subjectA = auxSubject;
-				}
-				if (!projectedVars.contains(objectA)) {
-					objectA = auxObject;
-				}
-				Pair<Node,Node> pair = new Pair<Node,Node>(subjectA, objectA);
-				if (partitions.containsKey(pair)) {
-					partitions.put(pair, PathFactory.pathAlt(partitions.get(pair), tpA.getPath()));
+//			List<Op> copyOps = new ArrayList<Op>();
+//			Map<Pair<Node,Node>,Path> partitions = new HashMap<Pair<Node,Node>,Path>();
+//			Node auxSubject = Var.alloc(NodeFactory.createBlankNode().getBlankNodeLabel());
+//			Node auxObject = Var.alloc(NodeFactory.createBlankNode().getBlankNodeLabel());
+//			copyOps.addAll(newOps);
+//			for (int i = 0; i < copyOps.size(); i++) {
+//				if (copyOps.get(i) instanceof OpPath) {
+//					OpPath opA = (OpPath) copyOps.get(i);
+//					newOps.remove(opA);
+//					TriplePath tpA = opA.getTriplePath();
+//					Node subjectA = tpA.getSubject();
+//					Node objectA = tpA.getObject();
+//					if (!projectedVars.contains(subjectA)) {
+//						subjectA = auxSubject;
+//					}
+//					if (!projectedVars.contains(objectA)) {
+//						objectA = auxObject;
+//					}
+//					Pair<Node,Node> pair = new Pair<Node,Node>(subjectA, objectA);
+//					if (partitions.containsKey(pair)) {
+//						partitions.put(pair, PathFactory.pathAlt(partitions.get(pair), tpA.getPath()));
+//					}
+//					else {
+//						partitions.put(pair, tpA.getPath());
+//					}
+//				}
+//			}
+			Op ans = null;
+			for (Op o : newOps) {
+				if (ans == null) {
+					ans = o;
 				}
 				else {
-					partitions.put(pair, tpA.getPath());
+					ans = OpUnion.create(ans, o);
 				}
 			}
-		}
-		Op ans = null;
-		for (Op o : newOps) {
-			if (ans == null) {
-				ans = o;
+//			for (Map.Entry<Pair<Node,Node>, Path> entry : partitions.entrySet()) {
+//				if (ans == null) {
+//					ans = new OpPath(new TriplePath(entry.getKey().getLeft(), entry.getValue(), entry.getKey().getRight()));
+//				}
+//				else {
+//					ans = OpUnion.create(ans, new OpPath(new TriplePath(entry.getKey().getLeft(), entry.getValue(), entry.getKey().getRight())));
+//				}
+//			}
+			if (setSemantics) {
+				 
 			}
-			else {
-				ans = OpUnion.create(ans, o);
-			}
+			return ans;
 		}
-		for (Map.Entry<Pair<Node,Node>, Path> entry : partitions.entrySet()) {
-			if (ans == null) {
-				ans = new OpPath(new TriplePath(entry.getKey().getLeft(), entry.getValue(), entry.getKey().getRight()));
-			}
-			else {
-				ans = OpUnion.create(ans, new OpPath(new TriplePath(entry.getKey().getLeft(), entry.getValue(), entry.getKey().getRight())));
-			}
+		else {
+			return op;
 		}
-		if (setSemantics) {
-			 
-		}
-		return ans;
 	}
 	
 	public boolean isConnected(Graph g) {
@@ -841,35 +899,27 @@ public class BGPCollapser extends TransformCopy {
 		if (op instanceof OpJoin) {
 			Op left = ((OpJoin) op).getLeft();
 			Op right = ((OpJoin) op).getRight();
-			if (left instanceof OpTriple) {
-				ans.add(left);
-			}
-			else if (left instanceof OpBGP) {
-				ans.add(left);
-			}
-			else if (left instanceof OpPath) {
-				ans.add(left);
+			if (left instanceof OpSequence) {
+				for (Op o : ((OpSequence) left).getElements()) {
+					ans.add(o);
+				}
 			}
 			else if (left instanceof OpJoin) {
 				ans.addAll(opsInJoin(left));
 			}
 			else {
-				return null;
+				ans.add(left);
 			}
-			if (right instanceof OpTriple) {
-				ans.add(right);
-			}
-			else if (right instanceof OpBGP) {
-				ans.add(right);
-			}
-			else if (right instanceof OpPath) {
-				ans.add(right);
+			if (right instanceof OpSequence) {
+				for (Op o : ((OpSequence) right).getElements()) {
+					ans.add(o);
+				}
 			}
 			else if (right instanceof OpJoin) {
 				ans.addAll(opsInJoin(right));
 			}
 			else {
-				return null;
+				ans.add(right);
 			}
 		}
 		else {
@@ -924,6 +974,30 @@ public class BGPCollapser extends TransformCopy {
 			}
 			else {
 				return null;
+			}
+		}
+		else {
+			return ans;
+		}
+		return ans;
+	}
+	
+	public List<Op> allOpsInUnion(Op op){
+		List<Op> ans = new ArrayList<Op>();
+		if (op instanceof OpUnion) {
+			Op leftOp = ((OpUnion) op).getLeft();
+			Op rightOp = ((OpUnion) op).getRight();
+			if (leftOp instanceof OpUnion) {
+				ans.addAll(allOpsInUnion(leftOp));
+			}
+			else {
+				ans.add(leftOp);
+			}
+			if (rightOp instanceof OpUnion) {
+				ans.addAll(allOpsInUnion(rightOp));
+			}
+			else {
+				ans.add(rightOp);
 			}
 		}
 		else {
@@ -1119,7 +1193,7 @@ public class BGPCollapser extends TransformCopy {
 			int minNodes = 0;
 			while (rs.hasNext()) {
 				QuerySolution qs = rs.nextSolution();
-				System.out.println(qs);
+//				System.out.println(qs);
 				Set<Node> nodes = new HashSet<Node>();
 				Set<Node> paths = new HashSet<Node>();
 				boolean isValid = true;
@@ -1222,14 +1296,21 @@ public class BGPCollapser extends TransformCopy {
 					newOps.add(nextOp);
 				}
 			}
-			System.out.println(minSolution);
+//			System.out.println(minSolution);
 			ans = OpSequence.create();
 			for (Op o : newOps) {
 				((OpSequence) ans).add(o);
 			}
 		}
 		else if (op instanceof OpUnion) {
-			
+			List<Op> ops = allOpsInUnion(op);
+			List<Op> newOps = new ArrayList<Op>();
+			for (Op o : ops) {
+				newOps.add(containment(o));
+			} 
+			for (int i = 1; i < newOps.size(); i++) {
+				
+			}
 		}
 		else if (op instanceof OpJoin) {
 			OpSequence opSeq = OpSequence.create();
@@ -1245,11 +1326,35 @@ public class BGPCollapser extends TransformCopy {
 		return ans;
 	}
 	
+	public Node getValidNode(Node n) {
+		if (n.isVariable()) {
+			return NodeFactory.createBlankNode(n.getName());
+		}
+		if (n.isLiteral()) {
+			if (n.getLiteralLanguage().equals("")) {
+				return NodeFactory.createLiteralByValue(n.getLiteralValue().toString(), n.getLiteralDatatype());
+			}
+			else {
+				return NodeFactory.createLiteral(n.getLiteralValue().toString()+"@"+n.getLiteralLanguage());
+			}
+		}
+		else {
+			return n;
+		}
+	}
+	
 	public Node createLiteralWithType(String s){
 		Node ans;
 		s = s.replaceAll("\"", "");
+		String[] split = s.split("@");
+		if (split.length > 1) {
+			String lang = split[split.length-1];
+			if (s.contains("^^")) {
+				lang = lang.substring(0,lang.indexOf("^^"));
+			}
+			return NodeFactory.createLiteral(s.substring(0,s.lastIndexOf("@")), lang);
+		}
 		if (s.contains("^^")){
-				NodeFactory.getType(s);
 				ans = NodeFactory.createLiteralByValue(s.substring(0, s.indexOf("^^")), NodeFactory.getType(s.substring(1+s.lastIndexOf("^")).replaceAll("<|>", "")));
 		}
 		else{

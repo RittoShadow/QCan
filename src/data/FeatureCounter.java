@@ -46,7 +46,7 @@ import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.algebra.op.OpUnion;
 import org.apache.jena.sparql.path.Path;
 
-import main.PGraph;
+import paths.PGraph;
 
 public class FeatureCounter implements OpVisitor {
 	
@@ -135,8 +135,8 @@ public class FeatureCounter implements OpVisitor {
 			pFeatures = pFeatures.substring(0, pFeatures.length() - 1) + "]\t";
 			pFeatures += ppfc.maxLength + "\t";
 			if (ppfc.features.contains("P_NegPropSet") || ppfc.features.contains("P_Mod") || ppfc.features.contains("P_Distinct") || ppfc.features.contains("P_ZeroOrOne") || ppfc.features.contains("P_Multi") || ppfc.features.contains("P_Shortest")) {
-				pFeatures += "unsupported";
-				return;
+				pFeatures += "[unsupported]";
+				pathStats.add(pFeatures);
 			}
 			else {
 				PGraph pg = new PGraph(p);
@@ -151,7 +151,6 @@ public class FeatureCounter implements OpVisitor {
 				pFeatures = pFeatures.substring(0, pFeatures.length() - 1) + "]\t";
 				pFeatures += ppfc2.maxLength + "\t";
 				pFeatures += t;
-				System.out.println(t);
 				pathStats.add(pFeatures);
 			}
 			
@@ -183,6 +182,7 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpFilter arg0) {
+		containsFilter = true;
 		features.add(arg0.getName());
 	}
 
@@ -221,16 +221,19 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpJoin arg0) {
+		containsJoin = true;
 		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpLeftJoin arg0) {
+		containsOptional = true;
 		features.add(arg0.getName());
 	}
 
 	@Override
 	public void visit(OpUnion arg0) {
+		containsUnion = true;
 		features.add(arg0.getName());
 	}
 
@@ -270,6 +273,7 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpOrder arg0) {
+		containsSolutionMods = true;
 		features.add(arg0.getName());
 	}
 
@@ -291,6 +295,7 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpSlice arg0) {
+		containsSolutionMods = true;
 		features.add(arg0.getName());
 	}
 

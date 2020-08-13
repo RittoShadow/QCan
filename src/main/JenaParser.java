@@ -18,6 +18,7 @@ import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.op.OpNull;
 
 public class JenaParser {
@@ -43,6 +44,16 @@ public class JenaParser {
 		long t = System.nanoTime();
 		Query query = QueryFactory.create(s);
 		Op op = Algebra.compile(query);
+		Query result = OpAsQuery.asQuery(op);
+		if (query.isAskType()) {
+			result.setQueryAskType();
+		}
+		else if (query.isConstructType()) {
+			result.setConstructTemplate(query.getConstructTemplate());
+		}
+		else if (query.isDescribeType()) {
+			result.setQueryDescribeType();
+		}
 		t = System.nanoTime() - t;
 		if (op instanceof OpNull){
 			return;
@@ -50,7 +61,7 @@ public class JenaParser {
 		queryInfo = totalQueries + "\t" + t + "\t";
 		queryInfo += query.getResultVars().size() + "\t";
 		queryInfo += query.isDistinct() + "\t";
-		canonQueries.add(op.toString());
+		canonQueries.add(result.toString());
 		bw.append(queryInfo);
 		bw.newLine();
 		supportedQueries++;
@@ -150,10 +161,10 @@ public class JenaParser {
 		return output;
 	}
 	
-	public void getDistributionInfo() throws IOException{
+	public void getDistributionInfo(String filename) throws IOException{
 		int i = 0;
 		int max = 0;
-		File file = new File("resultFiles/dist"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+		File file = new File("resultFiles/jena/" + filename + "_dist"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
 		FileWriter fw = new FileWriter(file);
 		BufferedWriter bw = new BufferedWriter(fw);
 		bw.append("Distribution of canonicalised queries: \n");
@@ -193,6 +204,5 @@ public class JenaParser {
 	
 	public static void main(String[] args) throws IOException{
 		JenaParser qp = new JenaParser(new File("testFiles/filterTest1"), new File("resultFiles/filterTest"), -1, true, false);
-		qp.getDistributionInfo();
 	}
 }
