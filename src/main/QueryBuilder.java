@@ -947,8 +947,9 @@ public class QueryBuilder {
 		leftOp = nextOpByType(left);
 		Node right = GraphUtil.listObjects(graph, n, rightNode).next();
 		rightOp = nextOpByType(right);
-		leftOp = filterBindOrGroupToOp(leftOp, n);
-		return OpLeftJoin.createLeftJoin(leftOp, rightOp, null);
+		Op ans = OpLeftJoin.createLeftJoin(leftOp, rightOp, null);
+		ans = filterBindOrGroupToOp(ans, n);
+		return ans;
 	}
 	
 	public Op minusToOp(Node n){
@@ -1465,6 +1466,9 @@ public class QueryBuilder {
 					return argToExpr(v);
 				}
 			}
+			else {
+				return argToExpr(n);
+			}
 		}
 		return e;
 	}
@@ -1501,13 +1505,6 @@ public class QueryBuilder {
 			first = root;
 		}
 		op = nextOpByType(first);
-		if (!pVariables.isEmpty()){
-			Collections.sort(pVariables, new NodeComparator());
-			op = new OpProject(op, pVariables);
-		}
-		if (this.graph.contains(root, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean))){
-			op = new OpDistinct(op);
-		}
 		if (GraphUtil.listSubjects(graph, typeNode, orderByNode).hasNext()){
 			Node orderBy = GraphUtil.listSubjects(graph, typeNode, orderByNode).next();
 			List<Node> args = GraphUtil.listObjects(graph, orderBy, argNode).toList();
@@ -1529,6 +1526,13 @@ public class QueryBuilder {
 			int start = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, limit, offsetNode).next()));
 			int finish = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, limit, valueNode).next()));
 			op = new OpSlice(op, start, finish);
+		}
+		if (!pVariables.isEmpty()){
+			Collections.sort(pVariables, new NodeComparator());
+			op = new OpProject(op, pVariables);
+		}
+		if (this.graph.contains(root, distinctNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)) && queryType.equals(projectNode)){
+			op = new OpDistinct(op);
 		}
 		Query q = OpAsQuery.asQuery(op);
 		if (f.hasNext()){

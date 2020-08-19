@@ -148,10 +148,10 @@ public class SingleQuery {
 		containsNamedGraphs = fc.getContainsNamedGraphs();
 		containsSolutionMods = fc.getContainsSolutionMods();
 		setContainsPaths(fc.getContainsPaths());
-		setContainsMinus(fc.getPathFeatures().contains("minus"));
-		setContainsBind(fc.getPathFeatures().contains("extend"));
-		setContainsGroupBy(fc.getPathFeatures().contains("group"));
-		setContainsTable(fc.getPathFeatures().contains("table"));
+		setContainsMinus(fc.getFeatures().contains("minus"));
+		setContainsBind(fc.getFeatures().contains("extend"));
+		setContainsGroupBy(fc.getFeatures().contains("group"));
+		setContainsTable(fc.getFeatures().contains("table"));
 	}
 	
 	public void canonicalise() throws InterruptedException, HashCollisionException{
@@ -269,7 +269,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "SELECT * WHERE {  {    ?var1  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var3  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var4  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var5  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var6  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   UNION  {    ?var7  <http://www.wikidata.org/prop/direct/P179>  ?var2 .  }   VALUES (  ?var1  ) {    (  <http://www.wikidata.org/entity/Q43361>  )    (  <http://www.wikidata.org/entity/Q46751>  )    (  <http://www.wikidata.org/entity/Q46750>  )    (  <http://www.wikidata.org/entity/Q47209>  )   }   VALUES (  ?var3  ) {    (  <http://www.wikidata.org/entity/Q46751>  )   }   VALUES (  ?var4  ) {    (  <http://www.wikidata.org/entity/Q46758>  )   }   VALUES (  ?var5  ) {    (  <http://www.wikidata.org/entity/Q46887>  )   }   VALUES (  ?var6  ) {    (  <http://www.wikidata.org/entity/Q47210>  )   }   VALUES (  ?var7  ) {    (  <http://www.wikidata.org/entity/Q47598>  )   } } ";
+		String q = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX toolType: <http://seek.rkbexplorer.com/id/toolType/> PREFIX taskType: <http://seek.rkbexplorer.com/id/taskType/> PREFIX artType: <http://seek.rkbexplorer.com/id/artifactType/> PREFIX prop: <http://seek.rkbexplorer.com/id/property/> PREFIX oc: <http://www.gsic.uva.es/ontologies/ontoolcoleModel.owl#> SELECT DISTINCT ?tool ?tlab WHERE { ?tool rdfs:label ?tlab . ?tool prop:weShareSeeAlso ?a .?tool a toolType:Tool . ?tool oc:supportsTask ?t0 . ?t0 a taskType:TextReading . ?tool oc:supportsTask ?t1 . ?t1 a taskType:TextBasedSynchronousCommunication . ?a0 a artType:Artifact . { {?tool prop:hasInput ?a0} UNION {?tool prop:hasOutput ?a0} UNION {?tool oc:providesStorage ?a0} }?a1 a artType:Artifact . { {?tool prop:hasInput ?a1} UNION {?tool prop:hasOutput ?a1} UNION {?tool oc:providesStorage ?a1} }?a2 a artType:Artifact . { {?tool prop:hasInput ?a2} UNION {?tool prop:hasOutput ?a2} UNION {?tool oc:providesStorage ?a2} }OPTIONAL{?tool prop:uSeekRanking ?rank}} ORDER BY ?rank";
 		SingleQuery sq = new SingleQuery(q,true,true,true,true);
 		sq.getCanonicalGraph().print();
 		System.out.println(sq.getQuery());

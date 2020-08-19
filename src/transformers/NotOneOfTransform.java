@@ -20,6 +20,9 @@ public class NotOneOfTransform extends TransformCopy {
 				else if (((OpUnion) o).getRight() instanceof OpPath && ((OpUnion) o).getLeft() == null) {
 					ans.add(((OpUnion) o).getRight());
 				}
+				else {
+					ans.add(o);
+				}
 			}
 			else {
 				ans.add(o);

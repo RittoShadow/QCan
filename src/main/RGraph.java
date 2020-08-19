@@ -1219,85 +1219,91 @@ public class RGraph {
 			if (GraphUtil.listObjects(graph, root, opNode).hasNext()) {
 				Node first = GraphUtil.listObjects(graph, root, opNode).next();
 				if (GraphUtil.listObjects(graph, first, typeNode).next().equals(joinNode)) {
-					Graph inner = ge.extract(first, graph);
-					Graph outer = GraphFactory.createPlainGraph();
-					GraphUtil.addInto(outer, graph);
-					GraphUtil.deleteFrom(outer, inner);
-					outer.delete(Triple.create(root, opNode, first));
-					Graph filterGraph = GraphFactory.createPlainGraph();
-					Graph orderByGraph = GraphFactory.createPlainGraph();
-					ExtendedIterator<Node> filters = GraphUtil.listObjects(inner, first, patternNode);
-					//FILTER, BIND, GROUP BY, etc.
-					if (filters.hasNext()){
-						filterGraph = ge.extract(filters.next(), inner);
-					}
-					GraphUtil.deleteFrom(inner,filterGraph);
-					UpdateAction.execute(filterVarsRule,filterGraph);
-					List<Node> filterVars = listSubjects(filterGraph, typeNode, varNode).toList();
-					for (Node f : filterVars){
-						filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
-						filterGraph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-						inner.add(Triple.create(f, typeNode, varNode));
-						inner.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
-						inner.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-					}
-					//PROJECTED
-					ExtendedIterator<Node> pVars = GraphUtil.listObjects(graph, root, argNode);
-					while (pVars.hasNext()){
-						Node p = pVars.next();
-						outer.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
-						outer.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-						outer.add(Triple.create(p, typeNode, varNode));
-						inner.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
-						inner.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-					}
-					//ORDER BY
-					ExtendedIterator<Node> orderBy = listSubjects(graph, typeNode, orderByNode);
-					if (orderBy.hasNext()) {
-						orderByGraph = ge.extract(orderBy.next(), outer);
-					}
-					UpdateAction.execute(filterVarsRule, orderByGraph);
-					while (orderBy.hasNext()){
-						ExtendedIterator<Node> orderVars = listSubjects(orderByGraph, typeNode, varNode);
-						while (orderVars.hasNext()){
-							Node v = orderVars.next();
-							Node var = GraphUtil.listObjects(graph, v, varNode).next();
-							outer.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
-							outer.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-							outer.add(Triple.create(var, typeNode, varNode));
-							inner.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
-							inner.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+					if (isUCQ(first)) {
+						Graph inner = ge.extract(first, graph);
+						Graph outer = GraphFactory.createPlainGraph();
+						GraphUtil.addInto(outer, graph);
+						GraphUtil.deleteFrom(outer, inner);
+						outer.delete(Triple.create(root, opNode, first));
+						Graph filterGraph = GraphFactory.createPlainGraph();
+						Graph orderByGraph = GraphFactory.createPlainGraph();
+						ExtendedIterator<Node> filters = GraphUtil.listObjects(inner, first, patternNode);
+						//FILTER, BIND, GROUP BY, etc.
+						if (filters.hasNext()){
+							filterGraph = ge.extract(filters.next(), inner);
 						}
-					}
-					//Create a new r-graph based on this conjunctive query.
-					RGraph e = new RGraph(first,inner,this.vars);
-					e.project(vars);
-					ExtendedIterator<Node> cqFilterVars = listSubjects(e.graph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
-					while(cqFilterVars.hasNext()){
-						Node p = cqFilterVars.next();
-						e.graph.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
-					}
-					UpdateAction.execute(tripleRelabelRule,e.graph); // May not be necessary anymore.
-					UpdateAction.execute(branchRelabelRule,e.graph);
+						GraphUtil.deleteFrom(inner,filterGraph);
+						ExtendedIterator<Node> pattern = GraphUtil.listObjects(inner,first,patternNode);
+						if (pattern.hasNext()) {
+							inner.delete(Triple.create(first,patternNode,pattern.next()));
+						}
+						UpdateAction.execute(filterVarsRule,filterGraph);
+						List<Node> filterVars = listSubjects(filterGraph, typeNode, varNode).toList();
+						for (Node f : filterVars){
+							filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
+							filterGraph.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+							inner.add(Triple.create(f, typeNode, varNode));
+							inner.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
+							inner.add(Triple.create(f, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+						}
+						//PROJECTED
+						ExtendedIterator<Node> pVars = GraphUtil.listObjects(graph, root, argNode);
+						while (pVars.hasNext()){
+							Node p = pVars.next();
+							outer.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+							outer.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+							outer.add(Triple.create(p, typeNode, varNode));
+							inner.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+							inner.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+						}
+						//ORDER BY
+						ExtendedIterator<Node> orderBy = listSubjects(graph, typeNode, orderByNode);
+						if (orderBy.hasNext()) {
+							orderByGraph = ge.extract(orderBy.next(), outer);
+						}
+						UpdateAction.execute(filterVarsRule, orderByGraph);
+						while (orderBy.hasNext()){
+							ExtendedIterator<Node> orderVars = listSubjects(orderByGraph, typeNode, varNode);
+							while (orderVars.hasNext()){
+								Node v = orderVars.next();
+								Node var = GraphUtil.listObjects(graph, v, varNode).next();
+								outer.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
+								outer.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+								outer.add(Triple.create(var, typeNode, varNode));
+								inner.add(Triple.create(var, valueNode, NodeFactory.createLiteral(var.getBlankNodeLabel())));
+								inner.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+							}
+						}
+						//Create a new r-graph based on this conjunctive query.
+						RGraph e = new RGraph(first,inner,this.vars);
+						e.project(vars);
+						ExtendedIterator<Node> cqFilterVars = listSubjects(e.graph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
+						while(cqFilterVars.hasNext()){
+							Node p = cqFilterVars.next();
+							e.graph.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
+						}
+						UpdateAction.execute(tripleRelabelRule,e.graph); // May not be necessary anymore.
+						UpdateAction.execute(branchRelabelRule,e.graph);
 //					UpdateAction.execute(branchCleanUpRule,e.graph);
-					e = e.getLeanForm();
-					RGraph eg = new RGraph(root,outer,this.vars);
-					Node eRoot = listSubjects(e.graph, typeNode, joinNode).next();
-					GraphUtil.addInto(eg.graph, ge.extract(eRoot, e.graph));
-					eg.graph.add(Triple.create(root, opNode, eRoot));
-					eg.root = root;
-					if (!filterGraph.isEmpty()){
-						Node fNode = listSubjects(filterGraph, typeNode, extraNode).next();
-						eg.graph.add(Triple.create(eRoot, patternNode, fNode));
+						e = e.getLeanForm();
+						RGraph eg = new RGraph(root,outer,this.vars);
+						Node eRoot = listSubjects(e.graph, typeNode, joinNode).next();
+						GraphUtil.addInto(eg.graph, ge.extract(eRoot, e.graph));
+						eg.graph.add(Triple.create(root, opNode, eRoot));
+						eg.root = root;
+						if (!filterGraph.isEmpty()){
+							Node fNode = listSubjects(filterGraph, typeNode, extraNode).next();
+							eg.graph.add(Triple.create(eRoot, patternNode, fNode));
+						}
+						GraphUtil.addInto(eg.graph, filterGraph);
+						UpdateAction.execute(joinTripleRule, eg.graph);
+						eg.setDistinctNode(true);
+						UpdateAction.execute(branchCleanUpRule,eg.graph);
+						UpdateAction.execute(branchUnionRule,eg.graph);
+						UpdateAction.execute(branchCleanUpRule2,eg.graph);
+						UpdateAction.execute(joinRule, eg.graph);
+						return eg;
 					}
-					GraphUtil.addInto(eg.graph, filterGraph);
-					UpdateAction.execute(joinTripleRule, eg.graph);
-					e.setDistinctNode(true);
-					UpdateAction.execute(branchCleanUpRule,eg.graph);
-					UpdateAction.execute(branchUnionRule,eg.graph);
-					UpdateAction.execute(branchCleanUpRule2,eg.graph);
-					UpdateAction.execute(joinRule, eg.graph);
-					return eg;
 				}
 			}
 		}	

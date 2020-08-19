@@ -639,8 +639,8 @@ public class Analysis {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		Analysis a = new Analysis("resultFiles/utf8I7_status2xx_userData_Joined_results20200811_170624.log");
-		a.filterQueriesByTotalTime(10000000000d);
+		Analysis a = new Analysis("resultFiles/utf8I7_status2xx_userData_Joined_results20200817_133531.log");
+		a.displayInfo();
 	}
 
 }

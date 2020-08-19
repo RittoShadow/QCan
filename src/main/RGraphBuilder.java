@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
+import java.util.logging.Filter;
 import java.util.regex.Pattern;
 
 import org.apache.jena.graph.Node;
@@ -80,6 +81,7 @@ import paths.PGraph;
 import paths.PathTransform;
 import transformers.FilterTransform;
 import transformers.NotOneOfTransform;
+import transformers.TransformPath;
 import transformers.UCQTransformer;
 import visitors.BindVisitor;
 import visitors.FilterVisitor;
@@ -324,7 +326,7 @@ public class RGraphBuilder implements OpVisitor {
 		for (Map.Entry<Var, Expr> m : map.entrySet()) {
 			totalVars.add(m.getKey());
 			totalVars.addAll(m.getValue().getVarsMentioned());
-			BindVisitor bv = new BindVisitor(m.getKey());
+			FilterVisitor bv = new FilterVisitor(m.getKey());
 			ExprWalker.walk(bv, m.getValue());
 			graphStack.peek().bind(bv.getGraph());
 		}
@@ -748,8 +750,8 @@ public class RGraphBuilder implements OpVisitor {
 		Op op2 = op;
 		do {
 			op1 = op2;
-			op2 = Transformer.transform(new UCQTransformer(), op1);
-			op2 = Transformer.transform(new TransformPathFlatternStd(), op2);
+			op2 = Transformer.transform(new UCQTransformer(), op2);
+			op2 = Transformer.transform(new TransformPath(), op2);
 			op2 = Transformer.transform(new NotOneOfTransform(), op2);
 			op2 = Transformer.transform(new FilterTransform(), op2);
 		}
@@ -762,26 +764,37 @@ public class RGraphBuilder implements OpVisitor {
 		if (op instanceof OpTriple) {
 			Triple t = ((OpTriple) op).getTriple();
 			if (t.getSubject().isVariable()) {
-				ans.add(Var.alloc(t.getSubject().getName()));
+				if (!t.getSubject().getName().startsWith("?")) {
+					ans.add(Var.alloc(t.getSubject().getName()));
+				}
 			}
 			if (t.getPredicate().isVariable()) {
-				ans.add(Var.alloc(t.getPredicate().getName()));
-
+				if (!t.getPredicate().getName().startsWith("?")) {
+					ans.add(Var.alloc(t.getPredicate().getName()));
+				}
 			}
 			if (t.getObject().isVariable()) {
-				ans.add(Var.alloc(t.getObject().getName()));
+				if (!t.getObject().getName().startsWith("?")) {
+					ans.add(Var.alloc(t.getObject().getName()));
+				}
 			}
 		}
 		else if (op instanceof OpBGP) {
 			for (Triple t : ((OpBGP) op).getPattern().getList()) {
 				if (t.getSubject().isVariable()) {
-					ans.add(Var.alloc(t.getSubject().getName()));
+					if (!t.getSubject().getName().startsWith("?")) {
+						ans.add(Var.alloc(t.getSubject().getName()));
+					}
 				}
 				if (t.getPredicate().isVariable()) {
-					ans.add(Var.alloc(t.getPredicate().getName()));
+					if (!t.getPredicate().getName().startsWith("?")) {
+						ans.add(Var.alloc(t.getPredicate().getName()));
+					}
 				}
 				if (t.getObject().isVariable()) {
-					ans.add(Var.alloc(t.getObject().getName()));
+					if (!t.getObject().getName().startsWith("?")) {
+						ans.add(Var.alloc(t.getObject().getName()));
+					}
 				}
 			}
 		}
@@ -844,10 +857,9 @@ public class RGraphBuilder implements OpVisitor {
 	}
 	
 	public Op UCQTransformation(Op op) {
-		Op op2 = Transformer.transform(new UCQTransformer(), op);
 //		op1 = transitiveClosure(op1);
-		op2 = UCQNormalisation(op2);
-		op2 = uC2RPQCollapse(op2);
+		Op op2 = UCQNormalisation(op);
+//		op2 = uC2RPQCollapse(op2);
 //		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
 //		op2 = Transformer.transform(new BGPCollapser(op2,this.projectionVars,false), op2); // transform BGPs
 		op2 = Transformer.transform(new TransformSimplify(), op2);

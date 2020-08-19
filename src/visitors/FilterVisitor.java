@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
+import java.util.logging.Filter;
 
 import main.RGraph;
 import main.RGraphBuilder;
@@ -41,9 +42,15 @@ public class FilterVisitor implements ExprVisitor {
 	
 	private Stack<Node> nodeStack = new Stack<Node>();
 	private RGraph filterGraph;
+	private Var var;
 
 	public FilterVisitor(){
 		filterGraph = new RGraph(NodeFactory.createBlankNode(), GraphFactory.createPlainGraph(), Collections.<Var> emptyList());
+	}
+
+	public FilterVisitor(Var var) {
+		this();
+		this.var = var;
 	}
 	
 	@Override
@@ -182,8 +189,14 @@ public class FilterVisitor implements ExprVisitor {
 	}
 	
 	public RGraph getGraph(){
-		filterGraph.root = nodeStack.peek();
-		filterGraph.filterNormalisation();
+		if (var == null) {
+			filterGraph.root = nodeStack.peek();
+			filterGraph.filterNormalisation();
+		}
+		else {
+			Node exprNode = nodeStack.peek();
+			filterGraph.bindNode(exprNode,var);
+		}
 		return this.filterGraph;
 	}
 
