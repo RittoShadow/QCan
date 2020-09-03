@@ -1046,7 +1046,7 @@ public class BGPCollapser extends TransformCopy {
 	public TreeSet<org.semanticweb.yars.nx.Node[]> getTriples(Graph g){
 		Model model = ModelFactory.createModelForGraph(g);
 		JenaModelIterator jmi = new JenaModelIterator(model);
-		TreeSet<org.semanticweb.yars.nx.Node[]> triples = new TreeSet<org.semanticweb.yars.nx.Node[]>(NodeComparator.NC);
+		TreeSet<org.semanticweb.yars.nx.Node[]> triples = new TreeSet<>(NodeComparator.NC);
 		while(jmi.hasNext()){
 			org.semanticweb.yars.nx.Node[] triple = jmi.next();
 			triples.add(new org.semanticweb.yars.nx.Node[]{triple[0],triple[1],triple[2]});

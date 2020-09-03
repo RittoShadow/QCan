@@ -9,8 +9,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
-import java.util.logging.Filter;
-import java.util.regex.Pattern;
 
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
@@ -60,8 +58,8 @@ import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.algebra.op.OpUnion;
 import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
 import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
-import org.apache.jena.sparql.algebra.optimize.TransformPathFlatternStd;
 import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
+import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
@@ -77,13 +75,13 @@ import org.apache.jena.sparql.path.P_ZeroOrMore1;
 import org.apache.jena.sparql.path.Path;
 
 import data.PropertyPathFeatureCounter;
+import org.apache.jena.sparql.syntax.Template;
 import paths.PGraph;
 import paths.PathTransform;
 import transformers.FilterTransform;
 import transformers.NotOneOfTransform;
 import transformers.TransformPath;
 import transformers.UCQTransformer;
-import visitors.BindVisitor;
 import visitors.FilterVisitor;
 import visitors.TopDownVisitor;
 
@@ -97,6 +95,7 @@ public class RGraphBuilder implements OpVisitor {
 	private final Stack<RGraph> graphStack = new Stack<>();
 	List<Var> projectionVars;
 	Set<Var> totalVars = new HashSet<>();
+	Template template = null;
 	private List<String> graphURI = Collections.emptyList();
 	private List<String> namedGraphURI = Collections.emptyList();
 	public int nTriples = 0;
@@ -130,6 +129,9 @@ public class RGraphBuilder implements OpVisitor {
 	
 	public RGraphBuilder(Query query, boolean pathNormalisation){
 		this.queryType = query.getQueryType();
+		if (this.queryType == Query.QueryTypeConstruct) {
+			template = query.getConstructTemplate();
+		}
 		this.projectionVars = query.getProjectVars();
 		graphURI = query.getGraphURIs();
 		namedGraphURI = query.getNamedGraphURIs();
@@ -151,14 +153,17 @@ public class RGraphBuilder implements OpVisitor {
 		nTriples += arg0.getPattern().size();
 		graphStack.add(new RGraph(arg0.getPattern().getList()));
 		for (Triple t : arg0.getPattern().getList()){
-			if (t.getSubject().isVariable()){
-				totalVars.add((Var) t.getSubject());
+			Node s = t.getSubject();
+			Node p = t.getPredicate();
+			Node o = t.getObject();
+			if (s.isVariable()){
+				totalVars.add((Var) s);
 			}
-			if (t.getPredicate().isVariable()){
-				totalVars.add((Var) t.getPredicate());
+			if (p.isVariable()){
+				totalVars.add((Var) p);
 			}
-			if (t.getObject().isVariable()){
-				totalVars.add((Var) t.getObject());
+			if (o.isVariable()){
+				totalVars.add((Var) o);
 			}
 		}
 	}
@@ -193,6 +198,7 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpQuad arg0) {
 		
 	}
+
 
 	@Override
 	public void visit(OpPath arg0) {
@@ -521,22 +527,18 @@ public class RGraphBuilder implements OpVisitor {
 
 	@Override
 	public void visit(OpProject arg0) {
-		projectedQueries++;
-		if (projectedQueries > 1) {
-			throw new UnsupportedOperationException("Nested queries.");
-		}
 		graphStack.peek().project(arg0.getVars());
 	}
 
 	@Override
 	public void visit(OpReduced arg0) {
-		
+		graphStack.peek().setReducedNode(true);
 	}
 
 	@Override
 	public void visit(OpDistinct arg0) {
 		isDistinct = true;
-		
+		graphStack.peek().setDistinctNode(true);
 	}
 
 	@Override
@@ -544,12 +546,7 @@ public class RGraphBuilder implements OpVisitor {
 		containsSolutionMods = true;
 		long offset = arg0.getStart() < 0 ? 0 : arg0.getStart();
 		long limit = arg0.getLength();
-		if (!graphStack.peek().containsProjection()){
-			graphStack.peek().project(projectionVars);
-			projectedQueries++;
-		}
 		graphStack.peek().slice((int)offset, (int)limit);
-		
 	}
 
 	@Override
@@ -582,19 +579,20 @@ public class RGraphBuilder implements OpVisitor {
 	}
 	
 	public RGraph getResult(){
-		if (!graphStack.peek().containsProjection()){
+		if (!graphStack.peek().isProjection()){
 			if (this.queryType == Query.QueryTypeAsk){
 				graphStack.peek().ask();
 			}
 			else if (this.queryType == Query.QueryTypeConstruct){
-				graphStack.peek().construct();
+				graphStack.peek().construct(template);
 			}
 			else if (this.queryType == Query.QueryTypeDescribe){
 				graphStack.peek().describe();
 			}
 			else if (this.queryType == Query.QueryTypeSelect) {
 				if (projectedQueries == 0) {
-					projectionVars = List.copyOf(totalVars);
+					projectionVars = new ArrayList<>();
+					projectionVars.addAll(totalVars);
 				}
 				if (projectionVars != null) {
 					graphStack.peek().project(projectionVars);

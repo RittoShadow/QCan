@@ -23,6 +23,7 @@ public class Tools {
 		while (e.hasNext()){
 			System.out.println(e.next() + " .");
 		}
+		System.out.println();
 	}
 	
 	public static void extractQueries(File in, File out, String split, int n, String beginAt, String end) throws IOException {
@@ -41,7 +42,7 @@ public class Tools {
 				else {
 					query = query.substring(query.indexOf(beginAt) + beginAt.length());
 				}
-				query = URLDecoder.decode(query, StandardCharsets.UTF_8);
+				query = URLDecoder.decode(query, String.valueOf(StandardCharsets.UTF_8));
 				query = query.replace("\n", " ").trim();
 				query = query.replace("\r", " ").trim();
 				Query q = QueryFactory.create(query);

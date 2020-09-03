@@ -7,38 +7,47 @@ import cl.uchile.dcc.blabel.label.GraphLabelling.GraphLabellingArgs;
 import cl.uchile.dcc.blabel.label.GraphLabelling.GraphLabellingResult;
 import cl.uchile.dcc.blabel.lean.DFSGraphLeaning;
 import cl.uchile.dcc.blabel.lean.GraphLeaning.GraphLeaningResult;
+import com.google.common.collect.Multiset;
+import com.sun.org.apache.xpath.internal.axes.FilterExprWalker;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.graph.*;
-import org.apache.jena.query.Query;
-import org.apache.jena.query.QueryExecution;
-import org.apache.jena.query.QueryExecutionFactory;
+import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpGroup;
+import org.apache.jena.sparql.algebra.optimize.ExprVisitorApplyVisitor;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
 import org.apache.jena.sparql.engine.binding.Binding;
-import org.apache.jena.sparql.expr.Expr;
+import org.apache.jena.sparql.expr.*;
 import org.apache.jena.sparql.expr.ExprWalker;
 import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.sparql.path.Path;
 import org.apache.jena.sparql.sse.writers.WriterPath;
+import org.apache.jena.sparql.syntax.Template;
+import org.apache.jena.sparql.util.graph.GraphUtils;
 import org.apache.jena.update.UpdateAction;
 import org.apache.jena.update.UpdateFactory;
 import org.apache.jena.update.UpdateRequest;
+import org.apache.jena.util.FileManager;
+import org.apache.jena.util.FileUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
-import org.semanticweb.yars.nx.NodeComparator;
 import paths.PGraph;
+import tools.CustomTripleBoundary;
 import tools.Tools;
 import visitors.FilterVisitor;
 
+import java.awt.*;
+import java.io.File;
 import java.util.*;
+import java.util.List;
 import java.util.regex.Pattern;
 
+import static org.apache.jena.graph.GraphUtil.listObjects;
 import static org.apache.jena.graph.GraphUtil.listSubjects;
 
 /**
@@ -91,6 +100,7 @@ public class RGraph {
 	private final Node fromNamedNode = NodeFactory.createURI(this.URI+"fromNamed");
 	private final Node graphNode = NodeFactory.createURI(this.URI+"graph");
 	private final Node distinctNode = NodeFactory.createURI(this.URI+"distinct");
+	private final Node reducedNode = NodeFactory.createURI(this.URI+"reduced");
 	private final Node tempNode = NodeFactory.createURI(this.URI+"temp");
 	private final Node bindNode = NodeFactory.createURI(this.URI+"bind");
 	private final Node tableNode = NodeFactory.createURI(this.URI+"table");
@@ -101,6 +111,7 @@ public class RGraph {
 	private final Node triplePathNode = NodeFactory.createURI(this.URI+"triplePath");
 	private final Node serviceNode = NodeFactory.createURI(this.URI+"service");
 	private final Node silentNode = NodeFactory.createURI(this.URI+"silent");
+	private final Node idNode = NodeFactory.createURI(this.URI+"id");
 	@SuppressWarnings("unused")
 	private final Node leafNode = NodeFactory.createURI(this.URI+"leaf");
 	private final UpdateRequest duplicatesRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/normalisation/duplicates.ru"));
@@ -116,9 +127,9 @@ public class RGraph {
 	private final UpdateRequest filterVarsRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/filterVars.ru"));
 	private final UpdateRequest joinLabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/joinLabel.ru"));
 	private final UpdateRequest tripleRelabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/tripleRelabel.ru"));
+	private final UpdateRequest subgraphRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/subLabel.ru"));
 	private final UpdateRequest askRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/ask.ru"));
-	
-	
+
 
 	/**
 	 * @param triples List of RDF triples.
@@ -325,7 +336,9 @@ public class RGraph {
 	
 	public Node getValidNode(Node n) {
 		if (n.isVariable()) {
-			return NodeFactory.createBlankNode(n.getName());
+			Node ans = NodeFactory.createBlankNode(n.getName());
+			graph.add(Triple.create(ans,typeNode,varNode));
+			return ans;
 		}
 		if (n.isLiteral()) {
 			if (n.getLiteralLanguage().equals("")) {
@@ -724,7 +737,7 @@ public class RGraph {
 	
 	public static RGraph group(OpGroup arg) {
 		Node root = NodeFactory.createBlankNode();
-		RGraph ans = new RGraph(root, GraphFactory.createDefaultGraph(), Set.of());
+		RGraph ans = new RGraph(root, GraphFactory.createDefaultGraph(), new HashSet<>());
 		ans.graph.add(Triple.create(root, ans.typeNode, ans.groupByNode));
 		Node varNode = NodeFactory.createBlankNode();
 		ans.graph.add(Triple.create(root, ans.argNode, varNode));
@@ -792,13 +805,16 @@ public class RGraph {
 	 * @param arg
 	 * @return
 	 */
-	public Node aggregationFunction(String op, Var var, Node arg) {
+	public Node aggregationFunction(String op, boolean distinct, Var var, Node arg) {
 		Node n = NodeFactory.createBlankNode();
 		if (var != null) {
 			n = NodeFactory.createBlankNode(var.getVarName());
-		}			
+		}
 		Node o = NodeFactory.createLiteral(op);
 		graph.add(Triple.create(n, functionNode, o));
+		if (distinct) {
+			graph.add(Triple.create(n, distinctNode, NodeFactory.createLiteralByValue(true,XSDDatatype.XSDboolean)));
+		}
 		if (!GraphUtil.listObjects(graph, arg, functionNode).hasNext()) {
 			Node a = NodeFactory.createBlankNode();
 			graph.add(Triple.create(n, argNode, a));
@@ -817,13 +833,16 @@ public class RGraph {
 	 * @param arg
 	 * @return
 	 */
-	public Node aggregationCount(String op, Var var, Node arg) {
+	public Node aggregationCount(String op, boolean distinct, Var var, Node arg) {
 		Node n = NodeFactory.createBlankNode();
 		if (var != null) {
 			n = NodeFactory.createBlankNode(var.getVarName());
 		}			
 		Node o = NodeFactory.createLiteral(op);
 		graph.add(Triple.create(n, functionNode, o));
+		if (distinct) {
+			graph.add(Triple.create(n, distinctNode, NodeFactory.createLiteralByValue(true,XSDDatatype.XSDboolean)));
+		}
 		graph.add(Triple.create(n, argNode, arg));
 		graph.add(Triple.create(arg, valueNode, NodeFactory.createLiteral("*")));
 		return n;
@@ -870,16 +889,21 @@ public class RGraph {
 		Node root = NodeFactory.createBlankNode();
 		graph.add(Triple.create(root, typeNode, projectNode));
 		graph.add(Triple.create(root, opNode, this.root));
+		this.root = root;
 		if (this.vars != null) {
 			this.vars.addAll(vars);
-		}		
+		}
 		if (graph.contains(NodeFactory.createBlankNode("orderBy"), typeNode, orderByNode)){
 			graph.add(Triple.create(root, modNode, NodeFactory.createBlankNode("orderBy")));
 		}
 		for (Var v : vars){
-			graph.add(Triple.create(root, argNode, NodeFactory.createBlankNode(v.getName())));		
+			graph.add(Triple.create(root, argNode, NodeFactory.createBlankNode(v.getName())));
 		}
-		this.root = root;
+	}
+
+	public void project(Collection<Var> vars, int n) {
+		this.project(vars);
+		graph.add(Triple.create(root,NodeFactory.createURI(this.URI+"id"),NodeFactory.createLiteralByValue(n,XSDDatatype.XSDinteger)));
 	}
 	
 	public void ask() {
@@ -895,7 +919,7 @@ public class RGraph {
 		this.root = root;
 	}
 	
-	public void construct() {
+	public void construct(Template template) {
 		Node root = NodeFactory.createBlankNode();
 		graph.add(Triple.create(root, typeNode, constructNode));
 		graph.add(Triple.create(root, opNode, this.root));	
@@ -904,6 +928,12 @@ public class RGraph {
 		}
 		for (Var v : vars){
 			graph.add(Triple.create(root, argNode, NodeFactory.createBlankNode(v.getName())));		
+		}
+		if (template != null) {
+			BasicPattern bp = template.getBGP();
+			RGraph rg = new RGraph(bp.getList());
+			graph.add(Triple.create(root,argNode,rg.root));
+			GraphUtil.addInto(graph,rg.graph);
 		}
 		this.root = root;
 	}
@@ -926,7 +956,35 @@ public class RGraph {
 	 * @param isDistinct A boolean that is true if the DISTINCT keyword has been used, and false otherwise.
 	 */
 	public void setDistinctNode(boolean isDistinct){
-		graph.add(Triple.create(root, distinctNode, NodeFactory.createLiteralByValue(isDistinct, XSDDatatype.XSDboolean)));
+		if (isProjection()) {
+			graph.add(Triple.create(root, distinctNode, NodeFactory.createLiteralByValue(isDistinct, XSDDatatype.XSDboolean)));
+		}
+		else if (isConstruction()) {
+			graph.add(Triple.create(root, distinctNode, NodeFactory.createLiteralByValue(isDistinct, XSDDatatype.XSDboolean)));
+		}
+		else {
+			Node p = NodeFactory.createBlankNode();
+			graph.add(Triple.create(p,typeNode,projectNode));
+			graph.add(Triple.create(p,opNode,root));
+			graph.add(Triple.create(p,distinctNode,NodeFactory.createLiteralByValue(isDistinct, XSDDatatype.XSDboolean)));
+			this.root = p;
+		}
+	}
+
+	public void setReducedNode(boolean isReduced) {
+		if (isProjection()) {
+			graph.add(Triple.create(root, distinctNode, NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
+		}
+		else if (isConstruction()) {
+			graph.add(Triple.create(root, distinctNode, NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
+		}
+		else {
+			Node p = NodeFactory.createBlankNode();
+			graph.add(Triple.create(p,typeNode,projectNode));
+			graph.add(Triple.create(p,opNode,root));
+			graph.add(Triple.create(p,distinctNode,NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
+			this.root = p;
+		}
 	}
 	
 	/**
@@ -978,9 +1036,14 @@ public class RGraph {
 	 */
 	
 	public void orderBy(List<Expr> exprs, List<Integer> dir) {
-		Node project = root;
+		if (!isProjection()) {
+			Node project = NodeFactory.createBlankNode();
+			graph.add(Triple.create(project,typeNode,projectNode));
+			graph.add(Triple.create(project,opNode,root));
+			this.root = project;
+		}
 		Node order = NodeFactory.createBlankNode();
-		graph.add(Triple.create(project, modNode, order));
+		graph.add(Triple.create(root, modNode, order));
 		graph.add(Triple.create(order, typeNode, orderByNode));
 		for (int i = 0; i < exprs.size(); i++) {
 			Node auxNode = NodeFactory.createBlankNode();
@@ -998,6 +1061,7 @@ public class RGraph {
 			graph.add(Triple.create(auxNode, orderNode, NodeFactory.createLiteralByValue(i, XSDDatatype.XSDint)));
 			graph.add(Triple.create(auxNode, dirNode, NodeFactory.createLiteralByValue(dir.get(i), XSDDatatype.XSDint)));
 		}
+		root = order;
 	}
 	
 	/**
@@ -1006,10 +1070,15 @@ public class RGraph {
 	 * @param limit A number that specifies the number of solutions to return.
 	 */
 	public void slice(int offset, int limit){
-		Node order = root;
 		//Node order = GraphUtil.listSubjects(graph, typeNode, projectNode).next();
+		if (!isProjection()) {
+			Node root = NodeFactory.createBlankNode();
+			graph.add(Triple.create(root,typeNode,projectNode));
+			graph.add(Triple.create(root,opNode,this.root));
+			this.root = root;
+		}
 		Node lNode = NodeFactory.createBlankNode();
-		graph.add(Triple.create(order, modNode, lNode));
+		graph.add(Triple.create(root, modNode, lNode));
 		graph.add(Triple.create(lNode, typeNode, limitNode));
 		graph.add(Triple.create(lNode, offsetNode, NodeFactory.createLiteralByValue(offset, XSDDatatype.XSDint)));
 		graph.add(Triple.create(lNode, valueNode, NodeFactory.createLiteralByValue(limit, XSDDatatype.XSDint)));
@@ -1034,7 +1103,29 @@ public class RGraph {
 		this.leaning = b;
 	}
 
-	public boolean containsProjection(){
+	public boolean isProjection(){
+		ExtendedIterator<Node> nodes = listObjects(graph,root,typeNode);
+		if (nodes.hasNext()) {
+			Node type = listObjects(graph,root,typeNode).next();
+			return type.equals(projectNode);
+		}
+		else {
+			return false;
+		}
+	}
+
+	public boolean isConstruction() {
+		ExtendedIterator<Node> nodes = listObjects(graph,root,typeNode);
+		if (nodes.hasNext()) {
+			Node type = listObjects(graph,root,typeNode).next();
+			return type.equals(constructNode);
+		}
+		else {
+			return false;
+		}
+	}
+
+	public boolean containsProjection() {
 		return listSubjects(graph, typeNode, projectNode).hasNext();
 	}
 	
@@ -1071,7 +1162,7 @@ public class RGraph {
 	public TreeSet<org.semanticweb.yars.nx.Node[]> getTriples(){
 		Model model = this.asModel();
 		JenaModelIterator jmi = new JenaModelIterator(model);
-		TreeSet<org.semanticweb.yars.nx.Node[]> triples = new TreeSet<>(NodeComparator.NC);
+		TreeSet<org.semanticweb.yars.nx.Node[]> triples = new TreeSet<>(org.semanticweb.yars.nx.NodeComparator.NC);
 		while(jmi.hasNext()){
 			org.semanticweb.yars.nx.Node[] triple = jmi.next();
 			triples.add(new org.semanticweb.yars.nx.Node[]{triple[0],triple[1],triple[2]});
@@ -1123,6 +1214,55 @@ public class RGraph {
 		iterativeUpdate(joinRule);
 		UpdateAction.execute(joinLabelRule,this.graph);
 	}
+
+	public void subQueryRelabelling() {
+		ExtendedIterator<Node> projections = GraphUtil.listSubjects(graph,typeNode,projectNode);
+		if (projections.hasNext()) {
+			List<Node> projectionList = projections.toList();
+			int n = 0;
+			if (projectionList.size() > 1) {
+				Map<Node,Graph> map = new HashMap<>();
+				for (Node p : projectionList) {
+					graph.add(Triple.create(p,idNode,NodeFactory.createLiteralByValue(n++,XSDDatatype.XSDinteger)));
+					GraphExtract ge = new GraphExtract(new CustomTripleBoundary(projectionList,p));
+					Graph g = ge.extract(p,graph);
+					map.put(p,g);
+				}
+				List<Graph> subGraphs = new ArrayList<>();
+				for (Map.Entry<Node, Graph> entry : map.entrySet()) {
+					Graph currentGraph = entry.getValue();
+					Node currentNode = entry.getKey();
+					List<Node> currentProjectionNodes = GraphUtil.listObjects(currentGraph,currentNode,argNode).toList();
+					Node id = GraphUtil.listObjects(currentGraph,currentNode,idNode).hasNext() ? GraphUtil.listObjects(currentGraph,currentNode,idNode).next() : NodeFactory.createLiteralByValue(0,XSDDatatype.XSDinteger);
+					ExtendedIterator<Node> nodes = GraphUtil.listSubjects(currentGraph,typeNode,varNode);
+					while (nodes.hasNext()) {
+						Node node = nodes.next();
+						if (node.isBlank()) {
+							if (!currentProjectionNodes.contains(node)) {
+								currentGraph.add(Triple.create(node,idNode,id));
+							}
+						}
+					}
+					UpdateAction.execute(subgraphRule,currentGraph);
+					subGraphs.add(currentGraph);
+					currentGraph.delete(Triple.create(currentNode,idNode,id));
+				}
+				Graph ans = GraphFactory.createDefaultGraph();
+				for (Graph g : subGraphs) {
+					GraphUtil.addInto(ans,g);
+				}
+				this.graph = ans;
+			}
+			else {
+				Node p = projectionList.get(0);
+				ExtendedIterator<Node> ids = GraphUtil.listObjects(graph,p,idNode);
+				if (ids.hasNext()) {
+					Node id = ids.next();
+					graph.delete(Triple.create(p,idNode,id));
+				}
+			}
+		}
+	}
 	
 	/**
 	 * Performs a leaning of the current r-graph.
@@ -1154,6 +1294,7 @@ public class RGraph {
 			}
 			try{
 				if (!containsPaths) {
+					subQueryRelabelling();
 					branchRelabelling();
 				}
 			}
@@ -1175,6 +1316,11 @@ public class RGraph {
 			if (verbose){
 				ans.print();
 				System.out.println("Beginning leaning.");
+			}
+			ExtendedIterator<Node> vars = GraphUtil.listSubjects(ans.graph,typeNode,varNode);
+			while (vars.hasNext()) {
+				Node var = vars.next();
+				ans.graph.delete(Triple.create(var,typeNode,varNode));
 			}
 			long time1 = System.nanoTime() - t;
 			UpdateAction.execute(duplicatesRule,ans.graph);
@@ -1507,7 +1653,7 @@ public class RGraph {
 				this.graph = eg.graph;
 //				return eg;
 			}
-		}	
+		}
 		return this;
 	}
 	public boolean isUCQ(Node n) {

@@ -79,6 +79,9 @@ public class Test {
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/test20.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			assertTrue(qp.equalQueries(1, 2));
+			qp = new QueryParserTest(new File("testFiles/test21.txt"));
+			assertTrue(qp.equalQueries(0,1));
+			assertTrue(qp.equalQueries(1,2));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -104,6 +107,8 @@ public class Test {
 			assertFalse(qp.equalQueries(1, 2));
 			QueryParserTest qp1 = new QueryParserTest(new File("testFiles/filterTest1"));
 			assertTrue(qp1.equalQueries(0, 1));
+			qp = new QueryParserTest(new File("testFiles/filterTest8.txt"));
+			assertTrue(qp.equalQueries(0,1));
 		} catch(IOException e){
 			e.printStackTrace();
 		}
@@ -117,6 +122,8 @@ public class Test {
 			//assertTrue(qp.equalQueries(2, 3));
 			assertTrue(qp.equalQueries(4, 5));
 			assertTrue(qp.equalQueries(6, 7));
+			qp = new QueryParserTest(new File("testFiles/test23.txt"));
+
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -141,6 +148,9 @@ public class Test {
 		try {
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/test17.txt"));
 			//qp = new QueryParserTest(new File("testFiles/test24.txt"));
+			qp = new QueryParserTest(new File("testFiles/test18.txt"));
+			qp = new QueryParserTest(new File("testFiles/test19.txt"));
+			qp = new QueryParserTest(new File("testFiles/test24.txt"));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

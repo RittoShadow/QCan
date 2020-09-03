@@ -269,7 +269,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> PREFIX toolType: <http://seek.rkbexplorer.com/id/toolType/> PREFIX taskType: <http://seek.rkbexplorer.com/id/taskType/> PREFIX artType: <http://seek.rkbexplorer.com/id/artifactType/> PREFIX prop: <http://seek.rkbexplorer.com/id/property/> PREFIX oc: <http://www.gsic.uva.es/ontologies/ontoolcoleModel.owl#> SELECT DISTINCT ?tool ?tlab WHERE { ?tool rdfs:label ?tlab . ?tool prop:weShareSeeAlso ?a .?tool a toolType:Tool . ?tool oc:supportsTask ?t0 . ?t0 a taskType:TextReading . ?tool oc:supportsTask ?t1 . ?t1 a taskType:TextBasedSynchronousCommunication . ?a0 a artType:Artifact . { {?tool prop:hasInput ?a0} UNION {?tool prop:hasOutput ?a0} UNION {?tool oc:providesStorage ?a0} }?a1 a artType:Artifact . { {?tool prop:hasInput ?a1} UNION {?tool prop:hasOutput ?a1} UNION {?tool oc:providesStorage ?a1} }?a2 a artType:Artifact . { {?tool prop:hasInput ?a2} UNION {?tool prop:hasOutput ?a2} UNION {?tool oc:providesStorage ?a2} }OPTIONAL{?tool prop:uSeekRanking ?rank}} ORDER BY ?rank";
+		String q = "PREFIX  dc: <http://purl.org/dc/elements/1.1/> PREFIX app: <http://example.org/ns#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> CONSTRUCT { ?s ?p ?o } WHERE {   GRAPH ?g { ?s ?p ?o } .   ?g dc:publisher <http://www.w3.org/> .   ?g dc:date ?date .   FILTER ( app:customDate(?date) > \"2005-02-28T00:00:00Z\"^^xsd:dateTime ) . }";
 		SingleQuery sq = new SingleQuery(q,true,true,true,true);
 		sq.getCanonicalGraph().print();
 		System.out.println(sq.getQuery());

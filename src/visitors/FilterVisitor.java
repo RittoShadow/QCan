@@ -28,7 +28,7 @@ import org.apache.jena.sparql.expr.ExprVar;
 import org.apache.jena.sparql.expr.ExprVisitor;
 import org.apache.jena.sparql.expr.ExprWalker;
 import org.apache.jena.sparql.expr.NodeValue;
-import org.apache.jena.sparql.expr.aggregate.Aggregator;
+import org.apache.jena.sparql.expr.aggregate.*;
 import org.apache.jena.sparql.graph.GraphFactory;
 
 //import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
@@ -61,7 +61,8 @@ public class FilterVisitor implements ExprVisitor {
 	@Override
 	public void visit(ExprFunction1 func) {
 		Node arg = nodeStack.pop();
-		List<Node> args = List.of(arg);
+		List<Node> args = new ArrayList<>();
+		args.add(arg);
 		if (func.getOpName() != null) {
 			if (func.getOpName().equals("!")){
 				nodeStack.add(filterGraph.filterNot(arg));
@@ -168,20 +169,20 @@ public class FilterVisitor implements ExprVisitor {
 			Aggregator agg = eAgg.getAggregator();
 			ExprVar var = eAgg.getAggVar();
 			Node n = NodeFactory.createBlankNode();
-			nodeStack.add(filterGraph.aggregationCount(agg.getName(), var.asVar(), n));
+			nodeStack.add(filterGraph.aggregationCount(agg.getName(), isDistinct(agg), var.asVar(), n));
 		}
 		else {
 			List<Expr> exprs = eList.getList();
 			for (Expr e : exprs) {
 				if (e instanceof ExprVar) {
-					nodeStack.add(filterGraph.aggregationFunction(eAgg.getAggregator().getName(), eAgg.getVar(), NodeFactory.createBlankNode(e.getVarName())));
+					nodeStack.add(filterGraph.aggregationFunction(eAgg.getAggregator().getName(), isDistinct(eAgg.getAggregator()), eAgg.getVar(), NodeFactory.createBlankNode(e.getVarName())));
 				}
 				else {
 					FilterVisitor fv = new FilterVisitor();
 					ExprWalker.walk(fv, e);
 					RGraph r = fv.getGraph();
 					nodeStack.add(r.root);
-					nodeStack.add(filterGraph.aggregationFunction(eAgg.getAggregator().getName(), eAgg.getVar(), nodeStack.peek()));
+					nodeStack.add(filterGraph.aggregationFunction(eAgg.getAggregator().getName(), isDistinct(eAgg.getAggregator()), eAgg.getVar(), nodeStack.peek()));
 					GraphUtil.addInto(filterGraph.graph, r.graph);
 				}
 			}	
@@ -198,6 +199,36 @@ public class FilterVisitor implements ExprVisitor {
 			filterGraph.bindNode(exprNode,var);
 		}
 		return this.filterGraph;
+	}
+
+	public boolean isDistinct(Aggregator agg) {
+		if (agg instanceof AggAvgDistinct) {
+			return true;
+		}
+		else if (agg instanceof AggCountDistinct) {
+			return true;
+		}
+		else if (agg instanceof AggCountVarDistinct) {
+			return true;
+		}
+		else if (agg instanceof AggGroupConcatDistinct) {
+			return true;
+		}
+		else if (agg instanceof AggMaxDistinct) {
+			return true;
+		}
+		else if (agg instanceof AggMinDistinct) {
+			return true;
+		}
+		else if (agg instanceof AggSampleDistinct) {
+			return true;
+		}
+		else if (agg instanceof AggSumDistinct) {
+			return true;
+		}
+		else {
+			return false;
+		}
 	}
 
 }
