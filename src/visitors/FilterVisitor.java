@@ -12,6 +12,7 @@ import main.SingleQuery;
 import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
+import org.apache.jena.graph.Triple;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.core.Var;
@@ -148,10 +149,10 @@ public class FilterVisitor implements ExprVisitor {
 		}
 		if (n.isLiteral()) {
 			if (n.getLiteralLanguage().equals("")) {
-				n = NodeFactory.createLiteralByValue(n.getLiteralValue().toString(), n.getLiteralDatatype());
+				n = NodeFactory.createLiteralByValue(n.getLiteralLexicalForm(), n.getLiteralDatatype());
 			}
 			else {
-				n = NodeFactory.createLiteral(n.getLiteralValue().toString()+"@"+n.getLiteralLanguage());
+				n = NodeFactory.createLiteral(n.getLiteralLexicalForm()+"@"+n.getLiteralLanguage());
 			}
 		}
 		nodeStack.add(n);
@@ -159,7 +160,9 @@ public class FilterVisitor implements ExprVisitor {
 
 	@Override
 	public void visit(ExprVar nv) {
-		nodeStack.add(NodeFactory.createBlankNode(nv.getVarName()));	
+		Node v = NodeFactory.createBlankNode(nv.getVarName());
+		filterGraph.graph.add(Triple.create(v,filterGraph.typeNode,filterGraph.varNode));
+		nodeStack.add(v);
 	}
 
 	@Override

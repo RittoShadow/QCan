@@ -109,7 +109,20 @@ public class Test {
 			assertTrue(qp1.equalQueries(0, 1));
 			qp = new QueryParserTest(new File("testFiles/filterTest8.txt"));
 			assertTrue(qp.equalQueries(0,1));
+			qp = new QueryParserTest(new File("testFiles/filterTest7.txt")); // EXISTS and NOT EXISTS
 		} catch(IOException e){
+			e.printStackTrace();
+		}
+	}
+
+	@org.junit.Test
+	public void filterPushTest() {
+		try {
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/filterPushTest1.txt"));
+			assertFalse(qp.equalQueries(1,2));
+			assertFalse(qp.equalQueries(3,4));
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -139,6 +152,22 @@ public class Test {
 			assertTrue(qp.equalQueries(1, 2));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	@org.junit.Test
+	public void aggregationTest() {
+		try {
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/aggregatesTest2.txt"));
+			assertFalse(qp.equalQueries(0,1));
+			assertFalse(qp.equalQueries(1,2));
+			assertTrue(qp.equalQueries(2,3));
+			qp = new QueryParserTest(new File("testFiles/aggregatesTest1.txt"));
+			qp = new QueryParserTest(new File("testFiles/aggregatesTest3.txt"));
+			assertFalse(qp.equalQueries(0,1));
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 		}
 	}

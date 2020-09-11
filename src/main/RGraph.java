@@ -66,7 +66,8 @@ public class RGraph {
 	final String URI = "http://example.org/";
 	private long labelTime = 0;
 	private long minimisationTime = 0;
-	private final Node typeNode = NodeFactory.createURI(this.URI+"type");
+	public Map<Var,Node> exprMap = new HashMap<>();
+	public final Node typeNode = NodeFactory.createURI(this.URI+"type");
 	private final Node tpNode = NodeFactory.createURI(this.URI+"TP");
 	private final Node argNode = NodeFactory.createURI(this.URI+"arg");
 	private final Node subNode = NodeFactory.createURI(this.URI+"subject");
@@ -82,7 +83,7 @@ public class RGraph {
 	private final Node limitNode = NodeFactory.createURI(this.URI+"limit");
 	private final Node offsetNode = NodeFactory.createURI(this.URI+"offset");
 	private final Node orderByNode = NodeFactory.createURI(this.URI+"orderBy");
-	private final Node varNode = NodeFactory.createURI(this.URI+"var");
+	public final Node varNode = NodeFactory.createURI(this.URI+"var");
 	private final Node orderNode = NodeFactory.createURI(this.URI+"order");
 	private final Node valueNode = NodeFactory.createURI(this.URI+"value");
 	private final Node dirNode = NodeFactory.createURI(this.URI+"direction");
@@ -246,6 +247,16 @@ public class RGraph {
 		if (rootCandidates.size() == 1) {
 			this.root = (Node) rootCandidates.toArray()[0];
 		}
+		else {
+			for (Node n : rootCandidates) {
+				if (graph.contains(Triple.create(n,typeNode,projectNode))) {
+					this.root = n;
+				}
+			}
+		}
+		if (this.root == null) {
+			System.err.println("Something went wrong.");
+		}
 	}
 	
 	public RGraph(Node s, Node o, PGraph p) {
@@ -342,10 +353,10 @@ public class RGraph {
 		}
 		if (n.isLiteral()) {
 			if (n.getLiteralLanguage().equals("")) {
-				return NodeFactory.createLiteralByValue(n.getLiteralValue().toString(), n.getLiteralDatatype());
+				return NodeFactory.createLiteralByValue(n.getLiteralLexicalForm(), n.getLiteralDatatype());
 			}
 			else {
-				return NodeFactory.createLiteral(n.getLiteralValue().toString()+"@"+n.getLiteralLanguage());
+				return NodeFactory.createLiteral(n.getLiteralLexicalForm()+"@"+n.getLiteralLanguage());
 			}
 		}
 		else {
@@ -555,9 +566,28 @@ public class RGraph {
 			graph.add(Triple.create(root, patternNode, n));
 			graph.add(Triple.create(n, typeNode, extraNode));
 		}
+		checkForAnonVars(arg1);
 		Node n = GraphUtil.listObjects(graph, root, patternNode).next();
 		graph.add(Triple.create(n, argNode, arg1.root));
 		GraphUtil.addInto(this.graph, arg1.graph);
+	}
+
+	public void checkForAnonVars(RGraph arg1) {
+		for (Var v : exprMap.keySet()) {
+			Node vNode = NodeFactory.createBlankNode(v.getVarName());
+			ExtendedIterator<Node> ops = GraphUtil.listSubjects(arg1.graph,argNode,vNode);
+			while (ops.hasNext()) {
+				Node op = ops.next();
+				arg1.graph.delete(Triple.create(op,argNode,vNode));
+				arg1.graph.add(Triple.create(op,argNode,exprMap.get(v)));
+			}
+			ExtendedIterator<Node> blanks = GraphUtil.listSubjects(arg1.graph,valueNode,vNode);
+			while (blanks.hasNext()) {
+				Node blank = blanks.next();
+				arg1.graph.delete(Triple.create(blank,valueNode,vNode));
+				arg1.graph.add(Triple.create(blank,valueNode,exprMap.get(v)));
+			}
+		}
 	}
 	
 	/**
@@ -592,6 +622,7 @@ public class RGraph {
 			graph.add(Triple.create(root, patternNode, n));
 			graph.add(Triple.create(n, typeNode, extraNode));
 		}
+		checkForAnonVars(arg1);
 		Node n = GraphUtil.listObjects(graph, root, patternNode).next();
 		Node filter = NodeFactory.createBlankNode();
 		graph.add(Triple.create(n, argNode, filter));
@@ -749,10 +780,12 @@ public class RGraph {
 		for (Map.Entry<Var, Expr> m : varsExpr.entrySet()) {
 			Var v = m.getKey();
 			FilterVisitor fv = new FilterVisitor();
+			Node vNode = NodeFactory.createBlankNode();
+			ans.exprMap.put(v,vNode);
 			ExprWalker.walk(fv, m.getValue());
 			Node r = fv.getGraph().root;
 			GraphUtil.addInto(ans.graph, fv.getGraph().graph);
-			ans.graph.add(Triple.create(NodeFactory.createBlankNode(v.getVarName()), ans.valueNode, r));
+			ans.graph.add(Triple.create(vNode, ans.valueNode, r));
 		}
 		return ans;
 	}
@@ -795,6 +828,7 @@ public class RGraph {
 		GraphUtil.addInto(this.graph, r.graph);
 		for (RGraph arg : args) {
 			graph.add(Triple.create(extend, argNode, arg.root));
+			exprMap.putAll(arg.exprMap);
 			GraphUtil.addInto(this.graph, arg.graph);
 		}
 	}
@@ -808,7 +842,7 @@ public class RGraph {
 	public Node aggregationFunction(String op, boolean distinct, Var var, Node arg) {
 		Node n = NodeFactory.createBlankNode();
 		if (var != null) {
-			n = NodeFactory.createBlankNode(var.getVarName());
+			exprMap.put(var,n);
 		}
 		Node o = NodeFactory.createLiteral(op);
 		graph.add(Triple.create(n, functionNode, o));
@@ -836,8 +870,8 @@ public class RGraph {
 	public Node aggregationCount(String op, boolean distinct, Var var, Node arg) {
 		Node n = NodeFactory.createBlankNode();
 		if (var != null) {
-			n = NodeFactory.createBlankNode(var.getVarName());
-		}			
+			exprMap.put(var,n);
+		}
 		Node o = NodeFactory.createLiteral(op);
 		graph.add(Triple.create(n, functionNode, o));
 		if (distinct) {
@@ -886,15 +920,14 @@ public class RGraph {
 	 */
 	public void project(Collection<Var> vars){
 		// Used to check if there's a projection node
-		Node root = NodeFactory.createBlankNode();
-		graph.add(Triple.create(root, typeNode, projectNode));
-		graph.add(Triple.create(root, opNode, this.root));
-		this.root = root;
+		if (!isProjection()) {
+			Node root = NodeFactory.createBlankNode();
+			graph.add(Triple.create(root, typeNode, projectNode));
+			graph.add(Triple.create(root, opNode, this.root));
+			this.root = root;
+		}
 		if (this.vars != null) {
 			this.vars.addAll(vars);
-		}
-		if (graph.contains(NodeFactory.createBlankNode("orderBy"), typeNode, orderByNode)){
-			graph.add(Triple.create(root, modNode, NodeFactory.createBlankNode("orderBy")));
 		}
 		for (Var v : vars){
 			graph.add(Triple.create(root, argNode, NodeFactory.createBlankNode(v.getName())));
@@ -1000,7 +1033,7 @@ public class RGraph {
 	 */
 	public void fromGraph(Collection<String> g){
 		Node n = NodeFactory.createBlankNode();
-		graph.add(Triple.create(root, opNode, n));
+		graph.add(Triple.create(root, modNode, n));
 		graph.add(Triple.create(n, typeNode, fromNode));
 		for (String s : g){
 			graph.add(Triple.create(n, argNode, NodeFactory.createURI(s)));
@@ -1022,7 +1055,7 @@ public class RGraph {
 			graph.add(Triple.create(aux, typeNode, fromNode));
 		}
 		Node n = NodeFactory.createBlankNode();
-		graph.add(Triple.create(aux, opNode, n));
+		graph.add(Triple.create(aux, modNode, n));
 		graph.add(Triple.create(n, typeNode, fromNamedNode));
 		for (String s : g){
 			graph.add(Triple.create(n, argNode, NodeFactory.createURI(s)));
@@ -1061,7 +1094,6 @@ public class RGraph {
 			graph.add(Triple.create(auxNode, orderNode, NodeFactory.createLiteralByValue(i, XSDDatatype.XSDint)));
 			graph.add(Triple.create(auxNode, dirNode, NodeFactory.createLiteralByValue(dir.get(i), XSDDatatype.XSDint)));
 		}
-		root = order;
 	}
 	
 	/**
@@ -1654,6 +1686,10 @@ public class RGraph {
 //				return eg;
 			}
 		}
+		UpdateAction.execute(branchCleanUpRule,graph);
+		UpdateAction.execute(branchUnionRule,graph);
+		UpdateAction.execute(branchCleanUpRule2,graph);
+		UpdateAction.execute(joinRule, graph);
 		return this;
 	}
 	public boolean isUCQ(Node n) {

@@ -98,6 +98,7 @@ public class RGraphBuilder implements OpVisitor {
 	Template template = null;
 	private List<String> graphURI = Collections.emptyList();
 	private List<String> namedGraphURI = Collections.emptyList();
+	private Map<Var,Node> exprMap = new HashMap<>();
 	public int nTriples = 0;
 	private boolean enableFilter = true;
 	private boolean enableOptional = true;
@@ -558,6 +559,7 @@ public class RGraphBuilder implements OpVisitor {
 			FilterVisitor fv = new FilterVisitor();
 			ExprWalker.walk(fv, a);
 			rGraphs.add(fv.getGraph());
+			exprMap.put(a.getVar(),fv.getGraph().root);
 		}
 		RGraph r0 = graphStack.peek();
 		r0.aggregation(r,rGraphs);
@@ -748,10 +750,10 @@ public class RGraphBuilder implements OpVisitor {
 		Op op2 = op;
 		do {
 			op1 = op2;
+			op2 = Transformer.transform(new FilterTransform(), op2);
 			op2 = Transformer.transform(new UCQTransformer(), op2);
 			op2 = Transformer.transform(new TransformPath(), op2);
 			op2 = Transformer.transform(new NotOneOfTransform(), op2);
-			op2 = Transformer.transform(new FilterTransform(), op2);
 		}
 		while (!op1.equals(op2));
 		return op2;

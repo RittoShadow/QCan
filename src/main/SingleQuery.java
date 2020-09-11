@@ -122,21 +122,20 @@ public class SingleQuery {
 		graphTime = rgb.graphTime;
 		rewriteTime = rgb.rewriteTime;
 		vars = rgb.varsContainedIn(op);
-		if (!rgb.isDistinct){
-			if (vars.containsAll(rgb.projectionVars) && rgb.projectionVars.containsAll(vars)){
-				if (!checkBranchVars(op)){
-					graph.setDistinctNode(true);
-				}			
-				else{
+		if (query.isSelectType()) {
+			if (!rgb.isDistinct) {
+				if (vars.containsAll(rgb.projectionVars) && rgb.projectionVars.containsAll(vars)) {
+					if (!checkBranchVars(op)) {
+						graph.setDistinctNode(true);
+					} else {
+						graph.setDistinctNode(rgb.isDistinct);
+					}
+				} else {
 					graph.setDistinctNode(rgb.isDistinct);
 				}
+			} else {
+				graph.setDistinctNode(true);
 			}
-			else{
-				graph.setDistinctNode(rgb.isDistinct);
-			}
-		}
-		else{
-			graph.setDistinctNode(true);
 		}
 		FeatureCounter fc = new FeatureCounter(op);
 		OpWalker.walk(op, fc);
@@ -269,7 +268,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "PREFIX  dc: <http://purl.org/dc/elements/1.1/> PREFIX app: <http://example.org/ns#> PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> CONSTRUCT { ?s ?p ?o } WHERE {   GRAPH ?g { ?s ?p ?o } .   ?g dc:publisher <http://www.w3.org/> .   ?g dc:date ?date .   FILTER ( app:customDate(?date) > \"2005-02-28T00:00:00Z\"^^xsd:dateTime ) . }";
+		String q = "PREFIX geo:<http://www.w3.org/2003/01/geo/wgs84_pos#>  PREFIX xsd:<http://www.w3.org/2001/XMLSchema#>  SELECT DISTINCT ?l ?lat ?lng  WHERE {   ?l geo:lat ?lat; geo:long ?lng; a <http://dbpedia.org/ontology/Place>.   FILTER(((?lat - xsd:float(44.849998))*(?lat - xsd:float(44.849998))+(?lng - xsd:float(7.716667))*(?lng - xsd:float(7.716667)))<xsd:float(1.0)) } ";
 		SingleQuery sq = new SingleQuery(q,true,true,true,true);
 		sq.getCanonicalGraph().print();
 		System.out.println(sq.getQuery());

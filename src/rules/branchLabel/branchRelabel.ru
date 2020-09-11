@@ -55,5 +55,5 @@ WHERE {
 	}
 	?tp ?p ?v .
 	FILTER( ?p != ex:pattern )
-	OPTIONAL{ ?tp ex:pattern ?filter . ?n ex:arg ?tp . }
+	OPTIONAL{ ?tp ex:pattern ?filter . ?n ex:arg ?tp }
 }

@@ -84,20 +84,20 @@ public class UCQTransformer extends TransformCopy{
         	return new OpBGP(bp);
         }
         else{
-        	return join;
+        	return OpJoin.create(left,right);
         }
     }
 	
-//	public Op transform(OpLeftJoin leftJoin, Op left, Op right) {
-//		if ((left instanceof OpUnion)) { // Case: (A_1 UNION A_2) OPT A_3 = (A_1 OPT A_3) UNION (A_2 OPT A_3)
-//			OpUnion ans = (OpUnion) OpUnion.create(OpLeftJoin.createLeftJoin(((OpUnion) left).getLeft(), right, null), OpLeftJoin.createLeftJoin(((OpUnion) left).getRight(), right, null));
-//			return ans;
-//		}
-//		else {
-//			return leftJoin;
-//		}
-//
-//	}
+	public Op transform(OpLeftJoin leftJoin, Op left, Op right) {
+		if ((left instanceof OpUnion)) { // Case: (A_1 UNION A_2) OPT A_3 = (A_1 OPT A_3) UNION (A_2 OPT A_3)
+			OpUnion ans = (OpUnion) OpUnion.create(OpLeftJoin.createLeftJoin(((OpUnion) left).getLeft(), right, null), OpLeftJoin.createLeftJoin(((OpUnion) left).getRight(), right, null));
+			return ans;
+		}
+		else {
+			return OpLeftJoin.create(left,right,leftJoin.getExprs());
+		}
+
+	}
 
 	public Op transform(OpUnion op, Op left, Op right) {
 		if (left instanceof OpPath && right == null) {
@@ -111,26 +111,26 @@ public class UCQTransformer extends TransformCopy{
 		}
 	}
 	
-//	public Op transform(OpSequence op, List<Op> elts) {
-//		Op ans = null;
-//		if (elts.isEmpty()) {
-//			return op;
-//		}
-//		for (Op e : elts) {
-//			if (ans == null) {
-//				ans = e;
-//			}
-//			else {
-//				if (e instanceof OpTriple) {
-//					BasicPattern bp = new BasicPattern();
-//					bp.add(((OpTriple) e).getTriple());
-//					ans = OpJoin.create(ans, new OpBGP(bp));
-//				}
-//				ans = OpJoin.create(ans, e);
-//			}
-//		}
-//		return ans;
-//	}
+	public Op transform(OpSequence op, List<Op> elts) {
+		Op ans = null;
+		if (elts.isEmpty()) {
+			return op;
+		}
+		for (Op e : elts) {
+			if (ans == null) {
+				ans = e;
+			}
+			else {
+				if (e instanceof OpTriple) {
+					BasicPattern bp = new BasicPattern();
+					bp.add(((OpTriple) e).getTriple());
+					ans = OpJoin.create(ans, new OpBGP(bp));
+				}
+				ans = OpJoin.create(ans, e);
+			}
+		}
+		return ans;
+	}
 	
 	public static void main(String[] args){
 		String s = "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT DISTINCT ?x WHERE{	?x foaf:p ?z .	?z foaf:p ?y .	?z foaf:q ?y .?y foaf:p/foaf:p/foaf:p ?y .	?y foaf:u/foaf:v ?x . OPTIONAL { ?z foaf:r ?n . ?n foaf:z* ?q . } }";
@@ -148,47 +148,17 @@ public class UCQTransformer extends TransformCopy{
 		if (op instanceof OpUnion) {
 			Op leftOp = ((OpUnion) op).getLeft();
 			Op rightOp = ((OpUnion) op).getRight();
-			if (leftOp instanceof OpTriple) {
-				ans.add(leftOp);
-			}
-			else if (leftOp instanceof OpBGP) {
-				ans.add(leftOp);
-			}
-			else if (leftOp instanceof OpJoin) {
-				ans.add(leftOp);
-			}
-			else if (leftOp instanceof OpPath) {
-				ans.add(leftOp);
-			}
-			else if (leftOp instanceof OpUnion) {
+			if (leftOp instanceof OpUnion) {
 				ans.addAll(opsInUnion(leftOp));
 			}
-			else if (leftOp instanceof OpSequence) {
+			else {
 				ans.add(leftOp);
 			}
-			else {
-				return null;
-			}
-			if (rightOp instanceof OpTriple) {
-				ans.add(rightOp);
-			}
-			else if (rightOp instanceof OpBGP) {
-				ans.add(rightOp);
-			}
-			else if (rightOp instanceof OpJoin) {
-				ans.add(rightOp);
-			}
-			else if (rightOp instanceof OpPath) {
-				ans.add(rightOp);
-			}
-			else if (rightOp instanceof OpUnion) {
+			if (rightOp instanceof OpUnion) {
 				ans.addAll(opsInUnion(rightOp));
 			}
-			else if (rightOp instanceof OpSequence) {
-				ans.add(rightOp);
-			}
 			else {
-				return null;
+				ans.add(rightOp);
 			}
 		}
 		else {

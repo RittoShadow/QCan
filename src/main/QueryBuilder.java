@@ -13,9 +13,12 @@ import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.graph.TripleBoundary;
+import org.apache.jena.n3.turtle.Turtle2NTriples;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.SortCondition;
+import org.apache.jena.riot.writer.NTriplesWriter;
+import org.apache.jena.riot.writer.TurtleWriter;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.Table;
@@ -431,25 +434,22 @@ public class QueryBuilder {
 		}
 	}
 
-	public Expr aggregatorOperatorToExpr(Node n, boolean distinct, Expr... exprs) {
-		String f = (String) n.getLiteralValue();
+	public Expr aggregatorOperatorToExpr(Node v, boolean distinct, Expr... exprs) {
+		Node function = GraphUtil.listObjects(graph,v,functionNode).next();
+		String f = (String) function.getLiteralValue();
 		if (f.equals("MAX")) {
-			Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
 			return new ExprAggregator(var, AggregatorFactory.createMax(distinct, exprs[0]));
 		} else if (f.equals("MIN")) {
-			Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
 			return new ExprAggregator(var, AggregatorFactory.createMin(distinct, exprs[0]));
 		} else if (f.equals("AVG")) {
-			Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
 			return new ExprAggregator(var, AggregatorFactory.createAvg(distinct, exprs[0]));
 		} else if (f.equals("COUNT")) {
-			Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
 			if (exprs[0] == null) {
@@ -458,17 +458,14 @@ public class QueryBuilder {
 				return new ExprAggregator(var, AggregatorFactory.createCountExpr(distinct, exprs[0]));
 			}
 		} else if (f.equals("SUM")) {
-			Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
 			return new ExprAggregator(var, AggregatorFactory.createSum(distinct, exprs[0]));
 		} else if (f.equals("SAMPLE")) {
-			Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
 			return new ExprAggregator(var, AggregatorFactory.createSample(distinct, exprs[0]));
 		} else if (f.equals("GROUP_CONCAT")) {
-			Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
 			return new ExprAggregator(var, AggregatorFactory.createGroupConcat(distinct, exprs[0], f, null));
@@ -896,7 +893,6 @@ public class QueryBuilder {
 	}
 
 	public Expr bindToOp(Node n) {
-		Expr e = null;
 		if (GraphUtil.listObjects(graph, n, functionNode).hasNext()) {
 			Node function = GraphUtil.listObjects(graph, n, functionNode).next();
 			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
@@ -952,13 +948,9 @@ public class QueryBuilder {
 			Node v = GraphUtil.listObjects(graph, n, valueNode).next();
 			return argToExpr(v);
 		}
-		if (graph.contains(n, typeNode, varNode)) {
+		else {
 			return argToExpr(n);
 		}
-		if (n.isURI() || n.isLiteral()) {
-			return argToExpr(n);
-		}
-		return e;
 	}
 
 	public Expr argToExpr(Node value) {
@@ -1000,7 +992,7 @@ public class QueryBuilder {
 			int nParams = argList.size();
 			int i = 0;
 			if (nParams == 1) {
-				return aggregatorOperatorToExpr(function, distinct, filterToOp(argList.get(0)));
+				return aggregatorOperatorToExpr(n, distinct, filterToOp(argList.get(0)));
 			}
 			List<Expr> params = new ArrayList<>();
 			for (int k = 0; k < nParams; k++) {
@@ -1032,7 +1024,7 @@ public class QueryBuilder {
 			if (!isOrderedFunction(function)) {
 				Collections.sort(params, new ExprComparator());
 			}
-			return aggregatorOperatorToExpr(function, distinct, params.get(0), params.get(1));
+			return aggregatorOperatorToExpr(n, distinct, params.get(0), params.get(1));
 		}
 		if (GraphUtil.listObjects(graph, n, valueNode).hasNext()) {
 			Node v = GraphUtil.listObjects(graph, n, valueNode).next();
@@ -1382,7 +1374,7 @@ public class QueryBuilder {
 			}
 		}
 		if (orderBy != null) {
-			List<Node> args = GraphUtil.listObjects(graph, n, argNode).toList();
+			List<Node> args = GraphUtil.listObjects(graph, orderBy, argNode).toList();
 			List<SortCondition> params = new ArrayList<>();
 			for (int i = 0; i < args.size(); i++){
 				params.add(null);
@@ -1503,6 +1495,11 @@ public class QueryBuilder {
 			i++;
 		}
 		return ans;
+	}
+
+	@Override
+	public String toString() {
+		return getQuery();
 	}
 	
 	public Set<Var> getVars(){
