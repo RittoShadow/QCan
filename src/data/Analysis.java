@@ -8,6 +8,10 @@ import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
 
+import com.google.common.primitives.Doubles;
+import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
+import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
+
 import org.apache.jena.atlas.lib.Pair;
 
 public class Analysis {
@@ -546,6 +550,8 @@ public class Analysis {
 		String currentQuery = "";
 		HashMap<String,Integer> map = new HashMap<String,Integer>();
 		HashMap<String,Integer> map1 = new HashMap<String,Integer>();
+		int total1 = 0;
+		int total2 = 0;
 		while(true){
 			String line = bf.readLine();
 			if (line.startsWith("Total")){
@@ -560,6 +566,7 @@ public class Analysis {
 					int number = Integer.parseInt(n);
 					if (number > 1) {
 						map.put(currentQuery, number);
+						total1 += number - 1;
 					}
 				} catch (NumberFormatException e) {
 					System.err.print(line);
@@ -587,6 +594,7 @@ public class Analysis {
 					int number = Integer.parseInt(n);
 					if (number > 1) {
 						map1.put(currentQuery, number);
+						total2 += number - 1;
 					}
 				} catch (NumberFormatException e) {
 					System.err.print(line);
@@ -636,11 +644,39 @@ public class Analysis {
 				System.out.println(entry);
 			}
 		}
+		System.out.println("Total 1: " + total1);
+		System.out.println("Total 2: " + total2);
+	}
+
+	public void plot(int x, int y) throws IOException {
+		String line;
+		Map<Double,Double> points = new TreeMap<>();
+		while(true){
+			line = br.readLine();
+			if (line == null || line.startsWith("Total")){
+				break;
+			}
+			else{
+				String[] params = line.split("\t");
+				points.put(Double.parseDouble(params[x]),Double.parseDouble(params[y]));
+				uniqueQueries++;
+				if (uniqueQueries%10000 == 0){
+					System.out.println(uniqueQueries + " queries read.");
+				}
+			}
+		}
+		double[] xPoints = Doubles.toArray(points.keySet());
+		double[] yPoints = Doubles.toArray(points.values());
+		SplineInterpolator si = new SplineInterpolator();
+		PolynomialSplineFunction psf = si.interpolate(xPoints,yPoints);
+		System.out.println(psf.getPolynomials()[psf.getN() - 1]);
+		System.out.println(psf.getKnots());
 	}
 	
 	public static void main(String[] args) throws IOException{
-		Analysis a = new Analysis("resultFiles/utf8I7_status2xx_userData_Joined_results20200817_133531.log");
-		a.displayInfo();
+		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_SWDF_dist20201020_213603.log");
+		Analysis a2 = new Analysis("resultFiles/rewrite/rewrite_label_SWDF_dist20201020_163615.log");
+		a.compareWith(a2);
 	}
 
 }

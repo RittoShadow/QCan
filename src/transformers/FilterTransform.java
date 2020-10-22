@@ -90,8 +90,10 @@ public class FilterTransform extends TransformCopy {
 					return op;
 				}
 			}
-			ExprList exprs = op.getExprs();
-			exprs.addAll(((OpFilter) left).getExprs());
+			ExprList exprs = ((OpFilter) left).getExprs();
+			if (op.getExprs() != null) {
+				exprs.addAll(op.getExprs());
+			}
 			Op ans = OpLeftJoin.create(((OpFilter) left).getSubOp(),right,exprs);
 			return ans;
 		}

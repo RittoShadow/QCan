@@ -31,6 +31,7 @@ import org.apache.jena.sparql.expr.ExprWalker;
 import org.apache.jena.sparql.expr.NodeValue;
 import org.apache.jena.sparql.expr.aggregate.*;
 import org.apache.jena.sparql.graph.GraphFactory;
+import tools.Tools;
 
 //import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 
@@ -126,7 +127,7 @@ public class FilterVisitor implements ExprVisitor {
 
 	@Override
 	public void visit(ExprFunctionOp funcOp) {
-		Op op = SingleQuery.UCQTransformation(funcOp.getGraphPattern());
+		Op op = Tools.UCQTransformation(funcOp.getGraphPattern());
 		RGraphBuilder rb = new RGraphBuilder();
 		OpWalker.walk(op, rb);
 //		try {

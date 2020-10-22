@@ -11,16 +11,10 @@ import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.algebra.Transformer;
-import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
-import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
-import org.apache.jena.sparql.algebra.optimize.TransformPathFlatternStd;
-import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
 import org.apache.jena.sparql.core.Var;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 import data.FeatureCounter;
-import transformers.FilterTransform;
-import transformers.UCQTransformer;
 
 /**
  * A class that takes a query as an input, performs a canonicalisation and measures how long it takes.
@@ -38,7 +32,7 @@ public class SingleQuery {
 	private RGraph canonGraph;
 	private Set<Var> vars = new HashSet<Var>();
 	private Set<Var> canonVars = new HashSet<Var>();
-	private boolean enableLeaning = true;
+	private boolean minimisation = true;
 	private boolean containsUnion = false;
 	private boolean containsJoin = false;
 	private boolean containsOptional = false;
@@ -68,7 +62,7 @@ public class SingleQuery {
 		setLeaning(leaning);
 		this.pathNormalisation  = pathNormalisation;
 		long t = System.nanoTime();
-		parseQuery(q);
+		parseQuery(q,true);
 		graphTime = System.nanoTime() - t;
 		if (canon){
 			canonicalise(verbose);
@@ -78,26 +72,27 @@ public class SingleQuery {
 			minimisationTime = graphTime;
 		}
 	}
+
+	public SingleQuery(String q, boolean canon, boolean rewrite, boolean minimise, boolean pathNormalisation, boolean verbose) throws HashCollisionException, InterruptedException {
+		setLeaning(minimise);
+		this.pathNormalisation = pathNormalisation;
+		long t = System.nanoTime();
+		parseQuery(q,rewrite);
+		graphTime = System.nanoTime() - t;
+		if (canon){
+			canonicalise(verbose);
+		}
+		else{
+			canonGraph = this.graph;
+			minimisationTime = graphTime;
+		}
+
+	}
 	
 	public SingleQuery(Op op) throws InterruptedException, HashCollisionException {
 		String q = OpAsQuery.asQuery(op).toString();
-		parseQuery(q);
+		parseQuery(q,true);
 		canonicalise();
-	}
-	
-	public static Op UCQTransformation(Op op){
-		Op op2 = Transformer.transform(new TransformPathFlatternStd(), op);
-		op2 = Transformer.transform(new TransformSimplify(), op2);
-		op2 = Transformer.transform(new UCQTransformer(), op2);
-		while (!op.equals(op2)){
-			op = op2;
-			op2 = Transformer.transform(new UCQTransformer(), op2);
-		}
-		op2 = Transformer.transform(new FilterTransform(), op2);
-		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
-		op2 = Transformer.transform(new TransformExtendCombine(), op2);
-		op2 = Transformer.transform(new BGPSort(), op2);
-		return op2;
 	}
 	
 	public boolean checkBranchVars(Op op){
@@ -106,7 +101,7 @@ public class SingleQuery {
 		Op op2 = Transformer.transform(bgps, op);
 		for (int i = 0; i < bgps.ucqVars.size(); i++){
 			for (int j = i + 1; j < bgps.ucqVars.size(); j++){
-				if (bgps.ucqVars.get(i).equals(bgps.ucqVars.get(j))){
+				if (!bgps.ucqVars.get(i).equals(bgps.ucqVars.get(j))){
 					return true;
 				}
 			}
@@ -114,10 +109,10 @@ public class SingleQuery {
 		return false;
 	}
 	
-	public void parseQuery(String q) throws UnsupportedOperationException, QueryParseException{
+	public void parseQuery(String q, boolean rewrite) throws UnsupportedOperationException, QueryParseException{
 		Query query = QueryFactory.create(q);
 		Op op = Algebra.compile(query);
-		RGraphBuilder rgb = new RGraphBuilder(query,pathNormalisation);
+		RGraphBuilder rgb = new RGraphBuilder(query,rewrite,pathNormalisation);
 		graph = rgb.getResult();
 		graphTime = rgb.graphTime;
 		rewriteTime = rgb.rewriteTime;
@@ -158,7 +153,7 @@ public class SingleQuery {
 	}
 	
 	public void canonicalise(boolean verbose) throws InterruptedException, HashCollisionException{
-		this.graph.setLeaning(enableLeaning);
+		this.graph.setLeaning(minimisation);
 		canonGraph = this.graph.getCanonicalForm(verbose);
 		this.labelTime = canonGraph.getLabelTime();
 		this.minimisationTime = canonGraph.getMinimisationTime();
@@ -170,7 +165,7 @@ public class SingleQuery {
 	}
 	
 	public void setLeaning(boolean b){
-		this.enableLeaning = b;
+		this.minimisation = b;
 	}
 	
 	public long getGraphCreationTime(){
@@ -268,9 +263,8 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "PREFIX geo:<http://www.w3.org/2003/01/geo/wgs84_pos#>  PREFIX xsd:<http://www.w3.org/2001/XMLSchema#>  SELECT DISTINCT ?l ?lat ?lng  WHERE {   ?l geo:lat ?lat; geo:long ?lng; a <http://dbpedia.org/ontology/Place>.   FILTER(((?lat - xsd:float(44.849998))*(?lat - xsd:float(44.849998))+(?lng - xsd:float(7.716667))*(?lng - xsd:float(7.716667)))<xsd:float(1.0)) } ";
-		SingleQuery sq = new SingleQuery(q,true,true,true,true);
-		sq.getCanonicalGraph().print();
+		String q = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>                           PREFIX foaf: <http://xmlns.com/foaf/0.1/>                                      PREFIX ical: <http://www.w3.org/2002/12/cal/ical#>                             PREFIX icaltzid: <http://www.w3.org/2002/12/cal/icaltzid#>                             PREFIX owl:  <http://www.w3.org/2002/07/owl#>                                  PREFIX swc:  <http://data.semanticweb.org/ns/swc/ontology#> SELECT DISTINCT ?name ?homepage ?type ?page ?sameAs ?seeAlso ?graph ?logo      WHERE {                                                                        \t<http://data.semanticweb.org/workshop/wop/2009> rdfs:label ?name . \t{ <http://data.semanticweb.org/workshop/wop/2009> icaltzid:url ?homepage } UNION  \t    { <http://data.semanticweb.org/workshop/wop/2009> ical:url ?homepage } UNION  \t    { <http://data.semanticweb.org/workshop/wop/2009> foaf:homepage ?homepage } \t<http://data.semanticweb.org/workshop/wop/2009> a ?type .                    \tOPTIONAL { <http://data.semanticweb.org/workshop/wop/2009> swc:completeGraph ?graph .  }                                               \tOPTIONAL { {<http://data.semanticweb.org/workshop/wop/2009> swc:hasLogo ?logo} UNION {<http://data.semanticweb.org/workshop/wop/2009> foaf:logo ?logo}  }                                               \tOPTIONAL { <http://data.semanticweb.org/workshop/wop/2009> foaf:page ?page .\t}                                               \tOPTIONAL { <http://data.semanticweb.org/workshop/wop/2009> owl:sameAs ?sameAs . }                                               \tOPTIONAL { <http://data.semanticweb.org/workshop/wop/2009> rdfs:seeAlso ?seeAlso . } }";
+		SingleQuery sq = new SingleQuery(q,true,true, true,true,true);
 		System.out.println(sq.getQuery());
 		System.out.println(sq.graphTime/Math.pow(10, 9));
 		System.out.println(sq.rewriteTime/Math.pow(10, 9));

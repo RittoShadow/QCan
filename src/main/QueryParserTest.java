@@ -33,10 +33,12 @@ public class QueryParserTest {
 	boolean enableOptional = true;
 	boolean enableCanonical = true;
 	boolean enableLeaning = true;
+	protected boolean pathNormalisation = false;
+	private boolean enableRewrite = true;
 	
 	public void parse(String s) throws Exception{
 		try{
-		SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning, true);
+		SingleQuery q = new SingleQuery(s, enableCanonical, enableRewrite, enableLeaning, pathNormalisation, false );
 		canonQueries.add(q.getQuery());
 		q.getOriginalGraph().print();
 		System.out.println("");
@@ -48,40 +50,93 @@ public class QueryParserTest {
 			e.printStackTrace();
 		}	
 	}
+
+	public boolean compare(String s) throws Exception {
+		SingleQuery q1 = new SingleQuery(s, enableCanonical, enableRewrite, enableLeaning, pathNormalisation, false );
+		SingleQuery q2 = new SingleQuery(s, enableCanonical, enableRewrite, false, pathNormalisation, false);
+		return q1.getQuery().equals(q2.getQuery());
+	}
 	
 	public QueryParserTest(File f) throws IOException{
-		String s;
-		int i = 0;
-		this.enableFilter = true;
-		this.enableOptional = true;
 		this.enableLeaning(true);
 		this.enableCanonicalisation(true);
+		this.pathNormalisation = true;
+		this.enableRewrite = true;
 		try {
-			bf = new BufferedReader(new FileReader(f));
-			long t = System.currentTimeMillis();
-			while ((s = bf.readLine())!=null){
-				try{
-					System.out.println(i++);
-					this.parse(s);
-				}
-				catch (UnsupportedOperationException e){
-					unsupportedQueries++;
-					uQ.add(e.getMessage());
-				}
-				catch(QueryParseException e){
-					badSyntaxQueries++;
-					e.printStackTrace();
-				} 
-				catch (Exception e) {
-					otherUnspecifiedExceptions++;
-					e.printStackTrace();
-				}
-				totalQueries++;
-			}
-			this.totalTime = System.currentTimeMillis() - t;
+			read(f);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}		
+	}
+
+	public QueryParserTest(File f, boolean test) throws IOException {
+		if (test) {
+			this.enableLeaning = true;
+			this.enableCanonical = true;
+			this.enableRewrite = true;
+			this.pathNormalisation = true;
+			readAndCompare(f);
+		}
+		else {
+
+		}
+	}
+
+	public void read(File f) throws IOException {
+		String s;
+		int i = 0;
+		bf = new BufferedReader(new FileReader(f));
+		long t = System.currentTimeMillis();
+		while ((s = bf.readLine())!=null){
+			try{
+				System.out.println(i++);
+				this.parse(s);
+			}
+			catch (UnsupportedOperationException e){
+				unsupportedQueries++;
+				uQ.add(e.getMessage());
+			}
+			catch(QueryParseException e){
+				badSyntaxQueries++;
+				e.printStackTrace();
+			}
+			catch (Exception e) {
+				otherUnspecifiedExceptions++;
+				e.printStackTrace();
+			}
+			totalQueries++;
+		}
+		this.totalTime = System.currentTimeMillis() - t;
+
+	}
+
+	public void readAndCompare(File f) throws IOException {
+		String s;
+		int i = 0;
+		bf = new BufferedReader(new FileReader(f));
+		long t = System.currentTimeMillis();
+		while ((s = bf.readLine())!=null){
+			try{
+				if (!compare(s)) {
+					System.out.println(i);
+				}
+				i++;
+			}
+			catch (UnsupportedOperationException e){
+				unsupportedQueries++;
+				uQ.add(e.getMessage());
+			}
+			catch(QueryParseException e){
+				badSyntaxQueries++;
+				e.printStackTrace();
+			}
+			catch (Exception e) {
+				otherUnspecifiedExceptions++;
+				e.printStackTrace();
+			}
+			totalQueries++;
+		}
+		this.totalTime = System.currentTimeMillis() - t;
 	}
 	
 	public String unsupportedFeaturesToString(){
@@ -110,6 +165,6 @@ public class QueryParserTest {
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException{
-		QueryParserTest qp = new QueryParserTest(new File("testFiles/filterTest5.txt"));
+		QueryParserTest qp = new QueryParserTest(new File("clean_SWDF.txt"), true);
 	}
 }

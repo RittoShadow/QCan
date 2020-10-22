@@ -13,12 +13,8 @@ import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.graph.TripleBoundary;
-import org.apache.jena.n3.turtle.Turtle2NTriples;
 import org.apache.jena.query.Query;
-import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.SortCondition;
-import org.apache.jena.riot.writer.NTriplesWriter;
-import org.apache.jena.riot.writer.TurtleWriter;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.Table;
@@ -30,82 +26,7 @@ import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
 import org.apache.jena.sparql.engine.binding.BindingFactory;
 import org.apache.jena.sparql.engine.binding.BindingMap;
-import org.apache.jena.sparql.expr.E_Add;
-import org.apache.jena.sparql.expr.E_BNode;
-import org.apache.jena.sparql.expr.E_Bound;
-import org.apache.jena.sparql.expr.E_Coalesce;
-import org.apache.jena.sparql.expr.E_Conditional;
-import org.apache.jena.sparql.expr.E_Datatype;
-import org.apache.jena.sparql.expr.E_DateTimeDay;
-import org.apache.jena.sparql.expr.E_DateTimeHours;
-import org.apache.jena.sparql.expr.E_DateTimeMinutes;
-import org.apache.jena.sparql.expr.E_DateTimeMonth;
-import org.apache.jena.sparql.expr.E_DateTimeSeconds;
-import org.apache.jena.sparql.expr.E_DateTimeTZ;
-import org.apache.jena.sparql.expr.E_DateTimeTimezone;
-import org.apache.jena.sparql.expr.E_DateTimeYear;
-import org.apache.jena.sparql.expr.E_Divide;
-import org.apache.jena.sparql.expr.E_Equals;
-import org.apache.jena.sparql.expr.E_Exists;
-import org.apache.jena.sparql.expr.E_Function;
-import org.apache.jena.sparql.expr.E_GreaterThan;
-import org.apache.jena.sparql.expr.E_GreaterThanOrEqual;
-import org.apache.jena.sparql.expr.E_IRI;
-import org.apache.jena.sparql.expr.E_IsBlank;
-import org.apache.jena.sparql.expr.E_IsIRI;
-import org.apache.jena.sparql.expr.E_IsLiteral;
-import org.apache.jena.sparql.expr.E_IsNumeric;
-import org.apache.jena.sparql.expr.E_IsURI;
-import org.apache.jena.sparql.expr.E_Lang;
-import org.apache.jena.sparql.expr.E_LangMatches;
-import org.apache.jena.sparql.expr.E_LessThan;
-import org.apache.jena.sparql.expr.E_LessThanOrEqual;
-import org.apache.jena.sparql.expr.E_LogicalAnd;
-import org.apache.jena.sparql.expr.E_LogicalNot;
-import org.apache.jena.sparql.expr.E_LogicalOr;
-import org.apache.jena.sparql.expr.E_MD5;
-import org.apache.jena.sparql.expr.E_Multiply;
-import org.apache.jena.sparql.expr.E_NotEquals;
-import org.apache.jena.sparql.expr.E_NotExists;
-import org.apache.jena.sparql.expr.E_NotOneOf;
-import org.apache.jena.sparql.expr.E_Now;
-import org.apache.jena.sparql.expr.E_NumAbs;
-import org.apache.jena.sparql.expr.E_NumCeiling;
-import org.apache.jena.sparql.expr.E_NumFloor;
-import org.apache.jena.sparql.expr.E_NumRound;
-import org.apache.jena.sparql.expr.E_OneOf;
-import org.apache.jena.sparql.expr.E_Random;
-import org.apache.jena.sparql.expr.E_Regex;
-import org.apache.jena.sparql.expr.E_SHA1;
-import org.apache.jena.sparql.expr.E_SHA224;
-import org.apache.jena.sparql.expr.E_SHA256;
-import org.apache.jena.sparql.expr.E_SHA384;
-import org.apache.jena.sparql.expr.E_SHA512;
-import org.apache.jena.sparql.expr.E_SameTerm;
-import org.apache.jena.sparql.expr.E_Str;
-import org.apache.jena.sparql.expr.E_StrAfter;
-import org.apache.jena.sparql.expr.E_StrBefore;
-import org.apache.jena.sparql.expr.E_StrConcat;
-import org.apache.jena.sparql.expr.E_StrContains;
-import org.apache.jena.sparql.expr.E_StrDatatype;
-import org.apache.jena.sparql.expr.E_StrEncodeForURI;
-import org.apache.jena.sparql.expr.E_StrEndsWith;
-import org.apache.jena.sparql.expr.E_StrLang;
-import org.apache.jena.sparql.expr.E_StrLength;
-import org.apache.jena.sparql.expr.E_StrLowerCase;
-import org.apache.jena.sparql.expr.E_StrReplace;
-import org.apache.jena.sparql.expr.E_StrStartsWith;
-import org.apache.jena.sparql.expr.E_StrSubstring;
-import org.apache.jena.sparql.expr.E_StrUUID;
-import org.apache.jena.sparql.expr.E_StrUpperCase;
-import org.apache.jena.sparql.expr.E_Subtract;
-import org.apache.jena.sparql.expr.E_URI;
-import org.apache.jena.sparql.expr.E_UUID;
-import org.apache.jena.sparql.expr.Expr;
-import org.apache.jena.sparql.expr.ExprAggregator;
-import org.apache.jena.sparql.expr.ExprList;
-import org.apache.jena.sparql.expr.ExprVar;
-import org.apache.jena.sparql.expr.NodeValue;
+import org.apache.jena.sparql.expr.*;
 import org.apache.jena.sparql.expr.aggregate.AggregatorFactory;
 import org.apache.jena.sparql.path.P_Alt;
 import org.apache.jena.sparql.path.P_Seq;
@@ -115,7 +36,6 @@ import org.apache.jena.sparql.path.PathFactory;
 import org.apache.jena.sparql.syntax.Template;
 import org.apache.jena.sparql.util.ExprUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
-import org.semanticweb.yars.nx.dt.bool.XSDBoolean;
 
 /**
  * This class builds a query out of an r-graph.
@@ -429,13 +349,17 @@ public class QueryBuilder {
 				}
 
 			} else {
-				return null;
+				return new E_BNode();
 			}
 		}
 	}
 
 	public Expr aggregatorOperatorToExpr(Node v, boolean distinct, Expr... exprs) {
 		Node function = GraphUtil.listObjects(graph,v,functionNode).next();
+		if (function.isURI()) {
+			List<Expr> exprs1 = Arrays.asList(exprs);
+			return new E_Function(function.getURI(), new ExprList(exprs1));
+		}
 		String f = (String) function.getLiteralValue();
 		if (f.equals("MAX")) {
 			Var var = Var.alloc(v.getBlankNodeLabel());
@@ -471,7 +395,7 @@ public class QueryBuilder {
 			return new ExprAggregator(var, AggregatorFactory.createGroupConcat(distinct, exprs[0], f, null));
 		}
 		else {
-			return null;
+			return filterOperatorToString(function,exprs);
 		}
 	}
 
@@ -1267,7 +1191,8 @@ public class QueryBuilder {
 					e = new E_LogicalAnd(e, filterToOp(a));
 				}
 			}
-		} else if (graph.contains(n, typeNode, orNode)) {
+		}
+		else if (graph.contains(n, typeNode, orNode)) {
 			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
 			while (args.hasNext()) {
 				Node a = args.next();
@@ -1277,11 +1202,13 @@ public class QueryBuilder {
 					e = new E_LogicalOr(e, filterToOp(a));
 				}
 			}
-		} else if (graph.contains(n, typeNode, notNode)) {
+		}
+		else if (graph.contains(n, typeNode, notNode)) {
 			Node args = GraphUtil.listObjects(graph, n, argNode).next();
 			e = new E_LogicalNot(filterToOp(args));
-		} else {
-			if (GraphUtil.listObjects(graph, n, functionNode).hasNext()) {
+		}
+		else {
+			if (GraphUtil.listObjects(graph, n, functionNode).hasNext()) { //If it's a function.
 				Node function = GraphUtil.listObjects(graph, n, functionNode).next();
 				ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
 				List<Node> argList = args.toList();
@@ -1333,19 +1260,22 @@ public class QueryBuilder {
 				}
 				return filterOperatorToString(function, params);
 			}
-			if (GraphUtil.listObjects(graph, n, valueNode).hasNext()) {
+			if (GraphUtil.listObjects(graph, n, valueNode).hasNext()) { //If it's a variable representing a function.
 				Node v = GraphUtil.listObjects(graph, n, valueNode).next();
 				if (v.isBlank()) {
 					if (GraphUtil.listObjects(graph, v, functionNode).hasNext()) {
 						return aggregateToExpr(v);
-					} else {
+					}
+					else {
 						vars.add(Var.alloc(v.getBlankNodeLabel()));
 						return NodeValue.makeNode(Var.alloc(v.getBlankNodeLabel()));
 					}
-				} else {
+				}
+				else {
 					return argToExpr(v);
 				}
-			} else {
+			}
+			else {
 				return argToExpr(n);
 			}
 		}
@@ -1429,6 +1359,7 @@ public class QueryBuilder {
 			first = root;
 		}
 		op = nextOpByType(first);
+		System.out.println(op);
 		Query query = OpAsQuery.asQuery(op);
 		if (f.hasNext()){
 			ExtendedIterator<Node> URIs = GraphUtil.listObjects(graph, f.next(), argNode);

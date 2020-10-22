@@ -639,7 +639,7 @@ public class QueryFeaturesCounter {
 //			out.createNewFile();
 //		}
 //		in.add(inFile);
-		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("RKBExplorerQueries.txt"));
+		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("clean_linkedGeoQueries.txt"));
 //		QueryFeaturesCounter.filterPaths(in, out);
 //		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("testFiles/wikiDataPaths"), false, true);
 //		QueryFeaturesCounter.pathFiles(new File("resultFiles/features/paths.paths/pathFeatures20200513_154057.log"));

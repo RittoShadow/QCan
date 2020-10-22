@@ -13,14 +13,13 @@ public class Benchmark {
 	public File f;
 	public QueryParser pq;
 	public JenaParser jp;
-	public boolean enableFilter = false;
-	public boolean enableOptional = false;
 	public boolean enableLeaning = false;
 	public boolean enableCanonicalisation = false;
+	public boolean enableRewrite = false;
 	public boolean enableTrimming = false;
 	public boolean pathNormalisation = false;
 	
-	public Benchmark(String path) throws IOException{
+	public Benchmark(String path) {
 		f = new File(path);
 	}
 	
@@ -29,17 +28,16 @@ public class Benchmark {
 		this.enableTrimming = enableTrimming;
 	}
 	
-	public Benchmark(String path, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanonicalisation){
-		this(path,enableFilter,enableOptional,enableLeaning,enableCanonicalisation,false);
+	public Benchmark(String path, boolean enableLeaning, boolean enableCanonicalisation, boolean enableRewrite){
+		this(path,enableLeaning,enableCanonicalisation,enableRewrite,false);
 	}
 
 	
-	public Benchmark(String path, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanonicalisation, boolean pathNormalisation){
+	public Benchmark(String path, boolean enableLeaning, boolean enableCanonicalisation, boolean enableRewrite, boolean pathNormalisation){
 		f = new File(path);
-		this.enableFilter = enableFilter;
-		this.enableOptional = enableOptional;
 		this.enableLeaning = enableLeaning;
 		this.enableCanonicalisation = enableCanonicalisation;
+		this.enableRewrite = enableRewrite;
 		this.pathNormalisation = pathNormalisation;
 	}
 	
@@ -49,33 +47,31 @@ public class Benchmark {
 		if (filename.contains(".")) {
 			filename = filename.substring(0,filename.lastIndexOf("."));
 		}
-		if (enableLeaning){
-			out = new File("resultFiles/" + filename + "_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
-		}
-		else{
-			if (enableTrimming) {
-				out = new File("resultFiles/jena/" + filename + "_labelOnly_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
-			}
-			else {
-				out = new File("resultFiles/" + filename + "_labelOnly_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
-			}
-		}
-		if (!out.exists()){
-			out.createNewFile();
-		}
 		if (enableTrimming){
+			out = new File("resultFiles/jena/" + filename + "_labelOnly_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+			if (!out.exists()) {
+				out.createNewFile();
+			}
 			jp = new JenaParser(f, out, upTo, true, true);
 			if (printDist){
 				jp.getDistributionInfo(filename);
 			}
 		}
 		else{
-			if (pathNormalisation) {
-				pq = new QueryParser(f, out, upTo, offset, pathNormalisation);
+			if (enableLeaning) {
+				filename = "min_" + filename;
 			}
-			else {
-				pq = new QueryParser(f, out, upTo, offset, enableFilter, enableOptional, enableLeaning, enableCanonicalisation);
+			if (enableCanonicalisation) {
+				filename = "label_" + filename;
 			}
+			if (enableRewrite) {
+				filename = "rewrite_" + filename;
+			}
+			out = new File("resultFiles/" + filename + "_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+			if (!out.exists()) {
+				out.createNewFile();
+			}
+			pq = new QueryParser(f, out, upTo, offset, enableLeaning, enableCanonicalisation, enableRewrite, pathNormalisation);
 			if (printDist){
 				pq.getDistributionInfo(filename);
 			}
@@ -112,37 +108,33 @@ public class Benchmark {
 	    Option option_C = new Option("c", false, "Set to enable canonicalisation.");
 	    Option option_N = new Option("n", true, "Number of queries to parse. Default is 10000");
 	    option_N.setArgName("number");
-	    Option option_OFF = new Option("y", true, "Start at this query. Default is 0.");
+	    Option option_OFF = new Option("o", true, "Start at this query. Default is 0.");
 	    option_OFF.setArgName("offset");
 	    Option option_X = new Option("x", true, "Path to file containing queries.");
 	    Option option_D = new Option("d", false, "Set to output distribution of queries.");
-	    Option option_O = new Option("o", false, "Set to enable canonicalisation of OPTIONAL terms.");
-	    Option option_F = new Option("f", false, "Set to enable canonicalisation of FILTER terms.");
 	    Option option_L = new Option("l", false, "Set to enable leaning of graphs.");
 	    Option option_J = new Option("j", false, "Set to enable the Jena parser. If set as well as -c, it overrides the option.");
 	    Option option_P = new Option("p", false, "Set to enable path normalisation.");
-	    option_F.setArgName("file");
+	    Option option_R = new Option("r",false,"Set to rewrite queries.");
 	    Options options = new Options();
 	    CommandLineParser parser = new DefaultParser();
 
 	    options.addOption(option_C);
 	    options.addOption(option_W);
 	    options.addOption(option_N);
-	    options.addOption(option_F);
 	    options.addOption(option_D);
 	    options.addOption(option_X);
-	    options.addOption(option_O);
 	    options.addOption(option_L);
 	    options.addOption(option_J);
 	    options.addOption(option_P);
+	    options.addOption(option_R);
 	    options.addOption(option_OFF);
 
 	    String header = "";
 	    String footer = "";
-	    boolean enableFilter = false;
-	    boolean enableOptional = false;
 	    boolean enableLeaning = false;
 	    boolean enableCanonicalisation = false;
+	    boolean enableRewrite = false;
 	    boolean pathNormalisation = false;
 	    HelpFormatter formatter = new HelpFormatter();
 	    formatter.printHelp("benchmark", header, options, footer, true);    
@@ -156,18 +148,13 @@ public class Benchmark {
 	        	if (commandLine.hasOption("n")){
 	        		upTo = Integer.parseInt(commandLine.getOptionValue("n"));
 	        	}
-	        	if (commandLine.hasOption("y")){
-	        		offset = Integer.parseInt(commandLine.getOptionValue("y"));
+	        	if (commandLine.hasOption("o")){
+	        		offset = Integer.parseInt(commandLine.getOptionValue("o"));
 	        	}
 	        	if (commandLine.hasOption("w")){
 	        		QueryParser.removeQueries(file);
 	        		file = "clean" + file;
-	        	}
-	        	if (commandLine.hasOption("f")){
-	        		enableFilter = true;
-	        	}
-	        	if (commandLine.hasOption("o")){
-	        		enableOptional = true;
+	        		System.exit(0);
 	        	}
 	        	if (commandLine.hasOption("l")){
 	        		enableLeaning = true;
@@ -178,11 +165,14 @@ public class Benchmark {
 	        	if (commandLine.hasOption("p")) {
 	        		pathNormalisation = true;
 	        	}
+	        	if (commandLine.hasOption("r")) {
+					enableRewrite = true;
+				}
 	        	if (commandLine.hasOption("j")){
 	        		b = new Benchmark(file, true);
 	        	}
 	        	else{
-	        		b = new Benchmark(file, enableFilter, enableOptional, enableLeaning, enableCanonicalisation, pathNormalisation);
+	        		b = new Benchmark(file, enableLeaning, enableCanonicalisation, enableRewrite, pathNormalisation);
 	        	}
 	    		b.execute(upTo, offset, commandLine.hasOption("d"));
 	    		System.exit(0);

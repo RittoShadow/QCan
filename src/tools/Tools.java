@@ -10,6 +10,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import main.BGPSort;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Node;
@@ -17,13 +18,21 @@ import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.op.*;
+import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
+import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
+import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprList;
 import org.apache.jena.util.iterator.ExtendedIterator;
+import transformers.FilterTransform;
+import transformers.NotOneOfTransform;
+import transformers.TransformPath;
+import transformers.UCQTransformer;
 
 public class Tools {
 
@@ -206,6 +215,32 @@ public class Tools {
 			}
 		}
 		return ans;
+	}
+
+	public static Op UCQNormalisation(Op op) {
+		Op op1 = op;
+		Op op2 = op;
+		do {
+			op1 = op2;
+			op2 = Transformer.transform(new FilterTransform(), op2);
+			op2 = Transformer.transform(new UCQTransformer(), op2);
+			op2 = Transformer.transform(new TransformPath(), op2);
+			op2 = Transformer.transform(new NotOneOfTransform(), op2);
+		}
+		while (!op1.equals(op2));
+		return op2;
+	}
+
+	public static Op UCQTransformation(Op op) {
+		Op op2 = UCQNormalisation(op);
+//		op2 = uC2RPQCollapse(op2);
+//		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
+//		op2 = Transformer.transform(new BGPCollapser(op2,this.projectionVars,false), op2); // transform BGPs
+		op2 = Transformer.transform(new TransformSimplify(), op2);
+		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
+		op2 = Transformer.transform(new TransformExtendCombine(), op2);
+		op2 = Transformer.transform(new BGPSort(), op2);
+		return op2;
 	}
 	
 	public static void main(String[] args) throws IOException {

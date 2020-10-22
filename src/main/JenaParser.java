@@ -44,6 +44,10 @@ public class JenaParser {
 		long t = System.nanoTime();
 		Query query = QueryFactory.create(s);
 		Op op = Algebra.compile(query);
+		if (op instanceof OpNull){
+			canonQueries.add(query.toString());
+			return;
+		}
 		Query result = OpAsQuery.asQuery(op);
 		if (query.isAskType()) {
 			result.setQueryAskType();
@@ -55,9 +59,6 @@ public class JenaParser {
 			result.setQueryDescribeType();
 		}
 		t = System.nanoTime() - t;
-		if (op instanceof OpNull){
-			return;
-		}
 		queryInfo = totalQueries + "\t" + t + "\t";
 		queryInfo += query.getResultVars().size() + "\t";
 		queryInfo += query.isDistinct() + "\t";

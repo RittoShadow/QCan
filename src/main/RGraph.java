@@ -7,8 +7,6 @@ import cl.uchile.dcc.blabel.label.GraphLabelling.GraphLabellingArgs;
 import cl.uchile.dcc.blabel.label.GraphLabelling.GraphLabellingResult;
 import cl.uchile.dcc.blabel.lean.DFSGraphLeaning;
 import cl.uchile.dcc.blabel.lean.GraphLeaning.GraphLeaningResult;
-import com.google.common.collect.Multiset;
-import com.sun.org.apache.xpath.internal.axes.FilterExprWalker;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.graph.*;
 import org.apache.jena.query.*;
@@ -18,7 +16,6 @@ import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.Table;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpGroup;
-import org.apache.jena.sparql.algebra.optimize.ExprVisitorApplyVisitor;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.core.VarExprList;
@@ -29,20 +26,13 @@ import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.sparql.path.Path;
 import org.apache.jena.sparql.sse.writers.WriterPath;
 import org.apache.jena.sparql.syntax.Template;
-import org.apache.jena.sparql.util.graph.GraphUtils;
 import org.apache.jena.update.UpdateAction;
 import org.apache.jena.update.UpdateFactory;
 import org.apache.jena.update.UpdateRequest;
-import org.apache.jena.util.FileManager;
-import org.apache.jena.util.FileUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import paths.PGraph;
 import tools.CustomTripleBoundary;
-import tools.Tools;
 import visitors.FilterVisitor;
-
-import java.awt.*;
-import java.io.File;
 import java.util.*;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -135,7 +125,6 @@ public class RGraph {
 	/**
 	 * @param triples List of RDF triples.
 	 * @param vars List of the variables in the triples.
-	 * @return A new r-graph based on the list of triples.
 	 */
 	public RGraph(List<Triple> triples, List<Var> vars){
 		if (vars != null){
@@ -171,7 +160,6 @@ public class RGraph {
 	 * @param root This node will be the new root of the r-graph.
 	 * @param graph The graph on which the new r-graph is based.
 	 * @param vars The list of variables in the r-graph.
-	 * @return A new r-graph based on a given graph.
 	 */
 	public RGraph(Node root, Graph graph, Collection<Var> vars){
 		this.root = root;
@@ -183,7 +171,6 @@ public class RGraph {
 	
 	/**
 	 * @param triples List of RDF triples.
-	 * @return A new r-graph based on the list of triples.
 	 */
 	public RGraph(List<Triple> triples){
 		this(triples, null);
@@ -191,7 +178,6 @@ public class RGraph {
 	
 	/**
 	 * @param data A collection of triples of nodes.
-	 * @return A new r-graph based on a collection of nodes.
 	 */
 	public RGraph(Collection<org.semanticweb.yars.nx.Node[]> data){
 		Set<Node> rootCandidates = new HashSet<>();
@@ -742,9 +728,9 @@ public class RGraph {
 				if (isOrderedFunction(op) || o.isURI()) {
 					graph.add(Triple.create(newNode, orderNode, NodeFactory.createLiteralByValue(i++, XSDDatatype.XSDint)));
 				}
-				if (!isOrderedFunction(op) && o.isURI()) {
-
-				}
+//				if (!isOrderedFunction(op) && o.isURI()) {
+//
+//				}
 			}
 			else {
 				graph.add(Triple.create(n, argNode, node));
@@ -789,17 +775,21 @@ public class RGraph {
 		}
 		return ans;
 	}
-	
-	/**
-	 * @param group
-	 */
-	public void groupBy(RGraph group) {
+
+	public Node getPatternNode() {
 		if (!GraphUtil.listObjects(graph, root, patternNode).hasNext()) {
 			Node n = NodeFactory.createBlankNode();
 			graph.add(Triple.create(root, patternNode, n));
 			graph.add(Triple.create(n, typeNode, extraNode));
 		}
-		Node n = GraphUtil.listObjects(graph, root, patternNode).next();
+		return GraphUtil.listObjects(graph, root, patternNode).next();
+	}
+	
+	/**
+	 * @param group An r-graph representing a GROUP BY expression.
+	 */
+	public void groupBy(RGraph group) {
+		Node n = getPatternNode();
 		graph.add(Triple.create(n, argNode, group.root));
 		GraphUtil.addInto(graph, group.graph);
 		ExtendedIterator<Node> vars = listSubjects(group.graph, typeNode, varNode);
@@ -812,15 +802,10 @@ public class RGraph {
 	}
 	
 	/**
-	 * @param args
+	 * @param args A list of r-graphs that represent aggregation expressions.
 	 */
 	public void aggregation(RGraph r, List<RGraph> args) {
-		if (!GraphUtil.listObjects(graph, root, patternNode).hasNext()) {
-			Node n = NodeFactory.createBlankNode();
-			graph.add(Triple.create(root, patternNode, n));
-			graph.add(Triple.create(n, typeNode, extraNode));
-		}
-		Node n = GraphUtil.listObjects(graph, root, patternNode).next();
+		Node n = getPatternNode();
 		Node extend = NodeFactory.createBlankNode();
 		graph.add(Triple.create(r.root, patternNode, extend));
 		graph.add(Triple.create(extend, typeNode, aggregateNode));
@@ -840,15 +825,7 @@ public class RGraph {
 	 * @return
 	 */
 	public Node aggregationFunction(String op, boolean distinct, Var var, Node arg) {
-		Node n = NodeFactory.createBlankNode();
-		if (var != null) {
-			exprMap.put(var,n);
-		}
-		Node o = NodeFactory.createLiteral(op);
-		graph.add(Triple.create(n, functionNode, o));
-		if (distinct) {
-			graph.add(Triple.create(n, distinctNode, NodeFactory.createLiteralByValue(true,XSDDatatype.XSDboolean)));
-		}
+		Node n = getAggregateNode(op,distinct,var);
 		if (!GraphUtil.listObjects(graph, arg, functionNode).hasNext()) {
 			Node a = NodeFactory.createBlankNode();
 			graph.add(Triple.create(n, argNode, a));
@@ -868,6 +845,13 @@ public class RGraph {
 	 * @return
 	 */
 	public Node aggregationCount(String op, boolean distinct, Var var, Node arg) {
+		Node n = getAggregateNode(op,distinct,var);
+		graph.add(Triple.create(n, argNode, arg));
+		graph.add(Triple.create(arg, valueNode, NodeFactory.createLiteral("*")));
+		return n;
+	}
+
+	public Node getAggregateNode(String op, boolean distinct, Var var) {
 		Node n = NodeFactory.createBlankNode();
 		if (var != null) {
 			exprMap.put(var,n);
@@ -877,8 +861,6 @@ public class RGraph {
 		if (distinct) {
 			graph.add(Triple.create(n, distinctNode, NodeFactory.createLiteralByValue(true,XSDDatatype.XSDboolean)));
 		}
-		graph.add(Triple.create(n, argNode, arg));
-		graph.add(Triple.create(arg, valueNode, NodeFactory.createLiteral("*")));
 		return n;
 	}
 	
@@ -1006,16 +988,16 @@ public class RGraph {
 
 	public void setReducedNode(boolean isReduced) {
 		if (isProjection()) {
-			graph.add(Triple.create(root, distinctNode, NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
+			graph.add(Triple.create(root, reducedNode, NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
 		}
 		else if (isConstruction()) {
-			graph.add(Triple.create(root, distinctNode, NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
+			graph.add(Triple.create(root, reducedNode, NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
 		}
 		else {
 			Node p = NodeFactory.createBlankNode();
 			graph.add(Triple.create(p,typeNode,projectNode));
 			graph.add(Triple.create(p,opNode,root));
-			graph.add(Triple.create(p,distinctNode,NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
+			graph.add(Triple.create(p,reducedNode,NodeFactory.createLiteralByValue(isReduced, XSDDatatype.XSDboolean)));
 			this.root = p;
 		}
 	}
@@ -1174,13 +1156,14 @@ public class RGraph {
 	}
 
 	public String toString(){
-		String ans = "";
+		StringBuilder ans = new StringBuilder();
 		ExtendedIterator<Triple> e = GraphUtil.findAll(this.graph);
 		while (e.hasNext()){
 			Triple t = e.next();
-			ans += t.toString() + "\n";
+			ans.append(t.toString());
+			ans.append("\n");
 		}
-		return ans;
+		return ans.toString();
 	}
 
 	public void print(){
@@ -1377,14 +1360,23 @@ public class RGraph {
 			return ans;
 		}
 		else{
+			ExtendedIterator<Node> vars = GraphUtil.listSubjects(graph,typeNode,varNode);
+			while (vars.hasNext()) {
+				Node var = vars.next();
+				graph.delete(Triple.create(var,typeNode,varNode));
+			}
+			long time = System.nanoTime();
 			GraphLabellingResult glr = this.label(this.getTriples());
+			time = System.nanoTime() - time;
 			if (verbose){
 				System.out.println("Labelling results: \n");
 				System.out.println("Number of blank nodes: "+glr.getBnodeCount());
 				System.out.println("Number of colouring iterations: "+glr.getColourIterationCount());
 				System.out.println("Number of partitions found: "+glr.getPartitionCount());
 			}
-			return new RGraph(glr.getGraph());
+			RGraph ans = new RGraph(glr.getGraph());
+			ans.setLabelTime(time);
+			return ans;
 		}	
 	}
 
@@ -1683,6 +1675,7 @@ public class RGraph {
 				UpdateAction.execute(branchCleanUpRule2,eg.graph);
 				UpdateAction.execute(joinRule, eg.graph);
 				this.graph = eg.graph;
+				result = new ArrayList<>();
 //				return eg;
 			}
 		}

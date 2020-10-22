@@ -19,6 +19,9 @@ import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
+import org.apache.jena.sparql.algebra.Algebra;
+import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.OpAsQuery;
 
 public class QueryParser {
 	
@@ -44,7 +47,8 @@ public class QueryParser {
 	boolean enableLeaning = true;
 	boolean verbose = false;
 	protected boolean pathNormalisation = false;
-	
+	private boolean enableRewrite = true;
+
 	public void parse(final String s) throws Exception{
 		System.out.println("Begin parsing.");
 		Thread slave = new Thread(new Runnable(){
@@ -53,7 +57,7 @@ public class QueryParser {
 			public void run() {
 				try {
 					queryInfo = "";
-					SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning, verbose, pathNormalisation );
+					SingleQuery q = new SingleQuery(s, enableCanonical, enableRewrite, enableLeaning, pathNormalisation, verbose );
 					queryInfo = totalQueries + "\t" + q.getGraphCreationTime() + "\t"; //1
 					queryInfo += q.getRewriteTime() + "\t"; //2
 					queryInfo += q.getLabelTime() + "\t"; //3
@@ -128,17 +132,16 @@ public class QueryParser {
 		}
 	}
 	
-	public QueryParser(File f, File out, int upTo, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanon) throws IOException{
-		this(f, out, upTo, 0, enableFilter, enableOptional, enableLeaning, enableCanon);
+	public QueryParser(File f, File out, int upTo, boolean enableLeaning, boolean enableCanon, boolean enableRewrite) throws IOException{
+		this(f, out, upTo, 0, enableLeaning, enableCanon, enableRewrite);
 	}
 	
-	public QueryParser(File f, File out, int upTo, int offset, boolean enableFilter, boolean enableOptional, boolean enableLeaning, boolean enableCanon) throws IOException{
+	public QueryParser(File f, File out, int upTo, int offset, boolean enableLeaning, boolean enableCanon, boolean enableRewrite) throws IOException{
 		String s;
 		int i = 0;
-		this.enableFilter = enableFilter;
-		this.enableOptional = enableOptional;
 		this.enableLeaning(enableLeaning);
 		this.enableCanonicalisation(enableCanon);
+		this.enableRewrite(enableRewrite);
 		try {
 			bf = new BufferedReader(new FileReader(f));
 			fw = new FileWriter(out);
@@ -158,7 +161,7 @@ public class QueryParser {
 				try{
 					if (i == 0){
 						@SuppressWarnings("unused")
-						SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning);
+						SingleQuery q = new SingleQuery(s, enableCanonical, enableRewrite, enableLeaning, false, false);
 					}
 					this.parse(s);
 				}
@@ -187,15 +190,18 @@ public class QueryParser {
 			e.printStackTrace();
 		}		
 	}
-	
-	public QueryParser(File f, File out, int upTo, int offset, boolean paths) throws IOException{
+
+	private void enableRewrite(boolean enableRewrite) {
+		this.enableRewrite = enableRewrite;
+	}
+
+	public QueryParser(File f, File out, int upTo, int offset, boolean enableLeaning, boolean enableCanon, boolean enableRewrite, boolean paths) throws IOException{
 		String s;
 		int i = 0;
-		this.enableFilter = true;
-		this.enableOptional = true;
 		this.pathNormalisation = paths;
-		this.enableLeaning(true);
-		this.enableCanonicalisation(true);
+		this.enableLeaning(enableLeaning);
+		this.enableCanonicalisation(enableCanon);
+		this.enableRewrite(enableRewrite);
 		try {
 			bf = new BufferedReader(new FileReader(f));
 			fw = new FileWriter(out);
@@ -215,7 +221,7 @@ public class QueryParser {
 				try{
 					if (i == 0){
 						@SuppressWarnings("unused")
-						SingleQuery q = new SingleQuery(s, enableCanonical, enableLeaning, verbose, paths);
+						SingleQuery q = new SingleQuery(s, enableCanonical, enableRewrite, enableLeaning, paths, verbose);
 					}
 					this.parse(s);
 				}
@@ -259,9 +265,10 @@ public class QueryParser {
 			BufferedWriter bw = new BufferedWriter(fw);
 			while ((s = bf.readLine())!=null){
 				try{
-					String w = s.substring(s.indexOf('"')+1, s.lastIndexOf('"'));
-					QueryFactory.create(w);
-					bw.append(w);
+					Query q = QueryFactory.create(s);
+					Op op = Algebra.compile(q);
+					q = OpAsQuery.asQuery(op);
+					bw.append(s);
 					bw.newLine();
 				}
 				catch (Exception e){
@@ -363,7 +370,6 @@ public class QueryParser {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		@SuppressWarnings("unused")
-		QueryParser qp = new QueryParser(new File("testFiles/unsupported20171201_224715.log"), new File("resultFiles/unsupported20171201_224715.log"),-1,true,true,true,true);
+
 	}
 }

@@ -127,8 +127,12 @@ public class RGraphBuilder implements OpVisitor {
 	public RGraphBuilder(Query query) {
 		this(query,false);
 	}
+
+	public RGraphBuilder(Query query, boolean pathNormalisation) {
+		this(query,true,pathNormalisation);
+	}
 	
-	public RGraphBuilder(Query query, boolean pathNormalisation){
+	public RGraphBuilder(Query query, boolean rewrite, boolean pathNormalisation){
 		this.queryType = query.getQueryType();
 		if (this.queryType == Query.QueryTypeConstruct) {
 			template = query.getConstructTemplate();
@@ -138,9 +142,11 @@ public class RGraphBuilder implements OpVisitor {
 		namedGraphURI = query.getNamedGraphURIs();
 		this.pathNormalisation = pathNormalisation;
 		Op op = Algebra.compile(query);
-		long normalTime = System.nanoTime();
-		op = UCQTransformation(op);
-		this.rewriteTime = System.nanoTime() - normalTime;
+		if (rewrite) {
+			long normalTime = System.nanoTime();
+			op = UCQTransformation(op);
+			this.rewriteTime = System.nanoTime() - normalTime;
+		}
 		this.totalVars = varsContainedIn(op);
 		this.setEnableFilter(true);
 		this.setEnableOptional(true);
@@ -158,13 +164,13 @@ public class RGraphBuilder implements OpVisitor {
 			Node p = t.getPredicate();
 			Node o = t.getObject();
 			if (s.isVariable()){
-				totalVars.add((Var) s);
+				totalVars.add(Var.alloc(s));
 			}
 			if (p.isVariable()){
-				totalVars.add((Var) p);
+				totalVars.add(Var.alloc(p));
 			}
 			if (o.isVariable()){
-				totalVars.add((Var) o);
+				totalVars.add(Var.alloc(o));
 			}
 		}
 	}
@@ -591,14 +597,19 @@ public class RGraphBuilder implements OpVisitor {
 			else if (this.queryType == Query.QueryTypeDescribe){
 				graphStack.peek().describe();
 			}
-			else if (this.queryType == Query.QueryTypeSelect) {
+			if (this.queryType == Query.QueryTypeSelect) {
 				if (projectedQueries == 0) {
 					projectionVars = new ArrayList<>();
 					projectionVars.addAll(totalVars);
 				}
 				if (projectionVars != null) {
 					graphStack.peek().project(projectionVars);
-				}	
+				}
+			}
+		}
+		else {
+			if (projectionVars != null) {
+				graphStack.peek().project(projectionVars);
 			}
 		}
 		if (!this.graphURI.isEmpty()){

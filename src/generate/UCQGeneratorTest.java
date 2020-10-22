@@ -81,6 +81,9 @@ public class UCQGeneratorTest {
 				try{
 					execute();
 				}
+				catch (StackOverflowError e) {
+					System.exit(-1);
+				}
 				catch(Exception e){
 					e.printStackTrace();
 				}
