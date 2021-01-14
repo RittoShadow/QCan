@@ -1,10 +1,12 @@
-package main;
+package tools;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+
+import main.SingleQuery;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.TransformCopy;
@@ -15,7 +17,7 @@ import org.apache.jena.sparql.core.BasicPattern;
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 
 public class BGPSort extends TransformCopy {
-	List<HashSet<String>> ucqVars = new ArrayList<HashSet<String>>();
+	public List<HashSet<String>> ucqVars = new ArrayList<>();
 	
 	public Op transform(OpBGP bgp){
 		BasicPattern bp = new BasicPattern();
@@ -30,7 +32,7 @@ public class BGPSort extends TransformCopy {
 	public Op transform(OpUnion union, Op left, Op right){
 		if (left instanceof OpBGP){
 			List<Triple> triple = ((OpBGP) left).getPattern().getList();
-			HashSet<String> cqVars = new HashSet<String>();
+			HashSet<String> cqVars = new HashSet<>();
 			for (Triple t : triple){
 				if (t.getSubject().isVariable()){
 					cqVars.add(t.getSubject().getName());
@@ -46,7 +48,7 @@ public class BGPSort extends TransformCopy {
 		}
 		if (right instanceof OpBGP){
 			List<Triple> triple = ((OpBGP) right).getPattern().getList();
-			HashSet<String> cqVars = new HashSet<String>();
+			HashSet<String> cqVars = new HashSet<>();
 			for (Triple t : triple){
 				if (t.getSubject().isVariable()){
 					cqVars.add(t.getSubject().getName());

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import main.BGPCollapser;
+import transformers.BGPCollapser;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.Algebra;

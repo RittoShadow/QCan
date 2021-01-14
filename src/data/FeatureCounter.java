@@ -284,7 +284,6 @@ public class FeatureCounter implements OpVisitor {
 
 	@Override
 	public void visit(OpReduced arg0) {
-		features.add("Unsupported");
 		features.add(arg0.getName());
 	}
 

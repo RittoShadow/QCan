@@ -1,9 +1,10 @@
-package main;
+package builder;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import main.RGraph;
 import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.graph.Graph;
@@ -15,10 +16,7 @@ import org.apache.jena.graph.Triple;
 import org.apache.jena.graph.TripleBoundary;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.SortCondition;
-import org.apache.jena.sparql.algebra.Op;
-import org.apache.jena.sparql.algebra.OpAsQuery;
-import org.apache.jena.sparql.algebra.Table;
-import org.apache.jena.sparql.algebra.TableFactory;
+import org.apache.jena.sparql.algebra.*;
 import org.apache.jena.sparql.algebra.op.*;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.TriplePath;
@@ -28,14 +26,12 @@ import org.apache.jena.sparql.engine.binding.BindingFactory;
 import org.apache.jena.sparql.engine.binding.BindingMap;
 import org.apache.jena.sparql.expr.*;
 import org.apache.jena.sparql.expr.aggregate.AggregatorFactory;
-import org.apache.jena.sparql.path.P_Alt;
-import org.apache.jena.sparql.path.P_Seq;
-import org.apache.jena.sparql.path.P_ZeroOrMore1;
-import org.apache.jena.sparql.path.Path;
-import org.apache.jena.sparql.path.PathFactory;
+import org.apache.jena.sparql.path.*;
 import org.apache.jena.sparql.syntax.Template;
 import org.apache.jena.sparql.util.ExprUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
+import tools.Tools;
+import transformers.NotOneOfTransform;
 
 /**
  * This class builds a query out of an r-graph.
@@ -279,18 +275,7 @@ public class QueryBuilder {
 					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 					Node t = GraphUtil.listObjects(graph, v, argNode).next();
 					Node first = GraphUtil.listObjects(graph, t, valueNode).next();
-					Op ans = null;
-					if (graph.contains(Triple.create(first, typeNode, unionNode))) {
-						ans = unionToOp(first);
-					} else if (graph.contains(Triple.create(first, typeNode, joinNode))) {
-						ans = joinToOp(first);
-					} else if (graph.contains(Triple.create(first, typeNode, optionalNode))) {
-						ans = optionalToOp(first);
-					} else if (graph.contains(Triple.create(first, typeNode, graphNode))) {
-						ans = graphToOp(first);
-					} else if (graph.contains(Triple.create(first, typeNode, tpNode))) {
-						ans = tripleToOp(first);
-					}
+					Op ans = nextOpByType(first);
 					return new E_Exists(ans);
 				} else if (f.equals("notexists")) {
 					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
@@ -826,9 +811,6 @@ public class QueryBuilder {
 			if (nParams == 0) {
 				return filterOperatorToString(function);
 			}
-			if (nParams == 1) {
-				return filterOperatorToString(function, bindToOp(argList.get(0)));
-			}
 			List<Expr> params = new ArrayList<>();
 			for (int k = 0; k < nParams; k++) {
 				params.add(null);
@@ -865,6 +847,10 @@ public class QueryBuilder {
 			}
 			if (!isOrderedFunction(function)) {
 				Collections.sort(params, new ExprComparator());
+			}
+			if (nParams == 1) {
+				//return filterOperatorToString(function, bindToOp(argList.get(0)));
+				return filterOperatorToString(function, params.get(0));
 			}
 			return filterOperatorToString(function, params);
 		}
@@ -915,9 +901,6 @@ public class QueryBuilder {
 			List<Node> argList = args.toList();
 			int nParams = argList.size();
 			int i = 0;
-			if (nParams == 1) {
-				return aggregatorOperatorToExpr(n, distinct, filterToOp(argList.get(0)));
-			}
 			List<Expr> params = new ArrayList<>();
 			for (int k = 0; k < nParams; k++) {
 				params.add(null);
@@ -948,7 +931,18 @@ public class QueryBuilder {
 			if (!isOrderedFunction(function)) {
 				Collections.sort(params, new ExprComparator());
 			}
-			return aggregatorOperatorToExpr(n, distinct, params.get(0), params.get(1));
+			if (nParams == 0) {
+				return aggregatorOperatorToExpr(n, distinct, (Expr) null);
+			}
+			else if (nParams == 1) {
+				return aggregatorOperatorToExpr(n, distinct, filterToOp(argList.get(0)));
+			}
+			else if (nParams == 2) {
+				return aggregatorOperatorToExpr(n, distinct, params.get(0), params.get(1));
+			}
+			else if (nParams == 3) {
+				return aggregatorOperatorToExpr(n,distinct,params.get(0),params.get(1), params.get(2));
+			}
 		}
 		if (GraphUtil.listObjects(graph, n, valueNode).hasNext()) {
 			Node v = GraphUtil.listObjects(graph, n, valueNode).next();
@@ -982,9 +976,24 @@ public class QueryBuilder {
 
 	public Path propertyPathToOp(Node n) {
 		Path ans = null;
+		if (graph.contains(Triple.create(n,typeNode,NodeFactory.createURI(this.URI+"notOneOf")))) {
+			List<Node> predicates = GraphUtil.listObjects(graph,n,argNode).toList();
+			predicates.sort(new NodeComparator());
+			P_NegPropSet path = new P_NegPropSet();
+			for (Node p : predicates) {
+				if (p.isURI()) {
+					path.add((P_Path0) PathFactory.pathLink(p));
+				}
+				else {
+					String uri = p.toString().substring(p.toString().indexOf("^")+1).replaceAll("\"","");
+					path.add(new P_ReverseLink(NodeFactory.createURI(uri)));
+				}
+			}
+			return path;
+		}
 		List<Node> predicates = GraphUtil.listObjects(graph, n, preNode).toList();
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
-		Map<Pair<Node, Node>, Path> transitionTable = new HashMap<Pair<Node, Node>, Path>();
+		Map<Pair<Node, Node>, Path> transitionTable = new HashMap<>();
 		Graph dfa = ge.extract(n, graph);
 		boolean needStartState = false;
 		Node startState = n;
@@ -1019,7 +1028,23 @@ public class QueryBuilder {
 					String u = t.getPredicate().toString();
 					u = u.substring(2, u.length() - 1);
 					transitionTable.put(pair, PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(u))));
-				} else {
+				}
+				else if (t.getPredicate().toString().contains("negatedPropertySet")) {
+					String u = t.getPredicate().toString();
+					u = u.substring(u.lastIndexOf("negatedPropertySet") + 19);
+					String[] links = u.split("&#");
+					P_NegPropSet neg = new P_NegPropSet();
+					for (String link : links) {
+						if (link.startsWith("\"^")) {
+							neg.add((P_Path0) PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(link.substring(2)))));
+						}
+						else {
+							neg.add((P_Path0) PathFactory.pathLink(NodeFactory.createURI(link)));
+						}
+					}
+					transitionTable.put(pair,neg);
+				}
+				else {
 					transitionTable.put(pair, PathFactory.pathLink(t.getPredicate()));
 				}
 
@@ -1359,7 +1384,6 @@ public class QueryBuilder {
 			first = root;
 		}
 		op = nextOpByType(first);
-		System.out.println(op);
 		Query query = OpAsQuery.asQuery(op);
 		if (f.hasNext()){
 			ExtendedIterator<Node> URIs = GraphUtil.listObjects(graph, f.next(), argNode);
@@ -1395,7 +1419,6 @@ public class QueryBuilder {
 				}
 			}
 			query.setQueryConstructType();
-			ans = query.toString();
 /*			ans = ans.substring(ans.indexOf("WHERE"));
 			ans = "CONSTRUCT " + ans;*/
 		}
@@ -1403,27 +1426,25 @@ public class QueryBuilder {
 			ans = ans.substring(ans.indexOf("WHERE"));
 			ans = "DESCRIBE " + ans;
 		}
-		ans = newLabels(ans);
+		ans = newLabels(query);
 		return ans;
 	}
 	
-	public String newLabels(String q){
-		String ans = q;
-		HashSet<String> vars = new HashSet<String>();
-		Pattern pattern = Pattern.compile("\\?SK\\w+");
-		Matcher matcher = pattern.matcher(q);
-		while(matcher.find()){
-			vars.add(matcher.group(0));
+	public String newLabels(Query q){
+		Op op = Algebra.compile(q);
+		Set<Var> vars = Tools.varsContainedIn(op);
+		List<String> varLabels = new ArrayList<>();
+		for (Var v : vars) {
+			varLabels.add(v.getVarName());
 		}
-		List<String> newVars = new ArrayList<String>();
-		for (String var : vars){
-			newVars.add(var);
+		Collections.sort(varLabels);
+		Map<String,String> newLabels = new HashMap<>();
+		for (int i = 0; i < varLabels.size(); i++) {
+			newLabels.put(varLabels.get(i),"v"+i);
 		}
-		Collections.sort(newVars);
-		int i = 0;
-		for (String var : newVars){
-			ans = ans.replace(var, "?v"+i);
-			i++;
+		String ans = q.toString();
+		for (Map.Entry<String,String> entry : newLabels.entrySet()) {
+			ans = ans.replace(entry.getKey(), entry.getValue());
 		}
 		return ans;
 	}

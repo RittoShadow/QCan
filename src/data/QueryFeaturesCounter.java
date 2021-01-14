@@ -87,7 +87,19 @@ public class QueryFeaturesCounter {
 		Op op = Algebra.compile(q);
 		if (!q.getGraphURIs().isEmpty() || !q.getNamedGraphURIs().isEmpty()){
 			this.features.add("named");
-		}	
+		}
+		if (q.getQueryType() == Query.QueryTypeAsk) {
+			this.features.add("ask");
+		}
+		if (q.getQueryType() == Query.QueryTypeConstruct) {
+			this.features.add("construct");
+		}
+		if (q.getQueryType() == Query.QueryTypeDescribe) {
+			this.features.add("describe");
+		}
+		if (q.getQueryType() == Query.QueryTypeSelect) {
+			this.features.add("select");
+		}
 		FeatureCounter fc = new FeatureCounter(op);
 		OpWalker.walk(op, fc);
 		HashSet<String> features = fc.getFeatures();
@@ -205,7 +217,11 @@ public class QueryFeaturesCounter {
 	
 	public QueryFeaturesCounter(File f, boolean parse) throws IOException{
 		String s;
-		this.file = new File("resultFiles/features/result"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
+		String filename = f.getName();
+		if (filename.contains(".")) {
+			filename = filename.substring(0, filename.lastIndexOf("."));
+		}
+		this.file = new File("resultFiles/features/"+ filename + new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
 		if (!this.file.exists()){
 			this.file.createNewFile();
 		}
@@ -639,7 +655,7 @@ public class QueryFeaturesCounter {
 //			out.createNewFile();
 //		}
 //		in.add(inFile);
-		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("clean_linkedGeoQueries.txt"));
+		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("testFiles/utf8WikiDataQueries/utf8I7_status2xx_userData_Joined.tsv"));
 //		QueryFeaturesCounter.filterPaths(in, out);
 //		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("testFiles/wikiDataPaths"), false, true);
 //		QueryFeaturesCounter.pathFiles(new File("resultFiles/features/paths.paths/pathFeatures20200513_154057.log"));

@@ -1,4 +1,4 @@
-package main;
+package tests;
 
 import static org.junit.Assert.*;
 
@@ -16,21 +16,17 @@ public class Test {
 	@org.junit.Test
 	public void labelTest(){
 		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test01.txt"));
-			assertTrue(qp.equalQueries(0, 1));
-			qp = new QueryParserTest(new File("testFiles/test02.txt"));
-			assertTrue(qp.equalQueries(0, 1));
-			assertTrue(qp.equalQueries(1, 2));
-			qp = new QueryParserTest(new File("testFiles/test03.txt"));
-			assertTrue(qp.equalQueries(0, 1));
-			qp = new QueryParserTest(new File("testFiles/test04.txt"));
-			assertTrue(qp.equalQueries(0, 1));
-			qp = new QueryParserTest(new File("testFiles/test08.txt"));
-			assertTrue(qp.equalQueries(0, 1));
-			assertTrue(qp.equalQueries(1, 2));
-			assertTrue(qp.equalQueries(3, 4));
-			assertTrue(qp.equalQueries(5, 6));
-			assertTrue(qp.equalQueries(6, 7));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/labelTest.txt"));
+			assertTrue(qp.equalQueries(0,1));
+			assertTrue(qp.equalQueries(2,3));
+			assertTrue(qp.equalQueries(3,4));
+			assertTrue(qp.equalQueries(5,6));
+			assertTrue(qp.equalQueries(7,8));
+			assertTrue(qp.equalQueries(9,10));
+			assertTrue(qp.equalQueries(10,11));
+			assertTrue(qp.equalQueries(12,13));
+			assertTrue(qp.equalQueries(14,15));
+			assertTrue(qp.equalQueries(15,16));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -40,7 +36,7 @@ public class Test {
 	@org.junit.Test
 	public void unionTest(){
 		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test06.txt"));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/unionTest.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			assertTrue(qp.equalQueries(1, 2));
 			assertTrue(qp.equalQueries(3, 4));
@@ -54,20 +50,11 @@ public class Test {
 	@org.junit.Test
 	public void branchRelabelTest(){
 		try{
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test16.txt"));
-			assertTrue(qp.equalQueries(0, 1));
-			assertTrue(qp.equalQueries(1, 2));
-		} catch(IOException e){
-			e.printStackTrace();
-		}
-	}
-	
-	@org.junit.Test
-	public void branchRelabelTest2(){
-		try{
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test14.txt"));
-			assertTrue(qp.equalQueries(0, 1));
-			assertTrue(qp.equalQueries(2, 3));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/branchRelabelTest.txt"));
+			assertTrue(qp.equalQueries(0,1));
+			assertTrue(qp.equalQueries(1,2));
+			assertTrue(qp.equalQueries(3,4));
+			assertTrue(qp.equalQueries(5,6));
 		} catch(IOException e){
 			e.printStackTrace();
 		}
@@ -121,6 +108,11 @@ public class Test {
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/filterPushTest1.txt"));
 			assertFalse(qp.equalQueries(1,2));
 			assertFalse(qp.equalQueries(3,4));
+			qp = new QueryParserTest(new File("testFiles/filterPushTest.txt"));
+			assertTrue(qp.equalQueries(0,1));
+			assertFalse(qp.equalQueries(2,3));
+			assertFalse(qp.equalQueries(4,5));
+			assertTrue(qp.equalQueries(6,7));
 		}
 		catch (IOException e) {
 			e.printStackTrace();
@@ -130,7 +122,7 @@ public class Test {
 	@org.junit.Test
 	public void optionalTest(){
 		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test11.txt"));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/optionalTest.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			//assertTrue(qp.equalQueries(2, 3));
 			assertTrue(qp.equalQueries(4, 5));
@@ -159,13 +151,11 @@ public class Test {
 	@org.junit.Test
 	public void aggregationTest() {
 		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/aggregatesTest2.txt"));
-			assertFalse(qp.equalQueries(0,1));
-			assertFalse(qp.equalQueries(1,2));
-			assertTrue(qp.equalQueries(2,3));
-			qp = new QueryParserTest(new File("testFiles/aggregatesTest1.txt"));
-			qp = new QueryParserTest(new File("testFiles/aggregatesTest3.txt"));
-			assertFalse(qp.equalQueries(0,1));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/aggregationTest.txt"));
+			assertFalse(qp.equalQueries(3,4));
+			assertFalse(qp.equalQueries(4,5));
+			assertTrue(qp.equalQueries(5,6));
+			assertFalse(qp.equalQueries(7,8));
 		}
 		catch (IOException e) {
 			e.printStackTrace();

@@ -1,13 +1,8 @@
 package paths;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Stack;
+import java.util.*;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.GraphUtil;
@@ -36,13 +31,15 @@ import org.apache.jena.sparql.path.PathVisitor;
 import org.apache.jena.util.iterator.ExtendedIterator;
 
 public class PathWalker implements PathVisitor {
-	
+
+	final String URI = "http://example.org/";
 	Graph graph = GraphFactory.createPlainGraph();
 	Node epsilon = NodeFactory.createURI("http://example.org/epsilon");
-	Stack<Node> nodeStack = new Stack<Node>();
-	Stack<Triple> tripleStack = new Stack<Triple>();
-	Set<Node> predicates = new HashSet<Node>();
-	Map<Pair<Node,Node>, Set<Pair<Node,Integer>>> delta = new HashMap<Pair<Node,Node>, Set<Pair<Node,Integer>>>();
+	private final Node argNode = NodeFactory.createURI(this.URI+"arg");
+	Stack<Node> nodeStack = new Stack<>();
+	Stack<Triple> tripleStack = new Stack<>();
+	Set<Node> predicates = new HashSet<>();
+	Map<Pair<Node,Node>, Set<Pair<Node,Integer>>> delta = new HashMap<>();
 	
 	@Override
 	public void visit(P_Link arg0) {
@@ -70,10 +67,27 @@ public class PathWalker implements PathVisitor {
 	@Override
 	public void visit(P_NegPropSet arg0) {
 		List<P_Path0> list = arg0.getNodes();
-		
+		Node n = NodeFactory.createBlankNode();
+		Node b = NodeFactory.createBlankNode();
+		List<String> links = new ArrayList<>();
 		for (P_Path0 p : list ) {
-			p.visit(this);
+			if (p.isForward()) {
+				links.add(p.getNode().getURI());
+			} else {
+				links.add("^" + p.getNode().toString());
+			}
 		}
+		Collections.sort(links);
+		String link = "";
+		for (String l : links) {
+			link = link + l + "&#";
+		}
+		Node uri = NodeFactory.createURI("negatedPropertySet/" + link);
+		Triple t = Triple.create(n,uri,b);
+		tripleStack.add(t);
+		nodeStack.add(b);
+		graph.add(t);
+		predicates.add(uri);
 	}
 
 	@Override
@@ -229,4 +243,7 @@ public class PathWalker implements PathVisitor {
 		}
 	}
 
+	public Graph getGraph() {
+		return this.graph;
+	}
 }

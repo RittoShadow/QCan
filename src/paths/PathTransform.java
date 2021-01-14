@@ -13,23 +13,7 @@ import org.apache.jena.sparql.algebra.op.OpPath;
 import org.apache.jena.sparql.algebra.op.OpTriple;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
-import org.apache.jena.sparql.path.P_Alt;
-import org.apache.jena.sparql.path.P_Distinct;
-import org.apache.jena.sparql.path.P_FixedLength;
-import org.apache.jena.sparql.path.P_Inverse;
-import org.apache.jena.sparql.path.P_Link;
-import org.apache.jena.sparql.path.P_OneOrMore1;
-import org.apache.jena.sparql.path.P_OneOrMoreN;
-import org.apache.jena.sparql.path.P_Path0;
-import org.apache.jena.sparql.path.P_Path1;
-import org.apache.jena.sparql.path.P_Path2;
-import org.apache.jena.sparql.path.P_ReverseLink;
-import org.apache.jena.sparql.path.P_Seq;
-import org.apache.jena.sparql.path.P_ZeroOrMore1;
-import org.apache.jena.sparql.path.P_ZeroOrMoreN;
-import org.apache.jena.sparql.path.P_ZeroOrOne;
-import org.apache.jena.sparql.path.Path;
-import org.apache.jena.sparql.path.PathFactory;
+import org.apache.jena.sparql.path.*;
 import org.apache.jena.sparql.sse.SSE;
 
 public class PathTransform {
@@ -267,6 +251,9 @@ public class PathTransform {
 		Node o = tp.getObject();
 		Path p = visit(tp.getPath());
 		count(p);
+		if (tp.getPath() instanceof P_NegPropSet) {
+			return new OpPath(tp);
+		}
 		if (numberOfInverses < (totalNumberofPaths - numberOfInverses)) {
 			if (tp.getPath() instanceof P_Link) {
 				return new OpTriple(Triple.create(s, tp.getPredicate(), o));

@@ -1,8 +1,8 @@
 package transformers;
 
-import main.BGPCollapser;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
+import org.apache.jena.rdfxml.xmloutput.impl.Basic;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.TransformCopy;
@@ -10,6 +10,9 @@ import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.op.*;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
+import org.apache.jena.sparql.engine.main.OpExecutorFactory;
+import org.apache.jena.sparql.expr.Expr;
+import org.apache.jena.sparql.expr.ExprList;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -71,17 +74,20 @@ public class UCQTransformer extends TransformCopy{
         	BasicPattern bp = new BasicPattern();
         	bp.add(((OpTriple) left).getTriple());
         	bp.add(((OpTriple) right).getTriple());
-        	return new OpBGP(bp);
+        	Op ans = new OpBGP(bp);
+        	return ans;
         }
         else if ((left instanceof OpTriple) && (right instanceof OpBGP)) {
-        	BasicPattern bp = ((OpBGP) right).getPattern();
+        	BasicPattern bp = new BasicPattern();
+        	bp.addAll(((OpBGP) right).getPattern());
         	bp.add(((OpTriple) left).getTriple());
-        	return new OpBGP(bp);
+			return new OpBGP(bp);
         }
         else if ((right instanceof OpTriple) && (left instanceof OpBGP)) {
-        	BasicPattern bp = ((OpBGP) left).getPattern();
+			BasicPattern bp = new BasicPattern();
+        	bp.addAll((((OpBGP) left).getPattern()));
         	bp.add(((OpTriple) right).getTriple());
-        	return new OpBGP(bp);
+			return new OpBGP(bp);
         }
         else{
         	return OpJoin.create(left,right);
@@ -90,13 +96,38 @@ public class UCQTransformer extends TransformCopy{
 	
 	public Op transform(OpLeftJoin leftJoin, Op left, Op right) {
 		if ((left instanceof OpUnion)) { // Case: (A_1 UNION A_2) OPT A_3 = (A_1 OPT A_3) UNION (A_2 OPT A_3)
-			OpUnion ans = (OpUnion) OpUnion.create(OpLeftJoin.createLeftJoin(((OpUnion) left).getLeft(), right, null), OpLeftJoin.createLeftJoin(((OpUnion) left).getRight(), right, null));
+			List<Op> opsInUnion = opsInUnion(left);
+			List<Op> newOps = new ArrayList<>();
+			for (Op o : opsInUnion) {
+				newOps.add(OpLeftJoin.create(o,right, leftJoin.getExprs()));
+			}
+			Op ans = newOps.get(0);
+			for (int i = 1; i < newOps.size(); i++) {
+				ans = OpUnion.create(ans,newOps.get(i));
+			}
 			return ans;
 		}
 		else {
 			return OpLeftJoin.create(left,right,leftJoin.getExprs());
 		}
+	}
 
+	public Op transform(OpMinus minus, Op left, Op right) {
+		if (left instanceof OpUnion) {
+			List<Op> opsInUnion = opsInUnion(left);
+			List<Op> newOps = new ArrayList<>();
+			for (Op o : opsInUnion) {
+				newOps.add(OpMinus.create(o,right));
+			}
+			Op ans = newOps.get(0);
+			for (int i = 1; i < newOps.size(); i++) {
+				ans = OpUnion.create(ans,newOps.get(i));
+			}
+			return ans;
+		}
+		else {
+			return OpMinus.create(left, right);
+		}
 	}
 
 	public Op transform(OpUnion op, Op left, Op right) {
@@ -107,7 +138,7 @@ public class UCQTransformer extends TransformCopy{
 			return right;
 		}
 		else {
-			return op;
+			return OpUnion.create(left, right);
 		}
 	}
 	

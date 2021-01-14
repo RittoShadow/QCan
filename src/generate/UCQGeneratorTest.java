@@ -40,7 +40,7 @@ public class UCQGeneratorTest {
 		}
 		fw = new FileWriter(this.file, true);
 		bw = new BufferedWriter(fw);
-		bw.append("filename\tconjunctions\tunions\tgraph time\tcanon time\ttriples in\ttriples out\t");
+		bw.append("filename\tconjunctions\tunions\tgraph time\trewrite time\tleaning time\tcanon time\ttriples in\ttriples out\t");
 		bw.newLine();
 	}
 	
@@ -60,13 +60,14 @@ public class UCQGeneratorTest {
 			line += "\t"+conjunctions;
 			line += "\t"+unions;
 			generator.selectTriples(conjunctions, unions);
-			long t = System.nanoTime();
 			RGraph e = generator.generateGraph(conjunctions, unions);
-			line += "\t"+(System.nanoTime()-t);
-			t = System.nanoTime();
+			int triplesIn = e.getNumberOfTriples();
+			line += "\t"+generator.graphTime;
+			line += "\t"+generator.rewriteTime;
 			RGraph e1 = e.getCanonicalForm(false);
-			line += "\t"+(System.nanoTime()-t);
-			line += "\t"+e.getNumberOfTriples();
+			line += "\t"+e1.getMinimisationTime();
+			line += "\t"+e1.getLabelTime();
+			line += "\t"+triplesIn;
 			line += "\t"+e1.getNumberOfTriples();
 			bw.append(line);
 			bw.newLine();
@@ -75,14 +76,15 @@ public class UCQGeneratorTest {
 	}
 	
 	public void testAll(int a, int b) throws IOException, InterruptedException, HashCollisionException{
-		for (int x = 0; x < a; x++){
-			for (int y = 0; y < b; y++){
-				setup((int)Math.pow(2, x),(int)Math.pow(2, y));
+		for (int x = 1; x < a; x++){
+			for (int y = 1; y < b; y++){
+				setup(x,y);
 				try{
 					execute();
 				}
 				catch (StackOverflowError e) {
-					System.exit(-1);
+					System.err.println("Stopped at: c = "+a+" and u = "+b);
+					return;
 				}
 				catch(Exception e){
 					e.printStackTrace();

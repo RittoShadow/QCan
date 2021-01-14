@@ -18,7 +18,6 @@ import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpAsQuery;
-import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.algebra.op.OpBGP;
 import org.apache.jena.sparql.algebra.op.OpDistinct;
 import org.apache.jena.sparql.algebra.op.OpJoin;
@@ -28,7 +27,7 @@ import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
-import main.RGraphBuilder;
+import builder.RGraphBuilder;
 import main.RGraph;
 
 public class UCQGenerator {
@@ -40,6 +39,10 @@ public class UCQGenerator {
 	protected Random rng = new Random();
 	protected Node predicate;
 	protected List<Var> vars = new ArrayList<Var>();
+	public long graphTime;
+	public long rewriteTime;
+	public long leaningTime;
+	public long canonTime;
 	
 	public UCQGenerator(File f) throws FileNotFoundException{
 		br = new BufferedReader(new FileReader(f));
@@ -109,20 +112,22 @@ public class UCQGenerator {
 		op = new OpDistinct(op);
 		Query q = OpAsQuery.asQuery(op); 
 		RGraphBuilder visitor = new RGraphBuilder(q);
-		OpWalker.walk(op, visitor);       
 		RGraph ans = visitor.getResult();
-		
+		graphTime = visitor.graphTime;
+		rewriteTime = visitor.rewriteTime;
 		return ans;
 	}
 	
 	public static void main(String[] args) throws IOException, InterruptedException, HashCollisionException{
-		UCQGenerator g = new UCQGenerator(new File("eval/k/k-6"));
+		UCQGenerator g = new UCQGenerator(new File("eval/k/k-12"));
 		g.generateTriples();
-		RGraph e = g.generateGraph(4,2);
-		e.print();
+		RGraph e = g.generateGraph(1,8  );
+		System.out.println(e.graph.size());
+		System.out.println(e.getNumberOfTriples());
 		RGraph a = e.getCanonicalForm(false);
 		a.print();
-		System.out.println("");
+		System.out.println(e.getNumberOfTriples());
+		System.out.println(e.graph.size());
 	}
 
 }

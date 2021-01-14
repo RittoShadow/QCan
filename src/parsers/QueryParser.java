@@ -1,4 +1,4 @@
-package main;
+package parsers;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 
+import main.SingleQuery;
 import org.apache.jena.ext.com.google.common.collect.HashMultiset;
 import org.apache.jena.ext.com.google.common.collect.Multiset;
 import org.apache.jena.ext.com.google.common.collect.TreeMultiset;

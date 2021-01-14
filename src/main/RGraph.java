@@ -52,6 +52,7 @@ public class RGraph {
 	public Node root;
 	public boolean distinct = false;
 	public boolean leaning = true;
+	public boolean canonical = true;
 	public boolean containsPaths = false;
 	final String URI = "http://example.org/";
 	private long labelTime = 0;
@@ -120,6 +121,7 @@ public class RGraph {
 	private final UpdateRequest tripleRelabelRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/tripleRelabel.ru"));
 	private final UpdateRequest subgraphRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/subLabel.ru"));
 	private final UpdateRequest askRule = UpdateFactory.read(getClass().getResourceAsStream("/rules/branchLabel/ask.ru"));
+
 
 
 	/**
@@ -244,7 +246,12 @@ public class RGraph {
 			System.err.println("Something went wrong.");
 		}
 	}
-	
+
+	/**
+	 * @param s The subject of this path pattern.
+	 * @param o The object of this path pattern.
+	 * @param p The graph representation of this property path.
+	 */
 	public RGraph(Node s, Node o, PGraph p) {
 		Set<Var> vars = new HashSet<>();
 		Graph graph = GraphFactory.createPlainGraph();
@@ -286,7 +293,12 @@ public class RGraph {
 		this.vars = vars;
 		this.root = tp;
 	}
-	
+
+	/**
+	 * @param s The subject of this path pattern.
+	 * @param o The object of this path pattern.
+	 * @param p The property path of this path pattern.
+	 */
 	public RGraph(Node s, Node o, Path p) {
 		Set<Var> vars = new HashSet<>();
 		Graph graph = GraphFactory.createPlainGraph();
@@ -306,7 +318,10 @@ public class RGraph {
 		this.vars = vars;
 		this.root = tp;
 	}
-	
+
+	/**
+	 * @param table A table containing explicit values.
+	 */
 	public static RGraph table(Table table) {
 		Node tableRoot = NodeFactory.createBlankNode();
 		Graph graph = GraphFactory.createDefaultGraph();
@@ -330,7 +345,11 @@ public class RGraph {
 		}
 		return ans;
 	}
-	
+
+	/**
+	 * @param n A node that may be a literal or a variable.
+	 * @return A blank node if the input is a variable or a literal with the correct language or datatype otherwise.
+	 */
 	public Node getValidNode(Node n) {
 		if (n.isVariable()) {
 			Node ans = NodeFactory.createBlankNode(n.getName());
@@ -349,7 +368,11 @@ public class RGraph {
 			return n;
 		}
 	}
-	
+
+	/**
+	 * @param t A triple pattern.
+	 * @return A triple where all variable nodes have been replaced with blank nodes.
+	 */
 	public Triple getTripleWithVars(Triple t) {
 		Node s = t.getSubject();
 		if (s.isBlank()) {
@@ -819,10 +842,11 @@ public class RGraph {
 	}
 	
 	/**
-	 * @param op
-	 * @param var
-	 * @param arg
-	 * @return
+	 * @param op A name of the aggregate function.
+	 * @param distinct True if distinct.
+	 * @param var The variable to which the function is assigned.
+	 * @param arg A node pointing to a variable or expression.
+	 * @return A node pointing to this aggregate function.
 	 */
 	public Node aggregationFunction(String op, boolean distinct, Var var, Node arg) {
 		Node n = getAggregateNode(op,distinct,var);
@@ -907,6 +931,19 @@ public class RGraph {
 			graph.add(Triple.create(root, typeNode, projectNode));
 			graph.add(Triple.create(root, opNode, this.root));
 			this.root = root;
+		}
+		else {
+			List<Var> varList = new ArrayList<>();
+			ExtendedIterator<Node> varNodes = GraphUtil.listObjects(graph,root,argNode);
+			while (varNodes.hasNext()) {
+				varList.add(Var.alloc(varNodes.next().getBlankNodeLabel()));
+			}
+			if (!(varList.containsAll(vars) && vars.containsAll(varList))) {
+				Node root = NodeFactory.createBlankNode();
+				graph.add(Triple.create(root, typeNode, projectNode));
+				graph.add(Triple.create(root, opNode, this.root));
+				this.root = root;
+			}
 		}
 		if (this.vars != null) {
 			this.vars.addAll(vars);
@@ -1288,6 +1325,18 @@ public class RGraph {
 		GraphLeaningResult glResult = this.DFSLeaning(getTriples());
 		return new RGraph(glResult.getLeanData());
 	}
+
+	public RGraph canonicalLabel(boolean verbose) throws HashCollisionException, InterruptedException {
+		GraphLabellingResult glr = this.label(this.getTriples());
+		if (verbose){
+			System.out.println("Labelling results: \n");
+			System.out.println("Number of blank nodes: "+glr.getBnodeCount());
+			System.out.println("Number of colouring iterations: "+glr.getColourIterationCount());
+			System.out.println("Number of partitions found: "+glr.getPartitionCount());
+		}
+		RGraph ans = new RGraph(glr.getGraph());
+		return ans;
+	}
 	
 	/**
 	 * @param verbose A boolean that allows messages to appear during canonicalisation.
@@ -1343,20 +1392,16 @@ public class RGraph {
 				System.out.println("Beginning labelling");
 			}
 			t = System.nanoTime();
-			GraphLabellingResult glr = this.label(ans.getTriples());
-			long time2 = System.nanoTime() - t;			
-			if (verbose){
-				System.out.println("Labelling results: \n");
-				System.out.println("Number of blank nodes: "+glr.getBnodeCount());
-				System.out.println("Number of colouring iterations: "+glr.getColourIterationCount());
-				System.out.println("Number of partitions found: "+glr.getPartitionCount());
-			}
-			ans = new RGraph(glr.getGraph());
-			ans.setMinimisationTime(time1);
-			ans.setLabelTime(time2);
 			if (verbose){
 				ans.print();
 			}
+			if (canonical) {
+				long time = System.nanoTime();
+				ans = ans.canonicalLabel(verbose);
+				time = System.nanoTime() - time;
+				ans.setLabelTime(time);
+			}
+			ans.setMinimisationTime(time1);
 			return ans;
 		}
 		else{
@@ -1365,19 +1410,17 @@ public class RGraph {
 				Node var = vars.next();
 				graph.delete(Triple.create(var,typeNode,varNode));
 			}
-			long time = System.nanoTime();
-			GraphLabellingResult glr = this.label(this.getTriples());
-			time = System.nanoTime() - time;
-			if (verbose){
-				System.out.println("Labelling results: \n");
-				System.out.println("Number of blank nodes: "+glr.getBnodeCount());
-				System.out.println("Number of colouring iterations: "+glr.getColourIterationCount());
-				System.out.println("Number of partitions found: "+glr.getPartitionCount());
+			if (canonical) {
+				long time = System.nanoTime();
+				RGraph ans = canonicalLabel(verbose);
+				time = System.nanoTime() - time;
+				ans.setLabelTime(time);
+				return ans;
 			}
-			RGraph ans = new RGraph(glr.getGraph());
-			ans.setLabelTime(time);
-			return ans;
-		}	
+			else {
+				return this;
+			}
+		}
 	}
 
 	public RGraph ucqMinimisation() throws InterruptedException {
@@ -1454,7 +1497,6 @@ public class RGraph {
 						}
 						UpdateAction.execute(tripleRelabelRule,e.graph); // May not be necessary anymore.
 						UpdateAction.execute(branchRelabelRule,e.graph);
-//					UpdateAction.execute(branchCleanUpRule,e.graph);
 						e = e.getLeanForm();
 						RGraph eg = new RGraph(root,outer,this.vars);
 						Node eRoot = listSubjects(e.graph, typeNode, joinNode).next();
@@ -1502,7 +1544,6 @@ public class RGraph {
 			Graph orderByGraph = GraphFactory.createPlainGraph();
 			ExtendedIterator<Node> filters = GraphUtil.listObjects(inner, union, patternNode);
 			ExtendedIterator<Node> cQueries = GraphUtil.listObjects(inner, union, argNode);
-
 			boolean isUCQ = isUCQ(union);
 			if (!isUCQ) {
 				continue;
@@ -1543,8 +1584,7 @@ public class RGraph {
 						inner.add(Triple.create(var, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 					}
 				}
-				UpdateAction.execute(filterVarsRule,filterGraph);	
-				//printGraph(filterGraph);
+				UpdateAction.execute(filterVarsRule,filterGraph);
 				List<Node> filterVars = listSubjects(filterGraph, typeNode, varNode).toList();
 				for (Node f : filterVars){
 					filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
@@ -1586,7 +1626,6 @@ public class RGraph {
 					}
 					UpdateAction.execute(tripleRelabelRule,e.graph); // May not be necessary anymore.
 					UpdateAction.execute(branchRelabelRule,e.graph);
-//					UpdateAction.execute(branchCleanUpRule,e.graph);
 					RGraph a = e.getLeanForm();
 					result.add(a);
 				}
@@ -1676,7 +1715,6 @@ public class RGraph {
 				UpdateAction.execute(joinRule, eg.graph);
 				this.graph = eg.graph;
 				result = new ArrayList<>();
-//				return eg;
 			}
 		}
 		UpdateAction.execute(branchCleanUpRule,graph);

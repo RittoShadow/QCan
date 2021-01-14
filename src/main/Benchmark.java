@@ -1,7 +1,8 @@
 package main;
 
-import cl.uchile.dcc.blabel.label.GraphColouring;
 import org.apache.commons.cli.*;
+import parsers.JenaParser;
+import parsers.QueryParser;
 
 import java.io.File;
 import java.io.FileOutputStream;

@@ -4,17 +4,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
-import java.util.logging.Filter;
 
 import main.RGraph;
-import main.RGraphBuilder;
-import main.SingleQuery;
+import builder.RGraphBuilder;
 import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.sparql.algebra.Op;
-import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprAggregator;
@@ -33,8 +30,6 @@ import org.apache.jena.sparql.expr.aggregate.*;
 import org.apache.jena.sparql.graph.GraphFactory;
 import tools.Tools;
 
-//import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
-
 /**
  * A class based on Jena's ExprVisitor that creates an r-graph that represents a FILTER expression.
  * @author Jaime
@@ -42,12 +37,12 @@ import tools.Tools;
  */
 public class FilterVisitor implements ExprVisitor {
 	
-	private Stack<Node> nodeStack = new Stack<Node>();
+	private Stack<Node> nodeStack = new Stack<>();
 	private RGraph filterGraph;
 	private Var var;
 
 	public FilterVisitor(){
-		filterGraph = new RGraph(NodeFactory.createBlankNode(), GraphFactory.createPlainGraph(), Collections.<Var> emptyList());
+		filterGraph = new RGraph(NodeFactory.createBlankNode(), GraphFactory.createPlainGraph(), Collections.emptyList());
 	}
 
 	public FilterVisitor(Var var) {
@@ -57,7 +52,7 @@ public class FilterVisitor implements ExprVisitor {
 	
 	@Override
 	public void visit(ExprFunction0 func) {
-		nodeStack.add(filterGraph.filterFunction(NodeFactory.createLiteral(func.getFunctionSymbol().getSymbol()), Collections.<Node>emptyList()));
+		nodeStack.add(filterGraph.filterFunction(NodeFactory.createLiteral(func.getFunctionSymbol().getSymbol()), Collections.emptyList()));
 	}
 
 	@Override
@@ -103,7 +98,7 @@ public class FilterVisitor implements ExprVisitor {
 		Node arg3 = nodeStack.pop();
 		Node arg2 = nodeStack.pop();
 		Node arg1 = nodeStack.pop();
-		List<Node> args = new ArrayList<Node>();
+		List<Node> args = new ArrayList<>();
 		args.add(arg1);
 		args.add(arg2);
 		args.add(arg3);
@@ -112,7 +107,7 @@ public class FilterVisitor implements ExprVisitor {
 
 	@Override
 	public void visit(ExprFunctionN func) {
-		List<Node> nodes = new ArrayList<Node>();
+		List<Node> nodes = new ArrayList<>();
 		for (int i = 0; i < func.getArgs().size(); i++) {
 			nodes.add(nodeStack.pop());
 		}
@@ -128,18 +123,10 @@ public class FilterVisitor implements ExprVisitor {
 	@Override
 	public void visit(ExprFunctionOp funcOp) {
 		Op op = Tools.UCQTransformation(funcOp.getGraphPattern());
-		RGraphBuilder rb = new RGraphBuilder();
-		OpWalker.walk(op, rb);
-//		try {
-			RGraph r = rb.getResult();
-			//RGraph r1 = r.getCanonicalForm(false);
-			GraphUtil.addInto(filterGraph.graph, r.graph);
-			nodeStack.add(filterGraph.filterFunction(funcOp.getFunctionSymbol().getSymbol(),r.root));
-//		} catch (InterruptedException e) {
-//			e.printStackTrace();
-//		} catch (HashCollisionException e) {
-//			e.printStackTrace();
-//		}
+		RGraphBuilder rb = new RGraphBuilder(op);
+		RGraph r = rb.getResult();
+		GraphUtil.addInto(filterGraph.graph, r.graph);
+		nodeStack.add(filterGraph.filterFunction(funcOp.getFunctionSymbol().getSymbol(),r.root));
 	}
 
 	@Override

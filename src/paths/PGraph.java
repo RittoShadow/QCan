@@ -32,14 +32,7 @@ import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.graph.GraphFactory;
-import org.apache.jena.sparql.path.P_Alt;
-import org.apache.jena.sparql.path.P_Path0;
-import org.apache.jena.sparql.path.P_Path1;
-import org.apache.jena.sparql.path.P_Path2;
-import org.apache.jena.sparql.path.P_Seq;
-import org.apache.jena.sparql.path.P_ZeroOrMore1;
-import org.apache.jena.sparql.path.Path;
-import org.apache.jena.sparql.path.PathFactory;
+import org.apache.jena.sparql.path.*;
 import org.apache.jena.sparql.sse.SSE;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import org.semanticweb.yars.nx.NodeComparator;
@@ -74,17 +67,7 @@ public class PGraph {
 	private final Node argNode = NodeFactory.createURI(this.URI+"arg");
 	
 	public PGraph(TriplePath tp) {
-		PathWalker pw = new PathWalker();
-		tp.getPath().visit(pw);
-		this.nfa = pw.graph;
-		this.startState = pw.getStartState();
-		this.endState = pw.getEndState();
-		this.predicates = pw.predicates;
-		this.newStartState = NodeFactory.createBlankNode();		
-		determineEClosures();
-		powerset(eClosures.get(startState));
-		minimisation();
-		complement();
+		this(tp.getPath());
 	}
 	
 	public PGraph(String path) {
@@ -558,7 +541,15 @@ public class PGraph {
 	}
 	
 	public Node getStartState() {
-		return this.newStartState;
+		if (this.newStartState != null) {
+			return this.newStartState;
+		}
+		else if (this.startState != null) {
+			return this.startState;
+		}
+		else{
+			return null;
+		}
 	}
 	
 	public Set<Node> getEndStates() {
@@ -573,7 +564,7 @@ public class PGraph {
 		Path ans = null;
 		List<Node> predicates = GraphUtil.listObjects(graph, n, preNode).toList();
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
-		Map<Pair<Node,Node>,Path> transitionTable = new HashMap<Pair<Node,Node>,Path>();
+		Map<Pair<Node,Node>,Path> transitionTable = new HashMap<>();
 		Graph dfa = ge.extract(n, graph);
 		Node startState = n;
 		Node newFinalState = null;
@@ -594,12 +585,12 @@ public class PGraph {
 		while (transitions.hasNext()) {
 			Triple t = transitions.next();
 			if (!t.getPredicate().equals(typeNode)) {
-				Pair<Node,Node> pair = new Pair<Node,Node>(t.getSubject(),t.getObject());
+				Pair<Node,Node> pair = new Pair<>(t.getSubject(),t.getObject());
 				List<Node> transitionList = GraphUtil.listPredicates(dfa, pair.getLeft(), pair.getRight()).toList();
 				if (!transitionTable.containsKey(pair)) {
 					if (transitionList.size() > 1) {
 						Path newPath = null;
-						List<String> pathList = new ArrayList<String>();
+						List<String> pathList = new ArrayList<>();
 						for (Node path : transitionList) {
 							pathList.add(path.toString());
 						}
@@ -637,7 +628,7 @@ public class PGraph {
 				}
 			}
 			if (t.getPredicate().equals(epsilon)) {
-				Pair<Node,Node> pair = new Pair<Node,Node>(t.getSubject(),t.getObject());
+				Pair<Node,Node> pair = new Pair<>(t.getSubject(),t.getObject());
 				transitionTable.put(pair, PathFactory.pathLink(epsilon));
 			}
 		}
@@ -646,7 +637,7 @@ public class PGraph {
 //			Path p = dfaToPath(startState, newFinalState, transitionTable, nodeList);
 //			possiblePaths.add(p);
 //		}
-		Set<Node> tempNodes = new HashSet<Node>();
+		Set<Node> tempNodes = new HashSet<>();
 		for (Node tempN : states) {
 			tempNodes.add(tempN);
 		}
@@ -955,14 +946,14 @@ public class PGraph {
 	}
 	
 	public static void main(String[] args) {
-		Path path = SSE.parsePath("(alt <http://xmlns.com/foaf/0.1/a> (seq (path* <http://xmlns.com/foaf/0.1/b>) <http://xmlns.com/foaf/0.1/b>))");
-		Path path2 = SSE.parsePath("(alt <http://xmlns.com/foaf/0.1/a> (path* <http://xmlns.com/foaf/0.1/b>))");
-		path2 = SSE.parsePath("(path? <http://xmlns.com/foaf/0.1/b>)");
+		Path path = SSE.parsePath("(path* (seq (path* <http://xmlns.com/foaf/0.1/b>) (path* <http://xmlns.com/foaf/0.1/b>)) )");
+		path = new P_NegPropSet();
+		((P_NegPropSet) path).add(new P_Link(NodeFactory.createURI("p")));
+		((P_NegPropSet) path).add(new P_Link(NodeFactory.createURI("q")));
+		((P_NegPropSet) path).add(new P_ReverseLink(NodeFactory.createURI("<http://xmlns.com/foaf/0.1/b>")));
 		PathTransform pt = new PathTransform();
 		path = pt.visit(path);
 		PGraph pg1 = new PGraph(path);
-		PGraph pg2 = new PGraph(path2);
-		pg2.printMinimalDFA();
-		System.out.println(pg2.getNormalisedPath());
+		pg1.printDFA();
 	}
 }

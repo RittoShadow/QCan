@@ -1,4 +1,4 @@
-package main;
+package transformers;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -65,11 +65,11 @@ import visitors.TopDownVisitor;
 @SuppressWarnings("unused")
 public class BGPCollapser extends TransformCopy {
 	List<Var> projectedVars;
-	Set<Node> namedVars = new HashSet<Node>();
+	Set<Node> namedVars = new HashSet<>();
 	Op op;
-	List<Pair<Node,Node>> edges = new ArrayList<Pair<Node,Node>>();
-	List<Pair<Node,Node>> multiEdges = new ArrayList<Pair<Node,Node>>();
-	List<Pair<Pair<Node,Node>,Path>> pathEdges = new ArrayList<Pair<Pair<Node,Node>,Path>>();
+	List<Pair<Node,Node>> edges = new ArrayList<>();
+	List<Pair<Node,Node>> multiEdges = new ArrayList<>();
+	List<Pair<Pair<Node,Node>,Path>> pathEdges = new ArrayList<>();
 	BiMap<Var,Node> varMap = HashBiMap.create();
 	boolean sequenceMode = true;
 	boolean setSemantics = false;

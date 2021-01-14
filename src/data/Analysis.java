@@ -674,9 +674,8 @@ public class Analysis {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_SWDF_dist20201020_213603.log");
-		Analysis a2 = new Analysis("resultFiles/rewrite/rewrite_label_SWDF_dist20201020_163615.log");
-		a.compareWith(a2);
+		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_projection_results20201103_150227.log");
+		a.displayInfo();
 	}
 
 }

@@ -3,6 +3,8 @@ package main;
 import java.util.HashSet;
 import java.util.Set;
 
+import builder.QueryBuilder;
+import builder.RGraphBuilder;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
@@ -15,6 +17,7 @@ import org.apache.jena.sparql.core.Var;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 import data.FeatureCounter;
+import tools.BGPSort;
 
 /**
  * A class that takes a query as an input, performs a canonicalisation and measures how long it takes.
@@ -64,7 +67,7 @@ public class SingleQuery {
 		long t = System.nanoTime();
 		parseQuery(q,true);
 		graphTime = System.nanoTime() - t;
-		if (canon){
+		if (canon || leaning){
 			canonicalise(verbose);
 		}
 		else{
@@ -79,7 +82,8 @@ public class SingleQuery {
 		long t = System.nanoTime();
 		parseQuery(q,rewrite);
 		graphTime = System.nanoTime() - t;
-		if (canon){
+		this.graph.canonical = canon;
+		if (canon || minimise){
 			canonicalise(verbose);
 		}
 		else{
@@ -101,7 +105,7 @@ public class SingleQuery {
 		Op op2 = Transformer.transform(bgps, op);
 		for (int i = 0; i < bgps.ucqVars.size(); i++){
 			for (int j = i + 1; j < bgps.ucqVars.size(); j++){
-				if (!bgps.ucqVars.get(i).equals(bgps.ucqVars.get(j))){
+				if (bgps.ucqVars.get(i).equals(bgps.ucqVars.get(j))){
 					return true;
 				}
 			}
@@ -213,6 +217,7 @@ public class SingleQuery {
 	}
 	
 	public String getQuery(){
+		canonGraph.print();
 		QueryBuilder qb = new QueryBuilder(this.canonGraph);
 		this.canonVars = qb.getVars();
 		return qb.getQuery();
@@ -263,7 +268,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>                           PREFIX foaf: <http://xmlns.com/foaf/0.1/>                                      PREFIX ical: <http://www.w3.org/2002/12/cal/ical#>                             PREFIX icaltzid: <http://www.w3.org/2002/12/cal/icaltzid#>                             PREFIX owl:  <http://www.w3.org/2002/07/owl#>                                  PREFIX swc:  <http://data.semanticweb.org/ns/swc/ontology#> SELECT DISTINCT ?name ?homepage ?type ?page ?sameAs ?seeAlso ?graph ?logo      WHERE {                                                                        \t<http://data.semanticweb.org/workshop/wop/2009> rdfs:label ?name . \t{ <http://data.semanticweb.org/workshop/wop/2009> icaltzid:url ?homepage } UNION  \t    { <http://data.semanticweb.org/workshop/wop/2009> ical:url ?homepage } UNION  \t    { <http://data.semanticweb.org/workshop/wop/2009> foaf:homepage ?homepage } \t<http://data.semanticweb.org/workshop/wop/2009> a ?type .                    \tOPTIONAL { <http://data.semanticweb.org/workshop/wop/2009> swc:completeGraph ?graph .  }                                               \tOPTIONAL { {<http://data.semanticweb.org/workshop/wop/2009> swc:hasLogo ?logo} UNION {<http://data.semanticweb.org/workshop/wop/2009> foaf:logo ?logo}  }                                               \tOPTIONAL { <http://data.semanticweb.org/workshop/wop/2009> foaf:page ?page .\t}                                               \tOPTIONAL { <http://data.semanticweb.org/workshop/wop/2009> owl:sameAs ?sameAs . }                                               \tOPTIONAL { <http://data.semanticweb.org/workshop/wop/2009> rdfs:seeAlso ?seeAlso . } }";
+		String q = "SELECT( COUNT ( ?var1  ) AS  ?var2  )(  SUM ( IF (  ?var3 ,\"1\"^^<http://www.w3.org/2001/XMLSchema#integer> ,\"0\"^^<http://www.w3.org/2001/XMLSchema#integer>  )  ) AS  ?var4  ) WHERE {  SELECT DISTINCT ?var1  ?var1Label  ?var3  ?var5  ?var6  ?var7   WHERE  {    ?var1  <http://www.wikidata.org/prop/direct/P4963>  ?var8 .   OPTIONAL {    ?var9  <http://www.wikidata.org/prop/direct/P138>  ?var1 .    ?var1  <http://www.wikidata.org/prop/direct/P31>  <http://www.wikidata.org/entity/Q5> .   }   OPTIONAL {    BIND (   True  AS  ?var3 ).    ?var1  <http://www.wikidata.org/prop/direct/P3217>  ?var10 .   }   OPTIONAL {    BIND (   True  AS  ?var6 ).    ?var1  <http://www.wikidata.org/prop/direct/P214>  ?var11 .   }   OPTIONAL {    BIND (   True  AS  ?var5 ).    ?var1  <http://www.wikidata.org/prop/direct/P906>  ?var12 .   }   {     BIND (    True  AS  ?var7 ).     ?var1  <http://www.wikidata.org/prop/direct/P2538>  ?var13 .   }   SERVICE  <http://wikiba.se/ontology#label>    {      <http://www.bigdata.com/rdf#serviceParam>  <http://wikiba.se/ontology#language>  \"sv,en\".    }  } }";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,true);
 		System.out.println(sq.getQuery());
 		System.out.println(sq.graphTime/Math.pow(10, 9));
