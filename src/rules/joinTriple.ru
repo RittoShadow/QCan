@@ -6,9 +6,10 @@ DELETE { ?w ex:arg ?b .
 INSERT{	?y ?o ?b }
 
 WHERE
-  { 
-  	?w ex:type ex:join .
-  	?w ex:arg ?b .
+  {
+        ?w ex:type ex:join .
+        ?w ex:arg ?b .
+        FILTER NOT EXISTS
   	{
 	SELECT (COUNT(?x) AS ?t)
 	WHERE{
@@ -17,6 +18,4 @@ WHERE
 		}
 	}
   	FILTER(?t = 1)
-  	?y ?o ?w .
-  	FILTER(?o = ex:arg || ?o = ex:OP)
   } 

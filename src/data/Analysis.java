@@ -9,8 +9,6 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import com.google.common.primitives.Doubles;
-import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
-import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 
 import org.apache.jena.atlas.lib.Pair;
 
@@ -49,7 +47,7 @@ public class Analysis {
 	public void read() throws IOException{
 		String line;
 		for (int i = 0; i < 8; i++){
-			data.add(i, new ArrayList<Double>());
+			data.add(i, new ArrayList<>());
 			average.add(i, 0.0);
 			median.add(i,0.0);
 			MAX.add(i,0.0);
@@ -175,8 +173,11 @@ public class Analysis {
 			}
 		}	
 		for (int i = 0; i < average.size(); i++){
-			double d = average.get(i)/data.get(i).size() ;
-			average.set(i, d);
+			int n = data.get(i).size();
+			if (n > 0) {
+				double d = average.get(i)/data.get(i).size();
+				average.set(i, d);
+			}
 		}
 	}
 	
@@ -202,40 +203,37 @@ public class Analysis {
 	public void getMedian(){
 		for (int i = 0; i < data.size(); i++){
 			int n = data.get(i).size();
-			double median;
-			if (n % 2 == 0){
-				median = (data.get(i).get(n/2-1) + data.get(i).get(n/2))/2;
+			if (n > 0) {
+				double median;
+				if (n % 2 == 0){
+					median = (data.get(i).get(n/2-1) + data.get(i).get(n/2))/2;
+				}
+				else{
+					median = data.get(i).get(n/2);
+				}
+				this.median.set(i, median);
+				this.q25.set(i, data.get(i).get(n/4));
+				this.q75.set(i,data.get(i).get(3*n/4));
 			}
-			else{
-				median = data.get(i).get(n/2);
-			}
-			this.median.set(i, median);
-			this.q25.set(i, data.get(i).get(n/4));
-			this.q75.set(i,data.get(i).get(3*n/4));
 		}
 	}
 	
 	public void getMax(){
 		for (int i = 0; i < data.size(); i++){
-			double max = data.get(i).get(0);
-			for (double d : data.get(i)){
-				if (d > max){
-					max = d;
-				}
+			int n = data.get(i).size();
+			if (n > 0) {
+				double max = data.get(i).get(n-1);
+				MAX.set(i, max);
 			}
-			MAX.set(i, max);
 		}
 	}
 	
 	public void getMin(){
 		for (int i = 0; i < data.size(); i++){
-			double min = data.get(i).get(0);
-			for (double d : data.get(i)){
-				if (d < min){
-					min = d;
-				}
+			if (data.get(i).size() > 0) {
+				double min = data.get(i).get(0);
+				MIN.set(i, min);
 			}
-			MIN.set(i, min);
 		}
 	}
 	
@@ -276,6 +274,7 @@ public class Analysis {
 		System.out.println("MINUS: "+minus);
 		System.out.println("Paths: "+paths);
 		System.out.println("VALUES: "+values);
+		System.out.println("Total: "+data.get(0).size());
 	}
 	
 	public void shortDisplayInfo() throws IOException{
@@ -460,9 +459,9 @@ public class Analysis {
 				}
 			}
 		}
-		List<Pair<List<Boolean>,Double>> entrySet = new ArrayList<Pair<List<Boolean>,Double>>();
+		List<Pair<List<Boolean>,Double>> entrySet = new ArrayList<>();
 		for (Entry<List<Boolean>, Double> entry : map.entrySet()) {
-			Pair<List<Boolean>,Double> e = new Pair<List<Boolean>,Double>(entry.getKey(), entry.getValue()/nMap.get(entry.getKey()));
+			Pair<List<Boolean>,Double> e = new Pair<>(entry.getKey(), entry.getValue()/nMap.get(entry.getKey()));
 			entrySet.add(e);
 		}
 			Collections.sort(entrySet, new Comparator<Pair<List<Boolean>,Double>>() {
@@ -667,10 +666,6 @@ public class Analysis {
 		}
 		double[] xPoints = Doubles.toArray(points.keySet());
 		double[] yPoints = Doubles.toArray(points.values());
-		SplineInterpolator si = new SplineInterpolator();
-		PolynomialSplineFunction psf = si.interpolate(xPoints,yPoints);
-		System.out.println(psf.getPolynomials()[psf.getN() - 1]);
-		System.out.println(psf.getKnots());
 	}
 	
 	public static void main(String[] args) throws IOException{

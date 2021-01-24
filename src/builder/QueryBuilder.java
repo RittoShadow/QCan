@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.BiMap;
 import main.RGraph;
 import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -40,50 +41,58 @@ import transformers.NotOneOfTransform;
  */
 public class QueryBuilder {
 	final String URI = "http://example.org/";
-	private final Node typeNode = NodeFactory.createURI(this.URI + "type");
-	private final Node tpNode = NodeFactory.createURI(this.URI + "TP");
-	private final Node argNode = NodeFactory.createURI(this.URI + "arg");
-	private final Node subNode = NodeFactory.createURI(this.URI + "subject");
-	private final Node preNode = NodeFactory.createURI(this.URI + "predicate");
-	private final Node objNode = NodeFactory.createURI(this.URI + "object");
-	private final Node joinNode = NodeFactory.createURI(this.URI + "join");
-	private final Node unionNode = NodeFactory.createURI(this.URI + "union");
-	private final Node projectNode = NodeFactory.createURI(this.URI + "projection");
-	private final Node askNode = NodeFactory.createURI(this.URI + "ask");
-	private final Node constructNode = NodeFactory.createURI(this.URI + "construct");
-	private final Node describeNode = NodeFactory.createURI(this.URI + "describe");
-	private final Node opNode = NodeFactory.createURI(this.URI + "OP");
-	private final Node limitNode = NodeFactory.createURI(this.URI + "limit");
-	private final Node offsetNode = NodeFactory.createURI(this.URI + "offset");
-	private final Node orderByNode = NodeFactory.createURI(this.URI + "orderBy");
-	private final Node modNode = NodeFactory.createURI(this.URI + "modifier");
-	private final Node varNode = NodeFactory.createURI(this.URI + "var");
-	private final Node orderNode = NodeFactory.createURI(this.URI + "order");
-	private final Node valueNode = NodeFactory.createURI(this.URI + "value");
-	private final Node dirNode = NodeFactory.createURI(this.URI + "direction");
-	private final Node patternNode = NodeFactory.createURI(this.URI + "pattern");
-	private final Node filterNode = NodeFactory.createURI(this.URI + "filter");
-	private final Node functionNode = NodeFactory.createURI(this.URI + "function");
-	private final Node andNode = NodeFactory.createURI(this.URI + "and");
-	private final Node orNode = NodeFactory.createURI(this.URI + "or");
-	private final Node notNode = NodeFactory.createURI(this.URI + "not");
-	private final Node optionalNode = NodeFactory.createURI(this.URI + "optional");
-	private final Node leftNode = NodeFactory.createURI(this.URI + "left");
-	private final Node rightNode = NodeFactory.createURI(this.URI + "right");
-	private final Node fromNode = NodeFactory.createURI(this.URI + "from");
-	private final Node fromNamedNode = NodeFactory.createURI(this.URI + "fromNamed");
-	private final Node graphNode = NodeFactory.createURI(this.URI + "graph");
-	private final Node distinctNode = NodeFactory.createURI(this.URI + "distinct");
-	private final Node reducedNode = NodeFactory.createURI(this.URI + "reduced");
-	private final Node bindNode = NodeFactory.createURI(this.URI + "bind");
-	private final Node tableNode = NodeFactory.createURI(this.URI + "table");
-	private final Node groupByNode = NodeFactory.createURI(this.URI + "group");
-	private final Node minusNode = NodeFactory.createURI(this.URI + "minus");
+	public Map<Node,Node> varMap = new HashMap<>();
+	public Map<String,String> finalVarMap = new HashMap<>();
+	public final Node typeNode = NodeFactory.createURI(this.URI+"type");
+	private final Node tpNode = NodeFactory.createURI(this.URI+"TP");
+	private final Node argNode = NodeFactory.createURI(this.URI+"arg");
+	private final Node subjectNode = NodeFactory.createURI(this.URI+"subject");
+	private final Node preNode = NodeFactory.createURI(this.URI+"predicate");
+	private final Node objNode = NodeFactory.createURI(this.URI+"object");
+	private final Node joinNode = NodeFactory.createURI(this.URI+"join");
+	private final Node unionNode = NodeFactory.createURI(this.URI+"union");
+	private final Node projectNode = NodeFactory.createURI(this.URI+"projection");
+	private final Node askNode = NodeFactory.createURI(this.URI+"ask");
+	private final Node constructNode = NodeFactory.createURI(this.URI+"construct");
+	private final Node describeNode = NodeFactory.createURI(this.URI+"describe");
+	private final Node opNode = NodeFactory.createURI(this.URI+"OP");
+	private final Node subNode = NodeFactory.createURI(this.URI+"subOp");
+	private final Node limitNode = NodeFactory.createURI(this.URI+"limit");
+	private final Node offsetNode = NodeFactory.createURI(this.URI+"offset");
+	private final Node orderByNode = NodeFactory.createURI(this.URI+"orderBy");
+	public final Node varNode = NodeFactory.createURI(this.URI+"var");
+	private final Node orderNode = NodeFactory.createURI(this.URI+"order");
+	private final Node valueNode = NodeFactory.createURI(this.URI+"value");
+	private final Node dirNode = NodeFactory.createURI(this.URI+"direction");
+	private final Node patternNode = NodeFactory.createURI(this.URI+"pattern");
+	private final Node modNode = NodeFactory.createURI(this.URI+"modifier");
+	private final Node filterNode = NodeFactory.createURI(this.URI+"filter");
+	private final Node functionNode = NodeFactory.createURI(this.URI+"function");
+	private final Node andNode = NodeFactory.createURI(this.URI+"and");
+	private final Node orNode = NodeFactory.createURI(this.URI+"or");
+	private final Node notNode = NodeFactory.createURI(this.URI+"not");
+	private final Node optionalNode = NodeFactory.createURI(this.URI+"optional");
+	private final Node leftNode = NodeFactory.createURI(this.URI+"left");
+	private final Node rightNode = NodeFactory.createURI(this.URI+"right");
+	private final Node fromNode = NodeFactory.createURI(this.URI+"from");
+	private final Node fromNamedNode = NodeFactory.createURI(this.URI+"fromNamed");
+	private final Node graphNode = NodeFactory.createURI(this.URI+"graph");
+	private final Node distinctNode = NodeFactory.createURI(this.URI+"distinct");
+	private final Node reducedNode = NodeFactory.createURI(this.URI+"reduced");
+	private final Node tempNode = NodeFactory.createURI(this.URI+"temp");
+	private final Node extendNode = NodeFactory.createURI(this.URI+"extend");
+	private final Node bindNode = NodeFactory.createURI(this.URI+"binding");
+	private final Node tableNode = NodeFactory.createURI(this.URI+"table");
+	private final Node groupByNode = NodeFactory.createURI(this.URI+"group");
+	private final Node aggregateNode = NodeFactory.createURI(this.URI+"aggregate");
+	private final Node minusNode = NodeFactory.createURI(this.URI+"minus");
+	private final Node extraNode = NodeFactory.createURI(this.URI+"extra");
+	private final Node triplePathNode = NodeFactory.createURI(this.URI+"triplePath");
+	private final Node serviceNode = NodeFactory.createURI(this.URI+"service");
+	private final Node silentNode = NodeFactory.createURI(this.URI+"silent");
+	private final Node idNode = NodeFactory.createURI(this.URI+"id");
 	private final Node epsilon = NodeFactory.createURI(this.URI + "epsilon");
 	private final Node finalNode = NodeFactory.createURI(this.URI + "final");
-	private final Node triplePathNode = NodeFactory.createURI(this.URI + "triplePath");
-	private final Node serviceNode = NodeFactory.createURI(this.URI + "service");
-	private final Node silentNode = NodeFactory.createURI(this.URI + "silent");
 	private final Graph graph;
 	private final Node root;
 	private Op op;
@@ -92,6 +101,7 @@ public class QueryBuilder {
 	public QueryBuilder(RGraph e) {
 		this.graph = e.graph;
 		this.root = e.root;
+		this.varMap = e.varMap;
 	}
 
 	public Expr filterOperatorToString(Node n, Expr... exprs) {
@@ -250,7 +260,7 @@ public class QueryBuilder {
 					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
-					if (exprs[0] == null) {
+					if (exprs[0] == NodeValue.makeString("*")) {
 						return new ExprAggregator(var, AggregatorFactory.createCount(false));
 					}
 					else{
@@ -339,45 +349,44 @@ public class QueryBuilder {
 		}
 	}
 
-	public Expr aggregatorOperatorToExpr(Node v, boolean distinct, Expr... exprs) {
+	public Expr aggregatorOperatorToExpr(Node v, boolean distinct, List<Expr> exprs) {
 		Node function = GraphUtil.listObjects(graph,v,functionNode).next();
 		if (function.isURI()) {
-			List<Expr> exprs1 = Arrays.asList(exprs);
-			return new E_Function(function.getURI(), new ExprList(exprs1));
+			return new E_Function(function.getURI(), new ExprList(exprs));
 		}
 		String f = (String) function.getLiteralValue();
 		if (f.equals("MAX")) {
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
-			return new ExprAggregator(var, AggregatorFactory.createMax(distinct, exprs[0]));
+			return new ExprAggregator(var, AggregatorFactory.createMax(distinct, exprs.get(0)));
 		} else if (f.equals("MIN")) {
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
-			return new ExprAggregator(var, AggregatorFactory.createMin(distinct, exprs[0]));
+			return new ExprAggregator(var, AggregatorFactory.createMin(distinct, exprs.get(0)));
 		} else if (f.equals("AVG")) {
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
-			return new ExprAggregator(var, AggregatorFactory.createAvg(distinct, exprs[0]));
+			return new ExprAggregator(var, AggregatorFactory.createAvg(distinct, exprs.get(0)));
 		} else if (f.equals("COUNT")) {
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
-			if (exprs[0] == null) {
+			if (exprs.size() == 0 || exprs.get(0) == null) {
 				return new ExprAggregator(var, AggregatorFactory.createCount(distinct));
 			} else {
-				return new ExprAggregator(var, AggregatorFactory.createCountExpr(distinct, exprs[0]));
+				return new ExprAggregator(var, AggregatorFactory.createCountExpr(distinct, exprs.get(0)));
 			}
 		} else if (f.equals("SUM")) {
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
-			return new ExprAggregator(var, AggregatorFactory.createSum(distinct, exprs[0]));
+			return new ExprAggregator(var, AggregatorFactory.createSum(distinct, exprs.get(0)));
 		} else if (f.equals("SAMPLE")) {
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
-			return new ExprAggregator(var, AggregatorFactory.createSample(distinct, exprs[0]));
+			return new ExprAggregator(var, AggregatorFactory.createSample(distinct, exprs.get(0)));
 		} else if (f.equals("GROUP_CONCAT")) {
 			Var var = Var.alloc(v.getBlankNodeLabel());
 			vars.add(var);
-			return new ExprAggregator(var, AggregatorFactory.createGroupConcat(distinct, exprs[0], f, null));
+			return new ExprAggregator(var, AggregatorFactory.createGroupConcat(distinct, exprs.get(0), f, null));
 		}
 		else {
 			return filterOperatorToString(function,exprs);
@@ -388,6 +397,9 @@ public class QueryBuilder {
 	public Expr filterOperatorToString(Node n, List<Expr> expr) {
 		if (!isOrderedFunction(n)) {
 			Collections.sort(expr, new ExprComparator());
+		}
+		if (expr.size() == 0 ) {
+			return filterOperatorToString(n);
 		}
 		if (expr.size() == 1) {
 			return filterOperatorToString(n, expr.get(0));
@@ -555,62 +567,60 @@ public class QueryBuilder {
 			for (Op o : opPaths) {
 				opS.add(o);
 			}
-			ans = filterBindOrGroupToOp(opS, n);
+			return opS;
 		} else {
 			if (!bp.isEmpty()) {
 				ans = OpJoin.create(ans, new OpBGP(bp));
 			}
-			ans = filterBindOrGroupToOp(ans, n);
 		}
 		return ans;
 	}
 
-	public Op filterBindOrGroupToOp(Op in, Node n) {
-		Op ans = in;
-		Node eNode = GraphUtil.listObjects(graph, n, patternNode).hasNext() ? GraphUtil.listObjects(graph, n, patternNode).next() : null;
-		if (eNode == null) {
-			return ans;
-		}
-		ExtendedIterator<Node> filterOrBind = GraphUtil.listObjects(graph, eNode, argNode);
+	public Op filterBindOrGroupToOp(Node n) {
+		Node subOp = GraphUtil.listObjects(graph,n,subNode).next();
+		Op ans = nextOpByType(subOp);
+		ExtendedIterator<Node> filterOrBind = GraphUtil.listObjects(graph, n, argNode);
 		VarExprList varExprList = new VarExprList();
 		VarExprList groupByVars = new VarExprList();
 		List<ExprAggregator> aggList = new ArrayList<>();
+		Node filter = GraphUtil.listObjects(graph,n,filterNode).hasNext() ? GraphUtil.listObjects(graph,n,filterNode).next() : null;
+		Node group = GraphUtil.listObjects(graph,n,argNode).hasNext() ? GraphUtil.listObjects(graph,n,argNode).next() : null;
+		ExtendedIterator<Node> bindings = GraphUtil.listObjects(graph,n,extendNode);
 		Expr filterExpr = null;
-		while (filterOrBind.hasNext()) {
-			Node f = filterOrBind.next();
-			Node type = GraphUtil.listObjects(graph, f, typeNode).next();
-			if (type.equals(filterNode)) {
-				filterExpr = filterToOp(GraphUtil.listObjects(graph, f, argNode).next());
-			} else if (type.equals(bindNode)) {
-				Var var = Var.alloc(GraphUtil.listObjects(graph, f, varNode).next().getBlankNodeLabel());
-				vars.add(var);
-				Expr expr = bindToOp(GraphUtil.listObjects(graph, f, argNode).next());
-				if (expr instanceof ExprAggregator) {
-					Node anon = GraphUtil.listObjects(graph,f,argNode).next();
-					expr = new ExprVar(Var.alloc(anon.getBlankNodeLabel()));
+		if (filter != null) {
+			filterExpr = filterToOp(GraphUtil.listObjects(graph, filter, argNode).next());
+		}
+		while (bindings.hasNext()) {
+			Node f = bindings.next();
+			Var var = Var.alloc(GraphUtil.listObjects(graph, f, varNode).next().getBlankNodeLabel());
+			vars.add(var);
+			Expr expr = bindToOp(GraphUtil.listObjects(graph, f, argNode).next());
+			if (expr instanceof ExprAggregator) {
+				Node anon = GraphUtil.listObjects(graph,f,argNode).next();
+				expr = new ExprVar(Var.alloc(anon.getBlankNodeLabel()));
+			}
+			varExprList.add(var, expr);
+		}
+		if (group != null) {
+			Node v = GraphUtil.listObjects(graph, group, argNode).next();
+			ExtendedIterator<Node> groupVars = GraphUtil.listObjects(graph, v, valueNode);
+			while (groupVars.hasNext()) {
+				Node g = groupVars.next();
+				Var var = Var.alloc(g.getBlankNodeLabel());
+				this.vars.add(var);
+				Expr expr = null;
+				if (GraphUtil.listObjects(graph, g, valueNode).hasNext()) {
+					Node value = GraphUtil.listObjects(graph, g, valueNode).next();
+					expr = filterToOp(value);
 				}
-				varExprList.add(var, expr);
-			} else if (type.equals(groupByNode)) {
-				Node v = GraphUtil.listObjects(graph, f, argNode).next();
-				ExtendedIterator<Node> groupVars = GraphUtil.listObjects(graph, v, valueNode);
-				while (groupVars.hasNext()) {
-					Node g = groupVars.next();
-					Var var = Var.alloc(g.getBlankNodeLabel());
-					this.vars.add(var);
-					Expr expr = null;
-					if (GraphUtil.listObjects(graph, g, valueNode).hasNext()) {
-						Node value = GraphUtil.listObjects(graph, g, valueNode).next();
-						expr = filterToOp(value);
-					}
-					groupByVars.add(var, expr);
-				}
-				if (GraphUtil.listObjects(graph, f, patternNode).hasNext()) {
-					Node p = GraphUtil.listObjects(graph, f, patternNode).next();
-					ExtendedIterator<Node> aggregateList = GraphUtil.listObjects(graph, p, argNode);
-					while (aggregateList.hasNext()) {
-						Node g = aggregateList.next();
-						aggList.add((ExprAggregator) aggregateToExpr(g));
-					}
+				groupByVars.add(var, expr);
+			}
+			if (GraphUtil.listObjects(graph, group, patternNode).hasNext()) {
+				Node p = GraphUtil.listObjects(graph, group, patternNode).next();
+				ExtendedIterator<Node> aggregateList = GraphUtil.listObjects(graph, p, argNode);
+				while (aggregateList.hasNext()) {
+					Node g = aggregateList.next();
+					aggList.add((ExprAggregator) aggregateToExpr(g));
 				}
 			}
 		}
@@ -629,7 +639,7 @@ public class QueryBuilder {
 	public Op tripleToOp(Node n) {
 		Op ans = null;
 		BasicPattern bp = new BasicPattern();
-		Node subjects = GraphUtil.listObjects(graph, n, subNode).next();
+		Node subjects = GraphUtil.listObjects(graph, n, subjectNode).next();
 		if (subjects.isBlank()) {
 			vars.add(Var.alloc(subjects.getBlankNodeLabel()));
 			subjects = NodeFactory.createVariable(subjects.getBlankNodeLabel());
@@ -657,12 +667,11 @@ public class QueryBuilder {
 		}
 		bp.add(Triple.create(subjects, predicates, objects));
 		ans = new OpBGP(bp);
-		ans = filterBindOrGroupToOp(ans, n);
 		return ans;
 	}
 
 	public Triple nodeToTriple(Node n) {
-		Node subjects = GraphUtil.listObjects(graph, n, subNode).next();
+		Node subjects = GraphUtil.listObjects(graph, n, subjectNode).next();
 		if (subjects.isBlank()) {
 			subjects = NodeFactory.createVariable(subjects.getBlankNodeLabel());
 			vars.add(Var.alloc(subjects));
@@ -703,7 +712,6 @@ public class QueryBuilder {
 		if (t.isEmpty()) {
 			ans = OpTable.unit();
 		}
-		ans = filterBindOrGroupToOp(ans, n);
 		return ans;
 	}
 
@@ -718,7 +726,6 @@ public class QueryBuilder {
 			Node arg = argList.get(i);
 			ans = new OpUnion(ans, nextOpByType(arg));
 		}
-		ans = filterBindOrGroupToOp(ans, n);
 		return ans;
 	}
 
@@ -753,6 +760,9 @@ public class QueryBuilder {
 		} else if (graph.contains(Triple.create(n, typeNode, serviceNode))) {
 			ans = serviceToOp(n);
 		}
+		else if (graph.contains(Triple.create(n,typeNode,extraNode))) {
+			ans = filterBindOrGroupToOp(n);
+		}
 		else if (graph.contains(Triple.create(n, typeNode, projectNode))) {
 			ans = projectToOp(n);
 		}
@@ -767,7 +777,6 @@ public class QueryBuilder {
 		Node right = GraphUtil.listObjects(graph, n, rightNode).next();
 		rightOp = nextOpByType(right);
 		Op ans = OpLeftJoin.createLeftJoin(leftOp, rightOp, null);
-		ans = filterBindOrGroupToOp(ans, n);
 		return ans;
 	}
 
@@ -778,7 +787,6 @@ public class QueryBuilder {
 		leftOp = nextOpByType(left);
 		Node right = GraphUtil.listObjects(graph, n, rightNode).next();
 		rightOp = nextOpByType(right);
-		leftOp = filterBindOrGroupToOp(leftOp, n);
 		return OpMinus.create(leftOp, rightOp);
 	}
 
@@ -797,7 +805,6 @@ public class QueryBuilder {
 			}
 			ans = new OpGraph(val, nextOpByType(next));
 		}
-		ans = filterBindOrGroupToOp(ans, n);
 		return ans;
 	}
 
@@ -873,7 +880,7 @@ public class QueryBuilder {
 		} else {
 			if (value.isLiteral()) {
 				if (value.getLiteralLexicalForm().replace("\"","").equals("*")) {
-					return null;
+					return NodeValue.makeString("*");
 				}
 				else {
 					String s = value.toString();
@@ -954,7 +961,7 @@ public class QueryBuilder {
 	public Op triplePathToOp(Node n) {
 		Op ans = null;
 		Path path = null;
-		Node subjects = GraphUtil.listObjects(graph, n, subNode).next();
+		Node subjects = GraphUtil.listObjects(graph, n, subjectNode).next();
 		if (subjects.isBlank()) {
 			vars.add(Var.alloc(subjects.getBlankNodeLabel()));
 			subjects = NodeFactory.createVariable(subjects.getBlankNodeLabel());
@@ -970,7 +977,6 @@ public class QueryBuilder {
 			objects = NodeFactory.createVariable(objects.getBlankNodeLabel());
 		}
 		ans = new OpPath(new TriplePath(subjects, path, objects));
-		ans = filterBindOrGroupToOp(ans, n);
 		return ans;
 	}
 
@@ -1357,12 +1363,10 @@ public class QueryBuilder {
 			int finish = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, limit, valueNode).next()));
 			op = new OpSlice(op,start,finish);
 		}
-		op = filterBindOrGroupToOp(op,n);
 		return op;
 	}
 	
 	public String getQuery(){
-		ArrayList<Var> pVariables = new ArrayList<>();
 		ExtendedIterator<Node> f = GraphUtil.listSubjects(graph, typeNode, fromNode);
 		ExtendedIterator<Node> fn = GraphUtil.listSubjects(graph, typeNode, fromNamedNode);
 		Node first;

@@ -9,7 +9,7 @@ WHERE {
  	}
  	UNION
  	{
- 	 ?n ex:type ex:bind .
+ 	 ?n ex:type ex:binding .
  	 ?n ex:var ?v .
  	 FILTER(ISBLANK(?v))
  	}

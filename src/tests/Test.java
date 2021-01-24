@@ -165,9 +165,9 @@ public class Test {
 	@org.junit.Test
 	public void generalTest() {
 		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test17.txt"));
+			//QueryParserTest qp = new QueryParserTest(new File("testFiles/test17.txt"));
 			//qp = new QueryParserTest(new File("testFiles/test24.txt"));
-			qp = new QueryParserTest(new File("testFiles/test18.txt"));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/test18.txt"));
 			qp = new QueryParserTest(new File("testFiles/test19.txt"));
 			qp = new QueryParserTest(new File("testFiles/test24.txt"));
 		} catch (IOException e) {

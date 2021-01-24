@@ -220,7 +220,9 @@ public class SingleQuery {
 		canonGraph.print();
 		QueryBuilder qb = new QueryBuilder(this.canonGraph);
 		this.canonVars = qb.getVars();
-		return qb.getQuery();
+		String query = qb.getQuery();
+		System.out.println(qb.finalVarMap);
+		return query;
 	}
 	
 	public boolean isDistinct(){
@@ -268,7 +270,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "SELECT( COUNT ( ?var1  ) AS  ?var2  )(  SUM ( IF (  ?var3 ,\"1\"^^<http://www.w3.org/2001/XMLSchema#integer> ,\"0\"^^<http://www.w3.org/2001/XMLSchema#integer>  )  ) AS  ?var4  ) WHERE {  SELECT DISTINCT ?var1  ?var1Label  ?var3  ?var5  ?var6  ?var7   WHERE  {    ?var1  <http://www.wikidata.org/prop/direct/P4963>  ?var8 .   OPTIONAL {    ?var9  <http://www.wikidata.org/prop/direct/P138>  ?var1 .    ?var1  <http://www.wikidata.org/prop/direct/P31>  <http://www.wikidata.org/entity/Q5> .   }   OPTIONAL {    BIND (   True  AS  ?var3 ).    ?var1  <http://www.wikidata.org/prop/direct/P3217>  ?var10 .   }   OPTIONAL {    BIND (   True  AS  ?var6 ).    ?var1  <http://www.wikidata.org/prop/direct/P214>  ?var11 .   }   OPTIONAL {    BIND (   True  AS  ?var5 ).    ?var1  <http://www.wikidata.org/prop/direct/P906>  ?var12 .   }   {     BIND (    True  AS  ?var7 ).     ?var1  <http://www.wikidata.org/prop/direct/P2538>  ?var13 .   }   SERVICE  <http://wikiba.se/ontology#label>    {      <http://www.bigdata.com/rdf#serviceParam>  <http://wikiba.se/ontology#language>  \"sv,en\".    }  } }";
+		String q = "SELECT DISTINCT ?var1Label  WHERE {   ?var1  <http://www.wikidata.org/prop/direct/P31>  <http://www.wikidata.org/entity/Q207621> .  OPTIONAL {   ?var2  <http://www.wikidata.org/prop/direct/P279>  ?var3 .   ?var1  <http://www.wikidata.org/prop/direct/P279>  ?var3 .  }  SERVICE  <http://wikiba.se/ontology#label>   {     <http://www.bigdata.com/rdf#serviceParam>  <http://wikiba.se/ontology#language>  \"ru,en\".   } } \n";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,true);
 		System.out.println(sq.getQuery());
 		System.out.println(sq.graphTime/Math.pow(10, 9));

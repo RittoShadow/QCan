@@ -164,7 +164,7 @@ public class UCQTransformer extends TransformCopy{
 	}
 	
 	public static void main(String[] args){
-		String s = "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT DISTINCT ?x WHERE{	?x foaf:p ?z .	?z foaf:p ?y .	?z foaf:q ?y .?y foaf:p/foaf:p/foaf:p ?y .	?y foaf:u/foaf:v ?x . OPTIONAL { ?z foaf:r ?n . ?n foaf:z* ?q . } }";
+		String s = "SELECT DISTINCT ?r WHERE { { ?r <p> ?w } UNION { ?r <q> ?y } FILTER(?z < 15)}";
 		Query query = QueryFactory.create(s);
 		for (Var v : query.getProjectVars()){
 			System.out.println(v);
