@@ -6,8 +6,6 @@ DELETE{
 		?n ?r ?u .
 	}
 INSERT { ?x ex:type ex:var .
-		?x ex:temp false .
-		?x ex:value ?vname .
 		?s ?p ?x .}
 WHERE {
  {

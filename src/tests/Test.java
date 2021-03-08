@@ -63,12 +63,21 @@ public class Test {
 	@org.junit.Test
 	public void UCQMinimisationTest() {
 		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test20.txt"));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/ucqMinimisationTest.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			assertTrue(qp.equalQueries(1, 2));
-			qp = new QueryParserTest(new File("testFiles/test21.txt"));
-			assertTrue(qp.equalQueries(0,1));
-			assertTrue(qp.equalQueries(1,2));
+			assertTrue(qp.equalQueries(3,4));
+			assertTrue(qp.equalQueries(4,5));
+			assertTrue(qp.equalQueries(6,7));
+			assertTrue(qp.equalQueries(7,8));
+			assertTrue(qp.equalQueries(9,10));
+			assertTrue(qp.equalQueries(10,11));
+			assertTrue(qp.equalQueries(12,13));
+			assertTrue(qp.equalQueries(13,14));
+			assertTrue(qp.equalQueries(15,16));
+			assertTrue(qp.equalQueries(17,18));
+			assertFalse(qp.equalQueries(16,19));
+			assertTrue(qp.equalQueries(19,20));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -78,7 +87,7 @@ public class Test {
 	@org.junit.Test
 	public void namedGraphTest(){
 		try{
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test13.txt"));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/namedGraph.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			assertTrue(qp.equalQueries(2, 3));
 		} catch(IOException e){
@@ -89,14 +98,15 @@ public class Test {
 	@org.junit.Test
 	public void filterTest(){
 		try{
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/test15.txt"));
-			assertTrue(qp.equalQueries(0, 1));
-			assertFalse(qp.equalQueries(1, 2));
-			QueryParserTest qp1 = new QueryParserTest(new File("testFiles/filterTest1"));
+			QueryParserTest qp1 = new QueryParserTest(new File("testFiles/filterTest.txt"));
 			assertTrue(qp1.equalQueries(0, 1));
-			qp = new QueryParserTest(new File("testFiles/filterTest8.txt"));
-			assertTrue(qp.equalQueries(0,1));
-			qp = new QueryParserTest(new File("testFiles/filterTest7.txt")); // EXISTS and NOT EXISTS
+			assertTrue(qp1.equalQueries(1,2));
+			assertFalse(qp1.equalQueries(2,3));
+			assertTrue(qp1.equalQueries(3,4));
+			assertTrue(qp1.equalQueries(9, 10));
+			assertFalse(qp1.equalQueries(10, 11));
+			assertTrue(qp1.equalQueries(14,15));
+			assertFalse(qp1.equalQueries(16, 17));
 		} catch(IOException e){
 			e.printStackTrace();
 		}
@@ -105,14 +115,12 @@ public class Test {
 	@org.junit.Test
 	public void filterPushTest() {
 		try {
-			QueryParserTest qp = new QueryParserTest(new File("testFiles/filterPushTest1.txt"));
-			assertFalse(qp.equalQueries(1,2));
-			assertFalse(qp.equalQueries(3,4));
-			qp = new QueryParserTest(new File("testFiles/filterPushTest.txt"));
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/filterPushTest.txt"));
 			assertTrue(qp.equalQueries(0,1));
 			assertFalse(qp.equalQueries(2,3));
-			assertFalse(qp.equalQueries(4,5));
-			assertTrue(qp.equalQueries(6,7));
+			assertFalse(qp.equalQueries(4,5));		assertTrue(qp.equalQueries(6,7));
+			assertFalse(qp.equalQueries(9,10));
+			assertFalse(qp.equalQueries(11,12));
 		}
 		catch (IOException e) {
 			e.printStackTrace();
@@ -168,7 +176,6 @@ public class Test {
 			//QueryParserTest qp = new QueryParserTest(new File("testFiles/test17.txt"));
 			//qp = new QueryParserTest(new File("testFiles/test24.txt"));
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/test18.txt"));
-			qp = new QueryParserTest(new File("testFiles/test19.txt"));
 			qp = new QueryParserTest(new File("testFiles/test24.txt"));
 		} catch (IOException e) {
 			e.printStackTrace();

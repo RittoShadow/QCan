@@ -117,6 +117,7 @@ public class FilterTransform extends TransformCopy {
 	}
 
 	public Op transform(OpLeftJoin op, Op left, Op right) {
+		Op ans = op;
 		if (left instanceof OpFilter) {
 			Set<Var> eVars = ((OpFilter) left).getExprs().getVarsMentioned();
 			Set<Var> safeVars = Tools.safeVars(left);
@@ -129,7 +130,7 @@ public class FilterTransform extends TransformCopy {
 			if (op.getExprs() != null) {
 				exprs.addAll(op.getExprs());
 			}
-			Op ans = OpFilter.filter(exprs,OpLeftJoin.create(((OpFilter) left).getSubOp(),right,op.getExprs()));
+			ans = OpFilter.filter(exprs,OpLeftJoin.create(((OpFilter) left).getSubOp(),right,op.getExprs()));
 			return ans;
 		}
 		else {

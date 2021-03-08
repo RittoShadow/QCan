@@ -96,7 +96,7 @@ public class QueryBuilder {
 	private final Graph graph;
 	private final Node root;
 	private Op op;
-	private final Set<Var> vars = new HashSet<Var>();
+	private final Set<Var> vars = new HashSet<>();
 
 	public QueryBuilder(RGraph e) {
 		this.graph = e.graph;
@@ -939,16 +939,13 @@ public class QueryBuilder {
 				Collections.sort(params, new ExprComparator());
 			}
 			if (nParams == 0) {
-				return aggregatorOperatorToExpr(n, distinct, (Expr) null);
+				return aggregatorOperatorToExpr(n, distinct, Collections.emptyList());
 			}
 			else if (nParams == 1) {
-				return aggregatorOperatorToExpr(n, distinct, filterToOp(argList.get(0)));
+				return aggregatorOperatorToExpr(n, distinct, Collections.singletonList(filterToOp(argList.get(0))));
 			}
-			else if (nParams == 2) {
-				return aggregatorOperatorToExpr(n, distinct, params.get(0), params.get(1));
-			}
-			else if (nParams == 3) {
-				return aggregatorOperatorToExpr(n,distinct,params.get(0),params.get(1), params.get(2));
+			else {
+				return aggregatorOperatorToExpr(n, distinct,params);
 			}
 		}
 		if (GraphUtil.listObjects(graph, n, valueNode).hasNext()) {

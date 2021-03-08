@@ -669,8 +669,8 @@ public class Analysis {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_projection_results20201103_150227.log");
-		a.displayInfo();
+		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_SWDF_results20210215_162742.log");
+		a.partitionByFeatures();
 	}
 
 }

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 
 import builder.QueryBuilder;
 import main.SingleQuery;
+import org.apache.jena.base.Sys;
 import org.apache.jena.ext.com.google.common.collect.HashMultiset;
 import org.apache.jena.ext.com.google.common.collect.Multiset;
 import org.apache.jena.query.QueryParseException;
@@ -35,7 +36,7 @@ public class QueryParserTest {
 	boolean enableOptional = true;
 	boolean enableCanonical = true;
 	boolean enableLeaning = true;
-	protected boolean pathNormalisation = false;
+	protected boolean pathNormalisation = true;
 	private boolean enableRewrite = true;
 	
 	public void parse(String s) throws Exception{
@@ -56,7 +57,9 @@ public class QueryParserTest {
 	public boolean compare(String s) throws Exception {
 		SingleQuery q1 = new SingleQuery(s, enableCanonical, enableRewrite, enableLeaning, pathNormalisation, false );
 		SingleQuery q2 = new SingleQuery(s, enableCanonical, enableRewrite, false, pathNormalisation, false);
-		return q1.getQuery().equals(q2.getQuery());
+		boolean ans = q1.getQuery().equals(q2.getQuery());
+		//ans = ans && (q1.getCanonicalGraph().graph.size() > q2.getCanonicalGraph().graph.size());
+		return ans;
 	}
 	
 	public QueryParserTest(File f) throws IOException{
@@ -121,8 +124,8 @@ public class QueryParserTest {
 			try{
 				if (!compare(s)) {
 					System.out.println(i);
+					System.out.println(s);
 				}
-				i++;
 			}
 			catch (UnsupportedOperationException e){
 				unsupportedQueries++;
@@ -136,6 +139,7 @@ public class QueryParserTest {
 				otherUnspecifiedExceptions++;
 				e.printStackTrace();
 			}
+			i++;
 			totalQueries++;
 		}
 		this.totalTime = System.currentTimeMillis() - t;
@@ -167,6 +171,6 @@ public class QueryParserTest {
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws IOException{
-		QueryParserTest qp = new QueryParserTest(new File("clean_SWDF.txt"), true);
+		QueryParserTest qp = new QueryParserTest(new File("clean_dbPediaQueries.txt"), true);
 	}
 }

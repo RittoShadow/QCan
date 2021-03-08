@@ -615,16 +615,16 @@ public class QueryFeaturesCounter {
 		double avgNormalLengths = (double) normalLengths/(nLines - unsupported);
 		System.out.println("Number of queries: " + i);
 		System.out.println("Average time: " + avgTime + " ns");
-		System.out.println("Average paths.paths in each query: " + avgNPaths);
-		System.out.println("Average length of paths.paths: " + avgLengths);
-		System.out.println("Average length of normalised paths.paths: " + avgNormalLengths);
+		System.out.println("Average paths in each query: " + avgNPaths);
+		System.out.println("Average length of paths: " + avgLengths);
+		System.out.println("Average length of normalised paths: " + avgNormalLengths);
 		System.out.println("Min time: " + minTime + " ns");
 		System.out.println("Max time: " + maxTime + " ns");
-		System.out.println("Min length of paths.paths: " + minLength);
-		System.out.println("Max length of paths.paths: " + maxLength);
-		System.out.println("Min length of normalised paths.paths: " + minNormalLength);
-		System.out.println("Max length of normalised paths.paths: " + maxNormalLength);
-		System.out.println("Number of different paths.paths: " + different);
+		System.out.println("Min length of paths: " + minLength);
+		System.out.println("Max length of paths: " + maxLength);
+		System.out.println("Min length of normalised paths: " + minNormalLength);
+		System.out.println("Max length of normalised paths: " + maxNormalLength);
+		System.out.println("Number of different paths: " + different);
 		for (String str : instances.keySet()) {
 			System.out.println(str + ": " + instances.get(str));
 		}
@@ -655,7 +655,7 @@ public class QueryFeaturesCounter {
 //			out.createNewFile();
 //		}
 //		in.add(inFile);
-		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("testFiles/utf8WikiDataQueries/utf8I7_status2xx_userData_Joined.tsv"));
+		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("clean_wikidata.tsv"));
 //		QueryFeaturesCounter.filterPaths(in, out);
 //		QueryFeaturesCounter qfc = new QueryFeaturesCounter(new File("testFiles/wikiDataPaths"), false, true);
 //		QueryFeaturesCounter.pathFiles(new File("resultFiles/features/paths.paths/pathFeatures20200513_154057.log"));

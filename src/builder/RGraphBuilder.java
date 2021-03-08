@@ -10,7 +10,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 
-import main.BGPSort;
 import main.RGraph;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
@@ -79,6 +78,7 @@ import data.PropertyPathFeatureCounter;
 import org.apache.jena.sparql.syntax.Template;
 import paths.PGraph;
 import paths.PathTransform;
+import tools.BGPSort;
 import transformers.FilterTransform;
 import transformers.NotOneOfTransform;
 import transformers.TransformPath;
@@ -122,7 +122,7 @@ public class RGraphBuilder implements OpVisitor {
 	}
 	
 	public RGraphBuilder(Op op) {
-		
+		OpWalker.walk(op, this);
 	}
 	
 	public RGraphBuilder(Query query) {
@@ -276,16 +276,16 @@ public class RGraphBuilder implements OpVisitor {
 			}
 		}
 		Expr expr = exprs.get(0);
-		if (expr instanceof E_NotExists) {
-			Op right = OpJoin.create(((E_NotExists) expr).getGraphPattern(), arg0.getSubOp());
-			RGraphBuilder rgb = new RGraphBuilder(right);
-			OpWalker.walk(right, rgb);
-			RGraph e = rgb.getResult();
-			RGraph e1 = graphStack.pop();
-			e1.minus(e);
-			graphStack.add(e1);
-			return;
-		}
+//		if (expr instanceof E_NotExists) {
+//			Op right = OpJoin.create(((E_NotExists) expr).getGraphPattern(), arg0.getSubOp());
+//			RGraphBuilder rgb = new RGraphBuilder(right);
+//			OpWalker.walk(right, rgb);
+//			RGraph e = rgb.getResult();
+//			RGraph e1 = graphStack.pop();
+//			e1.minus(e);
+//			graphStack.add(e1);
+//			return;
+//		}
 		if (exprs.size() > 1) {
 			for (Expr e : exprs.subList(1, exprs.size())){
 				expr = new E_LogicalAnd(expr, e);
@@ -428,6 +428,19 @@ public class RGraphBuilder implements OpVisitor {
 //				e1 = graphStack.pop();
 //			}
 			e2 = graphStack.pop();
+			if (arg0.getExprs() != null) {
+				ExprList exprs = arg0.getExprs();
+				Expr expr = exprs.get(0);
+				if (exprs.size() > 1) {
+					for (Expr e : exprs.subList(1, exprs.size())){
+						expr = new E_LogicalAnd(expr, e);
+					}
+				}
+				FilterVisitor fv = new FilterVisitor();
+				totalVars.addAll(expr.getVarsMentioned());
+				ExprWalker.walk(fv, expr);
+				e2.filter(fv.getGraph());
+			}
 			e1 = graphStack.pop();
 			e1.optional(e2);
 			graphStack.add(e1);

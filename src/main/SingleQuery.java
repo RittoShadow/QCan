@@ -1,10 +1,13 @@
 package main;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import builder.QueryBuilder;
 import builder.RGraphBuilder;
+import org.apache.jena.graph.Node;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
@@ -33,8 +36,8 @@ public class SingleQuery {
 	private int nTriples = 0;
 	private RGraph graph;
 	private RGraph canonGraph;
-	private Set<Var> vars = new HashSet<Var>();
-	private Set<Var> canonVars = new HashSet<Var>();
+	private Set<Var> vars = new HashSet<>();
+	private Set<Var> canonVars = new HashSet<>();
 	private boolean minimisation = true;
 	private boolean containsUnion = false;
 	private boolean containsJoin = false;
@@ -48,7 +51,8 @@ public class SingleQuery {
 	private boolean containsBind = false;
 	private boolean containsGroupBy = false;
 	private boolean containsTable = false;
-	
+	private Map<Node, Node> varMap = new HashMap<>();
+
 	public SingleQuery(String q) throws InterruptedException, HashCollisionException{
 		this(q,true,true);
 	}
@@ -217,11 +221,10 @@ public class SingleQuery {
 	}
 	
 	public String getQuery(){
-		canonGraph.print();
 		QueryBuilder qb = new QueryBuilder(this.canonGraph);
 		this.canonVars = qb.getVars();
+		this.varMap = qb.varMap;
 		String query = qb.getQuery();
-		System.out.println(qb.finalVarMap);
 		return query;
 	}
 	
@@ -270,13 +273,35 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "SELECT DISTINCT ?var1Label  WHERE {   ?var1  <http://www.wikidata.org/prop/direct/P31>  <http://www.wikidata.org/entity/Q207621> .  OPTIONAL {   ?var2  <http://www.wikidata.org/prop/direct/P279>  ?var3 .   ?var1  <http://www.wikidata.org/prop/direct/P279>  ?var3 .  }  SERVICE  <http://wikiba.se/ontology#label>   {     <http://www.bigdata.com/rdf#serviceParam>  <http://wikiba.se/ontology#language>  \"ru,en\".   } } \n";
-		SingleQuery sq = new SingleQuery(q,true,true, true,true,true);
-		System.out.println(sq.getQuery());
+		String q = "SELECT DISTINCT  ?v3 ?v1 ?v0\n" +
+				"WHERE\n" +
+				"  { { <http://dbpedia.org/resource/Desperate_Housewives>\n" +
+				"                <http://www.w3.org/2000/01/rdf-schema#comment>  ?v2 ;\n" +
+				"                <http://xmlns.com/foaf/0.1/name>  ?v4\n" +
+				"      OPTIONAL\n" +
+				"        {   { ?v3\n" +
+				"                        <http://www.w3.org/2002/07/owl#sameAs>  <http://dbpedia.org/resource/Desperate_Housewives>\n" +
+				"            }\n" +
+				"          UNION\n" +
+				"            { <http://dbpedia.org/resource/Desperate_Housewives>\n" +
+				"                        <http://www.w3.org/2002/07/owl#sameAs>  ?v3\n" +
+				"            }\n" +
+				"        }\n" +
+				"    }\n" +
+				"    FILTER ( lang(?v1) = \"en\" )\n" +
+				"  }";
+		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
+		sq.getCanonicalGraph().print();
+		String query1 = sq.getQuery();
+		System.out.println(query1);
 		System.out.println(sq.graphTime/Math.pow(10, 9));
 		System.out.println(sq.rewriteTime/Math.pow(10, 9));
 		System.out.println(sq.labelTime/Math.pow(10, 9));
 		System.out.println(sq.minimisationTime/Math.pow(10, 9));
+	}
+
+	public Map<Node,Node> getVarMap() {
+		return this.varMap;
 	}
 
 	public boolean containsPaths() {

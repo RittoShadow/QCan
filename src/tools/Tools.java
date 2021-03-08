@@ -158,6 +158,10 @@ public class Tools {
 				}
 			}
 		}
+		else if (op instanceof OpProject) {
+			ans.addAll(((OpProject) op).getVars());
+			ans.addAll(varsContainedIn(((OpProject) op).getSubOp()));
+		}
 		else if (op instanceof OpPath) {
 			TriplePath tp = ((OpPath) op).getTriplePath();
 			if (tp.getSubject().isVariable()) {

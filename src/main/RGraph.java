@@ -893,11 +893,13 @@ public class RGraph {
 			while (varNodes.hasNext()) {
 				varList.add(Var.alloc(varNodes.next().getBlankNodeLabel()));
 			}
-			if (!(varList.containsAll(vars) && vars.containsAll(varList))) {
-				Node root = NodeFactory.createBlankNode();
-				graph.add(Triple.create(root, typeNode, projectNode));
-				graph.add(Triple.create(root, opNode, this.root));
-				this.root = root;
+			if (!varList.isEmpty()) {
+				if (!(varList.containsAll(vars) && vars.containsAll(varList))) {
+					Node root = NodeFactory.createBlankNode();
+					graph.add(Triple.create(root, typeNode, projectNode));
+					graph.add(Triple.create(root, opNode, this.root));
+					this.root = root;
+				}
 			}
 		}
 		if (this.vars != null) {
@@ -1213,11 +1215,7 @@ public class RGraph {
 	/**
 	 * Re-labels all the variables in each conjunctive query.
 	 */
-	public void branchRelabelling(Node ucq, Collection<Node> projectedVars, Collection<Node> filterVars, Collection<Node> orderByVars){
-		Set<Node> vars = new HashSet<>();
-		vars.addAll(projectedVars);
-		vars.addAll(filterVars);
-		vars.addAll(orderByVars);
+	public void branchRelabelling(Node ucq, Collection<Node> vars, Graph graph){
 		if (isUCQ(ucq)) {
 			ExtendedIterator<Node> cqs = GraphUtil.listObjects(graph,ucq,argNode);
 			while (cqs.hasNext()) {
@@ -1465,18 +1463,19 @@ public class RGraph {
 	public RGraph ucqMinimisation() throws InterruptedException {
 		List<RGraph> result = new ArrayList<>();
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
-		ExtendedIterator<Node> projectionNodes = GraphUtil.listSubjects(graph,typeNode,projectNode);
 		Set<Node> projectedVars = new HashSet<>();
-		while (projectionNodes.hasNext()) {
-			Node currentProjection = projectionNodes.next();
-			ExtendedIterator<Node> currentArgs = GraphUtil.listObjects(graph,currentProjection,argNode);
-			while (currentArgs.hasNext()) {
-				Node currentArg = currentArgs.next();
-				projectedVars.add(currentArg);
-			}
-		}
 		Set<Node> ucqs = listMonotoneParts();
 		for (Node ucq : ucqs) {
+			projectedVars = new HashSet<>();
+			ExtendedIterator<Node> projectionNodes = GraphUtil.listSubjects(graph,typeNode,projectNode);
+			while (projectionNodes.hasNext()) {
+				Node currentProjection = projectionNodes.next();
+				ExtendedIterator<Node> currentArgs = GraphUtil.listObjects(graph,currentProjection,argNode);
+				while (currentArgs.hasNext()) {
+					Node currentArg = currentArgs.next();
+					projectedVars.add(currentArg);
+				}
+			}
 			if (graph.contains(Triple.create(ucq, typeNode, unionNode))) { //Make sure it's a union of conjunctive queries.
 				Node union = ucq;
 				Node subjectUnion, predicateUnion;
@@ -1501,68 +1500,69 @@ public class RGraph {
 					subjectUnion = listSubjects(graph, argNode, union).next();
 					predicateUnion = argNode;
 				}
-				Graph filterGraph = GraphFactory.createPlainGraph();
-				Graph orderByGraph = GraphFactory.createPlainGraph();
-				ExtendedIterator<Node> filters = GraphUtil.listSubjects(graph, subNode, union);
 				ExtendedIterator<Node> cQueries = GraphUtil.listObjects(graph, union, argNode);
 				cQueries = GraphUtil.listObjects(graph, union, argNode);
 				if (GraphUtil.listObjects(graph, union, argNode).toList().size() > 1) { //More than one BGP in union
-					Set<Node> filterVars = new HashSet<>();
-					Set<Node> orderByVars = new HashSet<>();
-					if (filters.hasNext()) {
-						CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(union),null);
-						GraphExtract filterExtract = new GraphExtract(ctb);
-						filterGraph = filterExtract.extract(filters.next(), graph);
-						UpdateAction.execute(filterVarsRule, filterGraph);
-						filterVars.addAll(listSubjects(filterGraph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)).toList());
-					}
-					ExtendedIterator<Node> orderBy = listSubjects(graph, typeNode, orderByNode); //TODO May also not be the right ORDER BY node. May depend on projection node as well.
-					if (orderBy.hasNext()) {
-						orderByGraph = ge.extract(orderBy.next(), graph);
-					}
-					//Extract all variables in ORDER BY clauses
-					UpdateAction.execute(filterVarsRule, orderByGraph);
-					while (orderBy.hasNext()) {
-						ExtendedIterator<Node> orderVars = listSubjects(orderByGraph, typeNode, varNode);
-						while (orderVars.hasNext()) {
-							Node v = orderVars.next();
-							Node var = GraphUtil.listObjects(graph, v, varNode).next();
-							orderByVars.add(var);
-						}
-					}
+//					Set<Node> filterVars = new HashSet<>();
+//					Set<Node> orderByVars = new HashSet<>();
+//					if (filters.hasNext()) {
+//						CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(union),null);
+//						GraphExtract filterExtract = new GraphExtract(ctb);
+//						filterGraph = filterExtract.extract(filters.next(), graph);
+//						UpdateAction.execute(filterVarsRule, filterGraph);
+//						filterVars.addAll(listSubjects(filterGraph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)).toList());
+//					}
+//					ExtendedIterator<Node> orderBy = listSubjects(graph, typeNode, orderByNode); //TODO May also not be the right ORDER BY node. May depend on projection node as well.
+//					if (orderBy.hasNext()) {
+//						orderByGraph = ge.extract(orderBy.next(), graph);
+//					}
+//					//Extract all variables in ORDER BY clauses
+//					UpdateAction.execute(filterVarsRule, orderByGraph);
+//					while (orderBy.hasNext()) {
+//						ExtendedIterator<Node> orderVars = listSubjects(orderByGraph, typeNode, varNode);
+//						while (orderVars.hasNext()) {
+//							Node v = orderVars.next();
+//							Node var = GraphUtil.listObjects(graph, v, varNode).next();
+//							orderByVars.add(var);
+//						}
+//					}
+//					ExtendedIterator<Node> bindings = listSubjects(graph,typeNode,bindNode);
+//					while (bindings.hasNext()) {
+//						Node binding = bindings.next();
+//						Node var = listObjects(graph,binding,varNode).next();
+//						orderByVars.add(var);
+//					}
 					//printGraph(filterGraph);
-					branchRelabelling(ucq,projectedVars,filterVars,orderByVars);
 					Graph inner = ge.extract(union, graph);
 					Graph outer = GraphFactory.createPlainGraph();
-					GraphUtil.addInto(outer, graph);
-					GraphUtil.deleteFrom(outer, inner);
+					CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(union),null);
+					GraphExtract extract = new GraphExtract(ctb);
+					outer = extract.extract(root, graph);
+					//UpdateAction.execute(filterVarsRule, filterGraph);
+					//filterVars.addAll(listSubjects(filterGraph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)).toList());
+					List<Node> innerVars = GraphUtil.listSubjects(inner,typeNode,varNode).toList();
+					List<Node> outerVars = GraphUtil.listSubjects(outer,typeNode,varNode).toList();
+					branchRelabelling(ucq,outerVars,inner);
 					outer.remove(subjectUnion, predicateUnion, union);
-					GraphUtil.deleteFrom(filterGraph,inner);
-					for (Node f : filterVars) {
-						filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
-					}
 					//Extract all projected variables from projection node.
 					//ExtendedIterator<Node> pVars = GraphUtil.listObjects(graph, root, argNode); //TODO This may not be the right projection node.
-					for (Node p : projectedVars) {
+					for (Node p : innerVars) {
+						inner.delete(Triple.create(p,typeNode,varNode));
+					}
+					for (Node p : outerVars) {
 						outer.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
 						outer.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 						outer.add(Triple.create(p, typeNode, varNode));
 						inner.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
 						inner.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-					}
-					for (Node o : orderByVars) {
-						outer.add(Triple.create(o, valueNode, NodeFactory.createLiteral(o.getBlankNodeLabel())));
-						outer.add(Triple.create(o, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-						outer.add(Triple.create(o, typeNode, varNode));
-						inner.add(Triple.create(o, valueNode, NodeFactory.createLiteral(o.getBlankNodeLabel())));
-						inner.add(Triple.create(o, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+						inner.add(Triple.create(p,typeNode,varNode));
 					}
 					//Iterate through all conjunctive queries.
 					while (cQueries.hasNext()) {
 						Node cRoot = cQueries.next();
 						Graph cGraph = ge.extract(cRoot, inner);
 						//Check all variables in filter clauses.
-						for (Node f : filterVars) {
+						for (Node f : outerVars) {
 							cGraph.add(Triple.create(f, typeNode, varNode));
 							cGraph.add(Triple.create(f,valueNode,NodeFactory.createLiteral(f.getBlankNodeLabel())));
 							cGraph.add(Triple.create(f,tempNode,NodeFactory.createLiteralByValue(true,XSDDatatype.XSDboolean)));
@@ -1578,11 +1578,11 @@ public class RGraph {
 						Node eRoot = e.root;
 						GraphUtil.addInto(eg.graph, e.graph);
 						eg.graph.add(Triple.create(subjectUnion, predicateUnion, eRoot));
-						if (!filterGraph.isEmpty()) {
-							Node fNode = listSubjects(filterGraph, typeNode, extraNode).next();
-							eg.graph.add(Triple.create(fNode, subNode, eRoot));
-						}
-						GraphUtil.addInto(eg.graph, filterGraph);
+//						if (!filterGraph.isEmpty()) {
+//							Node fNode = listSubjects(filterGraph, typeNode, extraNode).next();
+//							eg.graph.add(Triple.create(fNode, subNode, eRoot));
+//						}
+//						GraphUtil.addInto(eg.graph, filterGraph);
 						eg.graph.delete(Triple.create(subjectUnion,predicateUnion,union));
 						eg.eliminateRedundantJoins();
 					} else {
@@ -1594,20 +1594,19 @@ public class RGraph {
 							eg.graph.add(Triple.create(uNode, argNode, eRoot));
 							eg.eliminateRedundantJoins();
 						}
-						if (!filterGraph.isEmpty()) {
-							Node fNode = listSubjects(filterGraph, typeNode, extraNode).next();
-							//eg.graph.add(Triple.create(uNode, patternNode, fNode));
-							GraphUtil.addInto(eg.graph, filterGraph);
-						}
+//						if (!filterGraph.isEmpty()) {
+//							Node fNode = listSubjects(filterGraph, typeNode, extraNode).next();
+//							//eg.graph.add(Triple.create(uNode, patternNode, fNode));
+//							GraphUtil.addInto(eg.graph, filterGraph);
+//						}
 						eg.graph.delete(Triple.create(subjectUnion,predicateUnion,union));
 					}
 					eg.setDistinctNode(true);
 					UpdateAction.execute(branchCleanUpRule, eg.graph);
 					UpdateAction.execute(branchUnionRule, eg.graph);
-					UpdateAction.execute(branchCleanUpRule2, eg.graph);
+					//UpdateAction.execute(branchCleanUpRule2, eg.graph);
 					UpdateAction.execute(joinRule, eg.graph);
 					this.graph = eg.graph;
-					result = new ArrayList<>();
 				}
 			}
 			else { // BGP instead
@@ -1640,57 +1639,55 @@ public class RGraph {
 							subjectBGP = listSubjects(graph, argNode, first).next();
 							predicateBGP = argNode;
 						}
-						Set<Node> filterVars = new HashSet<>();
-						Set<Node> orderByVars = new HashSet<>();
-						Graph filterGraph = GraphFactory.createPlainGraph();
-						Graph orderByGraph = GraphFactory.createPlainGraph();
-						if (filter != null) {
-							CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(first),null);
-							GraphExtract filterExtract = new GraphExtract(ctb);
-							filterGraph = filterExtract.extract(filter, graph);
-							UpdateAction.execute(filterVarsRule, filterGraph);
-							filterVars.addAll(listSubjects(filterGraph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)).toList());
-						}
-						ExtendedIterator<Node> orderBy = listSubjects(graph, typeNode, orderByNode); //TODO May also not be the right ORDER BY node. May depend on projection node as well.
-						if (orderBy.hasNext()) {
-							orderByGraph = ge.extract(orderBy.next(), graph);
-						}
-						//Extract all variables in ORDER BY clauses
-						UpdateAction.execute(filterVarsRule, orderByGraph);
-						while (orderBy.hasNext()) {
-							ExtendedIterator<Node> orderVars = listSubjects(orderByGraph, typeNode, varNode);
-							while (orderVars.hasNext()) {
-								Node v = orderVars.next();
-								Node var = GraphUtil.listObjects(graph, v, varNode).next();
-								orderByVars.add(var);
-							}
-						}
+//						if (filter != null) {
+//							CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(first),null);
+//							GraphExtract filterExtract = new GraphExtract(ctb);
+//							filterGraph = filterExtract.extract(filter, graph);
+//							UpdateAction.execute(filterVarsRule, filterGraph);
+//							filterVars.addAll(listSubjects(filterGraph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)).toList());
+//						}
+//						ExtendedIterator<Node> orderBy = listSubjects(graph, typeNode, orderByNode); //TODO May also not be the right ORDER BY node. May depend on projection node as well.
+//						if (orderBy.hasNext()) {
+//							orderByGraph = ge.extract(orderBy.next(), graph);
+//						}
+//						//Extract all variables in ORDER BY clauses
+//						UpdateAction.execute(filterVarsRule, orderByGraph);
+//						ExtendedIterator<Node> bindings = listSubjects(graph,typeNode,bindNode);
+//						while (bindings.hasNext()) {
+//							Node binding = bindings.next();
+//							Node var = listObjects(graph,binding,varNode).next();
+//							orderByVars.add(var);
+//						}
+//						while (orderBy.hasNext()) {
+//							ExtendedIterator<Node> orderVars = listSubjects(orderByGraph, typeNode, varNode);
+//							while (orderVars.hasNext()) {
+//								Node v = orderVars.next();
+//								Node var = GraphUtil.listObjects(graph, v, varNode).next();
+//								orderByVars.add(var);
+//							}
+//						}
 						//printGraph(filterGraph);
 						//branchRelabelling(ucq,projectedVars,filterVars,orderByVars);
 						Graph inner = ge.extract(first, graph);
 						Graph outer = GraphFactory.createPlainGraph();
-						GraphUtil.addInto(outer, graph);
-						GraphUtil.deleteFrom(outer, inner);
+						CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(first),null);
+						GraphExtract extract = new GraphExtract(ctb);
+						outer = extract.extract(root, graph);
+						List<Node> innerVars = GraphUtil.listSubjects(inner,typeNode,varNode).toList();
+						List<Node> outerVars = GraphUtil.listSubjects(outer,typeNode,varNode).toList();
 						outer.remove(subjectBGP, predicateBGP, first);
-						GraphUtil.deleteFrom(filterGraph,inner);
-						for (Node f : filterVars) {
-							filterGraph.add(Triple.create(f, valueNode, NodeFactory.createLiteral(f.getBlankNodeLabel())));
-						}
 						//Extract all projected variables from projection node.
 						//ExtendedIterator<Node> pVars = GraphUtil.listObjects(graph, root, argNode); //TODO This may not be the right projection node.
-						for (Node p : projectedVars) {
+						for (Node p : innerVars) {
+							inner.delete(Triple.create(p,typeNode,varNode));
+						}
+						for (Node p : outerVars) {
 							outer.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
 							outer.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
 							outer.add(Triple.create(p, typeNode, varNode));
 							inner.add(Triple.create(p, valueNode, NodeFactory.createLiteral(p.getBlankNodeLabel())));
 							inner.add(Triple.create(p, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-						}
-						for (Node o : orderByVars) {
-							outer.add(Triple.create(o, valueNode, NodeFactory.createLiteral(o.getBlankNodeLabel())));
-							outer.add(Triple.create(o, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
-							outer.add(Triple.create(o, typeNode, varNode));
-							inner.add(Triple.create(o, valueNode, NodeFactory.createLiteral(o.getBlankNodeLabel())));
-							inner.add(Triple.create(o, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean)));
+							inner.add(Triple.create(p,typeNode,varNode));
 						}
 						//Create a new r-graph based on this conjunctive query.
 						RGraph e = cqMinimisation(first,inner);
@@ -1703,7 +1700,6 @@ public class RGraph {
 							}
 						}
 						GraphUtil.addInto(eg.graph, e.graph);
-						GraphUtil.addInto(eg.graph, filterGraph);
 						eg.graph.delete(Triple.create(subjectBGP,predicateBGP,first));
 						eg.graph.add(Triple.create(subjectBGP, predicateBGP, eRoot));
 						eg.root = root;
@@ -1711,16 +1707,18 @@ public class RGraph {
 						eg.setDistinctNode(true);
 						UpdateAction.execute(branchCleanUpRule, eg.graph);
 						UpdateAction.execute(branchUnionRule, eg.graph);
-						UpdateAction.execute(branchCleanUpRule2, eg.graph);
+						//UpdateAction.execute(branchCleanUpRule2, eg.graph);
 						UpdateAction.execute(joinRule, eg.graph);
-						return eg;
+						this.graph = eg.graph;
 					}
 				}
 			}
+			result = new ArrayList<>();
 		}
 		UpdateAction.execute(branchCleanUpRule,graph);
 		UpdateAction.execute(branchUnionRule,graph);
-		UpdateAction.execute(branchCleanUpRule2,graph);
+		//UpdateAction.execute(branchCleanUpRule2,graph);
+		removeTemporaryVars();
 		UpdateAction.execute(joinRule, graph);
 		return this;
 	}
@@ -1740,6 +1738,21 @@ public class RGraph {
 		}
 		else {
 			return false;
+		}
+	}
+
+	public void removeTemporaryVars() {
+		ExtendedIterator<Node> tempNodes = GraphUtil.listSubjects(graph,tempNode,NodeFactory.createLiteralByValue(true,XSDDatatype.XSDboolean));
+		while (tempNodes.hasNext()) {
+			Node temp = tempNodes.next();
+			Node value = GraphUtil.listObjects(graph,temp,valueNode).hasNext() ? GraphUtil.listObjects(graph,temp,valueNode).next() : null;
+			graph.delete(Triple.create(temp,tempNode,NodeFactory.createLiteralByValue(true,XSDDatatype.XSDboolean)));
+			if (value != null) {
+				graph.delete(Triple.create(temp,valueNode,value));
+			}
+			if (graph.contains(Triple.create(temp,typeNode,varNode))) {
+				graph.delete(Triple.create(temp,typeNode,varNode));
+			}
 		}
 	}
 
