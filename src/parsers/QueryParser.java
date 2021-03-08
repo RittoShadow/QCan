@@ -97,8 +97,6 @@ public class QueryParser {
 				}
 				catch (UnsupportedOperationException | NullPointerException e){
 					unsupportedQueries++;
-					Query q = QueryFactory.create(s);
-					canonQueries.add(q.toString());
 					unsupportedQueriesList.add(e.getMessage() + ": " + s);
 				}
 				catch(QueryParseException e){
@@ -333,7 +331,7 @@ public class QueryParser {
 				System.out.println(i+" queries added.");
 			}
 		}
-		bw.append("Total number of duplicates detected: "+numberOfDuplicates);
+		bw.append("Total number of duplicates detected: "+numberOfDuplicates+"\n");
 		bw.append("Most duplicates found: "+max);
 		bw.flush();
 		bw.close();
@@ -344,6 +342,7 @@ public class QueryParser {
 		output += "Total number of queries: " + this.totalQueries + "\n";
 		output += "Number of canonicalised queries: " + this.supportedQueries + "\n";
 		output += "Number of unique queries: " + this.canonQueries.entrySet().size() + "\n";
+		output += "Number of duplicates detected: "+numberOfDuplicates+"\n";
 		output += "Number of queries with unsupported features: "+this.unsupportedQueries + "\n";
 		output += "Number of queries with unspecified exceptions: "+this.otherUnspecifiedExceptions + "\n";
 		output += "Number of queries with bad syntax: "+this.badSyntaxQueries + "\n";
