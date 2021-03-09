@@ -179,7 +179,7 @@ public class RGraph {
 	 * @param triples List of RDF triples.
 	 */
 	public RGraph(List<Triple> triples){
-		this(triples, null);
+		this(triples, new ArrayList<>());
 	}
 	
 	/**
