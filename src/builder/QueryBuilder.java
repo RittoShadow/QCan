@@ -3,11 +3,11 @@ package builder;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import com.google.common.collect.BiMap;
 import main.RGraph;
 import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
+import org.apache.jena.ext.com.google.common.collect.BiMap;
+import org.apache.jena.ext.com.google.common.collect.HashBiMap;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.GraphExtract;
 import org.apache.jena.graph.GraphUtil;
@@ -41,7 +41,7 @@ import transformers.NotOneOfTransform;
  */
 public class QueryBuilder {
 	final String URI = "http://example.org/";
-	public Map<Node,Node> varMap = new HashMap<>();
+	public BiMap<Node,Node> varMap = HashBiMap.create();
 	public Map<String,String> finalVarMap = new HashMap<>();
 	public final Node typeNode = NodeFactory.createURI(this.URI+"type");
 	private final Node tpNode = NodeFactory.createURI(this.URI+"TP");
@@ -579,7 +579,6 @@ public class QueryBuilder {
 	public Op filterBindOrGroupToOp(Node n) {
 		Node subOp = GraphUtil.listObjects(graph,n,subNode).next();
 		Op ans = nextOpByType(subOp);
-		ExtendedIterator<Node> filterOrBind = GraphUtil.listObjects(graph, n, argNode);
 		VarExprList varExprList = new VarExprList();
 		VarExprList groupByVars = new VarExprList();
 		List<ExprAggregator> aggList = new ArrayList<>();
@@ -1445,7 +1444,11 @@ public class QueryBuilder {
 		}
 		String ans = q.toString();
 		for (Map.Entry<String,String> entry : newLabels.entrySet()) {
-			ans = ans.replace(entry.getKey(), entry.getValue());
+			String skLabel = entry.getKey();;
+			String newLabel = entry.getValue();
+			ans = ans.replace(skLabel, newLabel);
+			String originalLabel = varMap.inverse().get(NodeFactory.createBlankNode(skLabel)).toString();
+			finalVarMap.put(originalLabel,newLabel);
 		}
 		return ans;
 	}

@@ -2,10 +2,10 @@ PREFIX ex:  <http://example.org/>
 
 DELETE{
 		?s ?p ?n .
-		?n ex:value ?vname .
 		?n ?r ?u .
 	}
 INSERT { ?x ex:type ex:var .
+        ?x ex:value ?vname .
 		?s ?p ?x .}
 WHERE {
  {

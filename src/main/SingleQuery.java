@@ -273,27 +273,17 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "SELECT DISTINCT  ?v3 ?v1 ?v0\n" +
+		String q = "SELECT  *\n" +
 				"WHERE\n" +
-				"  { { <http://dbpedia.org/resource/Desperate_Housewives>\n" +
-				"                <http://www.w3.org/2000/01/rdf-schema#comment>  ?v2 ;\n" +
-				"                <http://xmlns.com/foaf/0.1/name>  ?v4\n" +
-				"      OPTIONAL\n" +
-				"        {   { ?v3\n" +
-				"                        <http://www.w3.org/2002/07/owl#sameAs>  <http://dbpedia.org/resource/Desperate_Housewives>\n" +
-				"            }\n" +
-				"          UNION\n" +
-				"            { <http://dbpedia.org/resource/Desperate_Housewives>\n" +
-				"                        <http://www.w3.org/2002/07/owl#sameAs>  ?v3\n" +
-				"            }\n" +
-				"        }\n" +
-				"    }\n" +
-				"    FILTER ( lang(?v1) = \"en\" )\n" +
+				"  { ?y  <http://www.wikidata.org/prop/direct/P197>  ?x .\n" +
+				"    ?z  <http://www.wikidata.org/prop/direct/P800>  ?x .\n" +
+				"    ?x  <http://www.wikidata.org/prop/direct/P1366>  ?v\n" +
 				"  }";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();
 		System.out.println(query1);
+		System.out.println(sq.getVarMap());
 		System.out.println(sq.graphTime/Math.pow(10, 9));
 		System.out.println(sq.rewriteTime/Math.pow(10, 9));
 		System.out.println(sq.labelTime/Math.pow(10, 9));
