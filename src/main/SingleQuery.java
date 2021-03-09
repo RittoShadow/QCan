@@ -7,7 +7,6 @@ import java.util.Set;
 
 import builder.QueryBuilder;
 import builder.RGraphBuilder;
-import org.apache.jena.graph.Node;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
@@ -51,7 +50,7 @@ public class SingleQuery {
 	private boolean containsBind = false;
 	private boolean containsGroupBy = false;
 	private boolean containsTable = false;
-	private Map<Node, Node> varMap = new HashMap<>();
+	private Map<String, String> varMap = new HashMap<String, String>();
 
 	public SingleQuery(String q) throws InterruptedException, HashCollisionException{
 		this(q,true,true);
@@ -223,7 +222,7 @@ public class SingleQuery {
 	public String getQuery(){
 		QueryBuilder qb = new QueryBuilder(this.canonGraph);
 		this.canonVars = qb.getVars();
-		this.varMap = qb.varMap;
+		this.varMap = qb.finalVarMap;
 		String query = qb.getQuery();
 		return query;
 	}
@@ -290,7 +289,7 @@ public class SingleQuery {
 		System.out.println(sq.minimisationTime/Math.pow(10, 9));
 	}
 
-	public Map<Node,Node> getVarMap() {
+	public Map<String, String> getVarMap() {
 		return this.varMap;
 	}
 

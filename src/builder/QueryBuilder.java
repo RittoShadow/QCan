@@ -1,7 +1,6 @@
 package builder;
 
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import main.RGraph;
 import org.apache.jena.atlas.lib.Pair;
@@ -32,7 +31,6 @@ import org.apache.jena.sparql.syntax.Template;
 import org.apache.jena.sparql.util.ExprUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import tools.Tools;
-import transformers.NotOneOfTransform;
 
 /**
  * This class builds a query out of an r-graph.
@@ -42,7 +40,7 @@ import transformers.NotOneOfTransform;
 public class QueryBuilder {
 	final String URI = "http://example.org/";
 	public BiMap<Node,Node> varMap = HashBiMap.create();
-	public Map<String,String> finalVarMap = new HashMap<>();
+	public Map<String, String> finalVarMap = new HashMap<String, String>();
 	public final Node typeNode = NodeFactory.createURI(this.URI+"type");
 	private final Node tpNode = NodeFactory.createURI(this.URI+"TP");
 	private final Node argNode = NodeFactory.createURI(this.URI+"arg");
