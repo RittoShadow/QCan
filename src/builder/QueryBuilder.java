@@ -1447,8 +1447,10 @@ public class QueryBuilder {
 			String skLabel = entry.getKey();;
 			String newLabel = entry.getValue();
 			ans = ans.replace(skLabel, newLabel);
-			String originalLabel = varMap.inverse().get(NodeFactory.createBlankNode(skLabel)).toString();
-			finalVarMap.put(originalLabel,newLabel);
+			if (varMap.inverse().containsKey(NodeFactory.createBlankNode(skLabel))) {
+				String originalLabel = varMap.inverse().get(NodeFactory.createBlankNode(skLabel)).toString();
+				finalVarMap.put(originalLabel,newLabel);
+			}
 		}
 		return ans;
 	}
