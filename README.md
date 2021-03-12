@@ -44,7 +44,7 @@ Options:
 
 # Demo
 
-Live demo [here](qcan.dcc.uchile.cl)
+Live demo [here](http://qcan.dcc.uchile.cl)
 
 # License
 
