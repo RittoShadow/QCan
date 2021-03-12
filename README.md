@@ -1,3 +1,7 @@
+
+
+![QCan](http://qcan.dcc.uchile.cl/QCan/assets/images/qcanLogoSmall.png)
+
 # QCan
 Software for canonicalising SPARQL queries.
 
