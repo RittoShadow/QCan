@@ -3,19 +3,20 @@ Software for canonicalising SPARQL queries.
 
 # Description
 QCan is a free software for the canonicalisation of SPARQL queries.
-This software works with queries under SPARQL 1.0 syntax. 
-Developed as part of a master's thesis.
+This software works with queries under SPARQL ~~1.0~~ 1.1 syntax. 
+Developed as part of a master's thesis. Extended as part of a doctorate.
 
 # Benchmark
 
 To run this software over a text file containing SPARQL queries (one per line) execute:
 
-> java Benchmark filename numberOfQueries
+> java Benchmark -x filename -n numberOfQueries -o offset
 
 Options:
-* -l to enable the leaning of graphs.
-* -o to enable the processing of queries containing OPTIONAL clauses.
-* -f to enable the processing of queries containing FILTER expressions.
+* -l to enable the minimisation of monotone parts of a query.
+* -c to enable canonical labeling.
+* -r to enable the rewriting of monotone parts of a query to UCQs (may involve an exponential blow-up).
+* -d to output a file containing all distinct queries as well as how many duplicates are found.
 
 The MultipleGenerator class contains a main type that creates SPARQL queries from graphs (contained in the eval folder). We create queries where nodes are variables connected by a fixed predicate.
 
@@ -25,6 +26,17 @@ The UCQGeneratorTest class contains a main type that creates SPARQL queries that
 These queries contain n conjunctions of patterns containing m disjunctions.
 
 > java UCQGeneratorTest conjunctions unions
+
+Includes an EasyCanonicalisation class 
+
+> java EasyCanonicalisation -f fileContainingQueries -o outputFile
+
+OR
+
+> java EasyCanonicalisation -q query
+
+Options:
+* -m to enable minimisation/leaning
 
 # Demo
 
