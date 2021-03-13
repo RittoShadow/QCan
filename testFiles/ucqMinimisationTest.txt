@@ -1,0 +1,21 @@
+SELECT DISTINCT ?z WHERE { { ?c <http://ex.org/a> ?y ; ?p  ?o . } UNION { ?c <http://ex.org/b> ?y } ?y <http://ex.org/c> ?z }
+SELECT DISTINCT ?q4 WHERE { { ?q3 <http://ex.org/a> ?q0 ; ?q2  ?q1 { ?q0 <http://ex.org/c> ?q4 } } UNION { ?q3 <http://ex.org/b>  ?q0 . ?q0 <http://ex.org/c>  ?q4 } }
+SELECT DISTINCT ?q0 WHERE { { ?q4 ?q3 ?q2 ; <http://ex.org/a> ?q1 { ?q1 <http://ex.org/c>  ?q0 } } UNION { ?q4 <http://ex.org/b>  ?q1 . ?q1 <http://ex.org/c>  ?q0 } }
+SELECT ?z WHERE {{ ?x <http://ex.org/a> ?y ; ?p  ?o . } UNION { ?x <http://ex.org/b> ?y } ?y <http://ex.org/c> ?z}
+SELECT ?q4 WHERE {{ ?q3 <http://ex.org/a> ?q0; ?q2 ?q1 { ?q0 <http://ex.org/c> ?q4 }} UNION {?q3 <http://ex.org/b> ?q0 . ?q0 <http://ex.org/c> ?q4 }}
+SELECT ?q0 WHERE {{ ?q4 ?q3 ?q2 ; <http://ex.org/a> ?q1 { ?q1 <http://ex.org/c> ?q0 }} UNION { ?q4 <http://ex.org/b> ?q1 . ?q1 <http://ex.org/c> ?q0}}
+SELECT DISTINCT ?a WHERE {  ?a <http://test.com> ?b , ?c .}
+SELECT DISTINCT ?a WHERE {  ?a <http://test.com> ?b , ?c ; <http://test.com> ?e .}
+SELECT DISTINCT ?x WHERE {  ?x <http://test.com> ?y .}
+SELECT DISTINCT ?a WHERE { { ?a <http://example.org/p> ?b  }   UNION { ?a <http://example.org/q> ?b  }   UNION { ?a <http://example.org/r> ?b  }}
+SELECT DISTINCT ?a WHERE { { ?a <http://example.org/q> ?b  }   UNION { ?a <http://example.org/p> ?b  }   UNION { ?a <http://example.org/r> ?b  }}
+SELECT DISTINCT ?a WHERE { { ?a <http://example.org/q> ?b  }   UNION { ?a <http://example.org/p> ?b  }   UNION { ?a <http://example.org/r> ?b , ?c  }}
+SELECT DISTINCT ?a WHERE { { ?a <http://example.org/q> ?b  }   UNION { ?a <http://example.org/p> ?b  }   UNION { ?a <http://example.org/r> ?b }   UNION { ?a <http://example.org/s> ?b }}
+SELECT DISTINCT ?a WHERE { { { ?a <http://example.org/q> ?b  }   UNION { ?a <http://example.org/p> ?b  } }   UNION { { ?a <http://example.org/r> ?b }   UNION { ?a <http://example.org/s> ?b } }}
+SELECT DISTINCT ?a WHERE { { { ?a <http://example.org/r> ?b }   UNION { ?a <http://example.org/q> ?b } }   UNION { { ?a <http://example.org/s> ?b  }   UNION { ?a <http://example.org/p> ?b  } }}
+SELECT DISTINCT ?a WHERE { { ?a <http://example.org/p> ?z } UNION { ?a ?y ?z }}
+SELECT DISTINCT ?x WHERE { ?x ?y ?z .}
+SELECT DISTINCT ?x WHERE { { ?x <http://example.org/p> ?y } UNION { ?x <http://example.org/q> ?z }}
+SELECT DISTINCT ?x WHERE { { ?x <http://example.org/p> ?y } UNION { ?x <http://example.org/q> ?y }}
+SELECT DISTINCT ?q2 WHERE { { ?q1 <http://ex.org/c>  ?q2 . ?q0 <http://ex.org/a>  ?q1 ; ?y ?z .} UNION { ?a ?b ?q2 .} }
+SELECT DISTINCT ?z WHERE { ?x ?y ?z .}

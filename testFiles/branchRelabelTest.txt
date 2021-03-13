@@ -1,0 +1,7 @@
+PREFIX : <http://example.org/> SELECT DISTINCT ?z WHERE{ {?w :mother ?x . } UNION {?w :father ?x . ?x :sister ?y .} UNION {?c :mother ?d . ?d :sister ?y .} ?d ?p ?e . ?e :name ?f . ?x :sister ?y . ?y :name ?z .}
+PREFIX : <http://example.org/> SELECT DISTINCT ?n WHERE{ {?a :name ?n . ?c :mother ?m . ?m :sister ?a .} UNION {?a :name ?n . ?c :father ?f . ?f :sister ?a .} }
+PREFIX : <http://example.org/> SELECT DISTINCT ?n WHERE{ {?a :name ?n . ?c :mother ?m . ?m :sister ?a .} UNION {?a :name ?n . ?c :father ?m . ?m :sister ?a .} }
+SELECT DISTINCT ?a WHERE { { ?a <http://example.org/p> ?z } UNION { ?a ?y ?z }}
+SELECT DISTINCT ?x WHERE { ?x ?y ?z .}
+SELECT DISTINCT ?x WHERE { { ?x <http://example.org/p> ?y } UNION { ?x <http://example.org/q> ?z }}
+SELECT DISTINCT ?x WHERE { { ?x <http://example.org/p> ?y } UNION { ?x <http://example.org/q> ?y }}
