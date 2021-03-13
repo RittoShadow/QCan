@@ -1,0 +1,9 @@
+PREFIX : <http://books.example/> SELECT (SUM(?lprice) AS ?totalPrice) WHERE {  ?org :affiliates ?auth .  ?auth :writesBook ?book .  ?book :price ?lprice . } GROUP BY ?org HAVING (SUM(?lprice) > 10)
+PREFIX : <http://example.com/data/#> SELECT ?x (MIN(?y) * 2 AS ?min) WHERE {  ?x :p ?y .  ?x :q ?z . } GROUP BY ?x (STR(?z))
+PREFIX : <http://example.com/data/#> SELECT ?g (AVG(?p) AS ?avg) ((MIN(?p) + MAX(?p)) / 2 AS ?c) WHERE {  ?g :p ?p . } GROUP BY ?g
+PREFIX : <http://example.com/data/#> SELECT ?g (AVG(?p) AS ?avg) ((MIN(?p) + MAX(?p)) / 2 AS ?c) WHERE {  ?g :p ?p . } GROUP BY ?g HAVING(AVG(?p) > 5)
+PREFIX : <http://data.example/> SELECT (AVG(?size) AS ?asize) WHERE {  ?x :size ?size } GROUP BY ?x HAVING(AVG(?size) > 10)
+PREFIX : <http://data.example/> SELECT DISTINCT (AVG(?size) AS ?asize) WHERE {{  ?x :size ?size } UNION { ?x ?y ?size }} GROUP BY ?x HAVING(AVG(?size) > 10)
+PREFIX : <http://data.example/> SELECT DISTINCT (AVG(?size) AS ?asize) WHERE { ?x ?y ?size } GROUP BY ?x HAVING(AVG(?size) > 10)
+SELECT DISTINCT (COUNT(?s) AS ?x) WHERE { ?s ?p ?o }
+SELECT (COUNT(DISTINCT ?s) AS ?x) WHERE { ?s ?p ?o }

@@ -1,0 +1,13 @@
+SELECT ?s WHERE {  { ?s ?p ?o . } OPTIONAL { ?o ?p ?s }  FILTER(?s>?o) } # 1 == 2
+SELECT ?s WHERE {  { ?s ?p ?o . FILTER(?s>?o) } OPTIONAL { ?o ?p ?s } }
+PREFIX : <http://example.org/> SELECT DISTINCT ?x ?y ?z WHERE {  { ?x :sibling ?y }   OPTIONAL { ?x :twin ?z FILTER(?x != ?z)  } } # 3 != 4
+PREFIX : <http://example.org/> SELECT DISTINCT ?x ?y ?z WHERE {  { ?x :sibling ?y }  OPTIONAL { ?x :twin ?z }  FILTER(?x != ?z) }
+PREFIX : <http://example.org/> SELECT DISTINCT ?x ?y ?z WHERE {  { ?x :sibling ?y }   OPTIONAL { ?x :twin ?z FILTER(?x != ?z)  }} # 5 != 6
+PREFIX : <http://example.org/> SELECT DISTINCT ?x ?y ?z WHERE {  { ?x :sibling ?y }   OPTIONAL { ?x :twin ?z }}
+SELECT ?s WHERE {  { ?s ?p ?o . } UNION { ?o ?p ?s }  FILTER(?s>?o) }  # 7 == 8
+SELECT ?s WHERE {  { ?s ?p ?o . FILTER(?s>?o) } UNION { ?o ?p ?s . FILTER(?s>?o) }  }
+SELECT DISTINCT ?z WHERE {{ ?x <http://ex.org/a> ?y ; ?p  ?o . } UNION { ?x <http://ex.org/b> ?y } ?y <http://ex.org/c> ?z FILTER(?z > ?y)}
+SELECT DISTINCT ?s WHERE { { ?s <http://ex.org/a> ?o } UNION { ?z <p> ?y FILTER(?z > 10) } . { ?s <http://ex.org/b> ?o } }
+SELECT DISTINCT ?s WHERE { { ?s <http://ex.org/a> ?o } UNION { ?s <p> ?y FILTER(?s > 10) } . { ?s <http://ex.org/b> ?o } }
+SELECT DISTINCT ?s WHERE { { { ?s <http://ex.org/a> ?o } UNION { ?z <p> ?y } FILTER(?z > 10) } . { ?s <http://ex.org/b> ?o } }
+SELECT DISTINCT ?s WHERE { { { ?s <http://ex.org/a> ?o } UNION { ?s <p> ?y } FILTER(?s > 10) } . { ?s <http://ex.org/b> ?o } }
