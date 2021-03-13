@@ -272,12 +272,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "SELECT  *\n" +
-				"WHERE\n" +
-				"  { ?y  <http://www.wikidata.org/prop/direct/P197>  ?x .\n" +
-				"    ?z  <http://www.wikidata.org/prop/direct/P800>  ?x .\n" +
-				"    ?x  <http://www.wikidata.org/prop/direct/P1366>  ?v\n" +
-				"  }";
+		String q = "Select ?r From <http://linkedgeodata.org> {          ?r <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?t.         ?r <http://www.w3.org/2000/01/rdf-schema#label> \"Paphos\".         OPTIONAL {             ?r <http://linkedgeodata.org/property/is_in> ?in.         }         OPTIONAL {             ?r <http://linkedgeodata.org/property/is_in%3Acountry> ?country.         }         Filter (?t = <http://linkedgeodata.org/ontology/City> || ?t = <http://linkedgeodata.org/ontology/Town> )         Filter (bound(?in) && regex(?in, \"Cyprus\", \"i\") || !bound(?in))         Filter (bound(?country) && regex(?country, \"Cyprus\", \"i\")|| !bound(?country))         Filter (bound(?in) || bound(?country))     }\n";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();

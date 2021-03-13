@@ -1,3 +1,0 @@
-PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT ?s WHERE { ?s foaf:age 20 }
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> SELECT ?s WHERE { ?s <http://xmlns.com/foaf/0.1/age> "20"^^xsd:integer }
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> SELECT ?s WHERE { { ?s <http://xmlns.com/foaf/0.1/age> "20"^^xsd:integer } }

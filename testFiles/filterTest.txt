@@ -1,0 +1,18 @@
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> ?o2 . FILTER((?o1 < 500 && ?o2 != 1000 && REGEX(?o1,"^a"))) }
+SELECT * WHERE { ?s <http://ex.org/q> ?a . ?s <http://ex.org/p> ?b . FILTER(REGEX(?b,"^a") && ?a != 1000 && ?b < 500) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> ?o2 . FILTER(1000 != ?o2) FILTER(?o1 < 500 && REGEX(?o1,"^a")) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/p> ?o2 . FILTER((?o1 < 500 && ?o2 != 1000) || REGEX(?o1,"^a")) }
+SELECT * WHERE { ?s <http://ex.org/p> ?a . ?s <http://ex.org/p> ?b . FILTER(REGEX(?b,"^a") || (?a != 1000 && ?b < 500)) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> 1 . }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> ?o2 . FILTER(?o2 = 1) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1 . ?s <http://ex.org/q> ?o2 . FILTER(!(?o2 = 1)) }
+SELECT * WHERE { ?s <http://ex.org/p> ?o1  FILTER(!(?o1 = 1)) }
+SELECT DISTINCT ?s WHERE { { ?s <p> ?o } UNION { ?s <q> ?o } FILTER(?o < 15)}
+SELECT DISTINCT ?r WHERE { { ?r <p> ?o } UNION { ?r <q> ?o } FILTER(?o < 15)}
+SELECT DISTINCT ?r WHERE { { ?r <p> ?w } UNION { ?r <q> ?y } FILTER(?z < 15)}
+SELECT DISTINCT ?s WHERE { { ?s <p> ?o } UNION { ?s <q> ?o }} ORDER BY ?o
+SELECT DISTINCT ?x WHERE { { ?x <p> ?w } UNION { ?x <q> ?y }} ORDER BY ?z
+PREFIX geo:<http://www.w3.org/2003/01/geo/wgs84_pos#>  PREFIX xsd:<http://www.w3.org/2001/XMLSchema#>  SELECT DISTINCT ?l ?lat ?lng  WHERE {   ?l geo:lat ?lat; geo:long ?lng; a <http://dbpedia.org/ontology/Place>.   FILTER(((?lat - xsd:float(44.849998))*(?lat - xsd:float(44.849998))+(?lng - xsd:float(7.716667))*(?lng - xsd:float(7.716667)))<xsd:float(1.0)) }
+SELECT DISTINCT  ?v1 ?v0 ?v2 WHERE  { ?v0              a                     <http://dbpedia.org/ontology/Place> ;              <http://www.w3.org/2003/01/geo/wgs84_pos#lat>  ?v1 ;             <http://www.w3.org/2003/01/geo/wgs84_pos#long>  ?v2    FILTER ( ( ( ( ?v2 - <http://www.w3.org/2001/XMLSchema#float>(7.716667) ) * ( ?v2 - <http://www.w3.org/2001/XMLSchema#float>(7.716667) ) ) + ( ( ?v1 - <http://www.w3.org/2001/XMLSchema#float>(44.849998) ) * ( ?v1 - <http://www.w3.org/2001/XMLSchema#float>(44.849998) ) ) ) < <http://www.w3.org/2001/XMLSchema#float>(1.0) )  }
+PREFIX  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX  foaf:   <http://xmlns.com/foaf/0.1/> SELECT ?person WHERE {    ?person rdf:type  foaf:Person .    FILTER NOT EXISTS { ?person foaf:name ?name } }
+PREFIX  rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX  foaf:   <http://xmlns.com/foaf/0.1/> SELECT ?person WHERE {    ?person rdf:type  foaf:Person .    FILTER EXISTS { ?person foaf:name ?name } }

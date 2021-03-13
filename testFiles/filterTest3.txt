@@ -1,1 +1,0 @@
-SELECT DISTINCT ?z WHERE {{ ?x <http://ex.org/a> ?y ; ?p  ?o . } UNION { ?x <http://ex.org/b> ?y } ?y <http://ex.org/c> ?z FILTER(?z > ?y)}

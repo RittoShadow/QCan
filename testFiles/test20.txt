@@ -1,3 +1,0 @@
-SELECT DISTINCT ?z WHERE { { ?c <http://ex.org/a> ?y ; ?p  ?o . } UNION { ?c <http://ex.org/b> ?y } ?y <http://ex.org/c> ?z }
-SELECT DISTINCT ?q4 WHERE { { ?q3 <http://ex.org/a> ?q0 ; ?q2  ?q1 { ?q0 <http://ex.org/c> ?q4 } } UNION { ?q3 <http://ex.org/b>  ?q0 . ?q0 <http://ex.org/c>  ?q4 } }
-SELECT DISTINCT ?q0 WHERE { { ?q4 ?q3 ?q2 ; <http://ex.org/a> ?q1 { ?q1 <http://ex.org/c>  ?q0 } } UNION { ?q4 <http://ex.org/b>  ?q1 . ?q1 <http://ex.org/c>  ?q0 } }

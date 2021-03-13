@@ -1,4 +1,0 @@
-SELECT DISTINCT ?a WHERE { { ?a <http://example.org/p> ?z } UNION { ?a ?y ?z }}
-SELECT DISTINCT ?x WHERE { ?x ?y ?z .}
-SELECT DISTINCT ?x WHERE { { ?x <http://example.org/p> ?y } UNION { ?x <http://example.org/q> ?z }}
-SELECT DISTINCT ?x WHERE { { ?x <http://example.org/p> ?y } UNION { ?x <http://example.org/q> ?y }}

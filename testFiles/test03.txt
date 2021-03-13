@@ -1,2 +1,0 @@
-PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT ?s ?n WHERE { ?s foaf:age 20 ; foaf:name ?n . }
-PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT ?s ?n WHERE { 	?s foaf:name ?n .	?s foaf:age 20 .  }

@@ -1,8 +1,0 @@
-SELECT DISTINCT ?a WHERE {  { ?a <http://ex.org/p> ?b }  { ?a <http://ex.org/q> ?c } }
-SELECT DISTINCT ?a WHERE {  { ?a <http://ex.org/p> _:b }  { ?a <http://ex.org/q> _:c } }
-SELECT DISTINCT ?a WHERE {  ?a <http://ex.org/p> ?b .  ?a <http://ex.org/q> ?c . }
-SELECT ?a WHERE { { { ?a <http://example.org/r> ?b }   UNION { ?a <http://example.org/q> ?b } }   UNION { { ?a <http://example.org/s> ?b  }   UNION { ?a <http://example.org/p> ?b  } } { ?a <http://example.org/w> ?b } }
-SELECT ?a WHERE { {  	{ ?a <http://example.org/r> ?b .     ?a <http://example.org/w> ?b }   UNION 	{ ?a <http://example.org/q> ?b .   	?a <http://example.org/w> ?b }   }   UNION { { ?a <http://example.org/s> ?b .     ?a <http://example.org/w> ?b }   UNION { ?a <http://example.org/p> ?b .    ?a <http://example.org/w> ?b} } }
-SELECT DISTINCT ?a WHERE {  { ?a <http://ex.org/p> ?b }  { ?a <http://ex.org/p> ?b } }
-SELECT DISTINCT ?a WHERE {  ?a <http://ex.org/p> ?b .  ?a <http://ex.org/p> ?b }
-SELECT DISTINCT ?a WHERE {  ?a <http://ex.org/p> ?b }

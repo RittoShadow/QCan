@@ -1,1 +1,0 @@
-SELECT DISTINCT ?q2 WHERE { { ?q1 <http://ex.org/c>  ?q2 . ?q0 <http://ex.org/a>  ?q1 ; ?y ?z .} UNION { ?a ?b ?q2 .} }

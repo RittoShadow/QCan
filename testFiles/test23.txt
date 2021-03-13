@@ -1,1 +1,0 @@
-SELECT * WHERE { ?a <p> ?b . OPTIONAL {  { ?b <q> ?c . } UNION  { ?b <r> ?c . }  { ?b <s> ?c . }    UNION  { ?b <t> ?c . } } }
