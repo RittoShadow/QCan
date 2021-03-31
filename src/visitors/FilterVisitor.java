@@ -29,6 +29,7 @@ import org.apache.jena.sparql.expr.NodeValue;
 import org.apache.jena.sparql.expr.aggregate.*;
 import org.apache.jena.sparql.graph.GraphFactory;
 import tools.Tools;
+import static tools.CommonNodes.*;
 
 /**
  * A class based on Jena's ExprVisitor that creates an r-graph that represents a FILTER expression.
@@ -149,7 +150,7 @@ public class FilterVisitor implements ExprVisitor {
 	@Override
 	public void visit(ExprVar nv) {
 		Node v = NodeFactory.createBlankNode(nv.getVarName());
-		filterGraph.graph.add(Triple.create(v,filterGraph.typeNode,filterGraph.varNode));
+		filterGraph.graph.add(Triple.create(v,typeNode,varNode));
 		nodeStack.add(v);
 	}
 

@@ -42,12 +42,7 @@ import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.graph.GraphFactory;
-import org.apache.jena.sparql.path.P_Link;
-import org.apache.jena.sparql.path.P_NegPropSet;
-import org.apache.jena.sparql.path.P_ZeroOrMore1;
-import org.apache.jena.sparql.path.Path;
-import org.apache.jena.sparql.path.PathFactory;
-import org.apache.jena.sparql.path.PathWriter;
+import org.apache.jena.sparql.path.*;
 import org.apache.jena.sparql.sse.SSE;
 import org.apache.jena.sparql.sse.writers.WriterPath;
 import org.apache.jena.util.iterator.ExtendedIterator;
@@ -60,7 +55,7 @@ import cl.uchile.dcc.blabel.jena.JenaModelIterator;
 import cl.uchile.dcc.blabel.lean.DFSGraphLeaning;
 import cl.uchile.dcc.blabel.lean.GraphLeaning.GraphLeaningResult;
 import paths.PGraph;
-import visitors.TopDownVisitor;
+import visitors.PathVisitor;
 
 @SuppressWarnings("unused")
 public class BGPCollapser extends TransformCopy {
@@ -609,11 +604,11 @@ public class BGPCollapser extends TransformCopy {
 					newAns = o;
 				}
 				else if (o instanceof OpJoin) {
-					TopDownVisitor tdv = new TopDownVisitor(o, this.projectedVars);
+					PathVisitor tdv = new PathVisitor(o, this.projectedVars);
 					newAns = tdv.getOp();
 				}
 				else if (o instanceof OpSequence) {
-					TopDownVisitor tdv = new TopDownVisitor(o, this.projectedVars);
+					PathVisitor tdv = new PathVisitor(o, this.projectedVars);
 					newAns = tdv.getOp();
 				}
 				else {

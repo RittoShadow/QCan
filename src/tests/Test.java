@@ -90,6 +90,8 @@ public class Test {
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/namedGraph.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			assertTrue(qp.equalQueries(2, 3));
+			assertFalse(qp.equalQueries(3,4));
+
 		} catch(IOException e){
 			e.printStackTrace();
 		}
@@ -165,6 +167,17 @@ public class Test {
 			assertFalse(qp.equalQueries(4,5));
 			assertTrue(qp.equalQueries(5,6));
 			assertFalse(qp.equalQueries(7,8));
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@org.junit.Test
+	public void minusTest() {
+		try {
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/minusDistTest.txt"));
+			assertTrue(qp.equalQueries(0,1));
 		}
 		catch (IOException e) {
 			e.printStackTrace();
