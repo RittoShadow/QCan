@@ -29,13 +29,13 @@ import org.apache.jena.sparql.path.P_ZeroOrMoreN;
 import org.apache.jena.sparql.path.P_ZeroOrOne;
 import org.apache.jena.sparql.path.PathVisitor;
 import org.apache.jena.util.iterator.ExtendedIterator;
+import static tools.CommonNodes.URI;
+import static tools.CommonNodes.argNode;
+import static tools.CommonNodes.epsilon;
 
 public class PathWalker implements PathVisitor {
 
-	final String URI = "http://example.org/";
 	Graph graph = GraphFactory.createPlainGraph();
-	Node epsilon = NodeFactory.createURI("http://example.org/epsilon");
-	private final Node argNode = NodeFactory.createURI(this.URI+"arg");
 	Stack<Node> nodeStack = new Stack<>();
 	Stack<Triple> tripleStack = new Stack<>();
 	Set<Node> predicates = new HashSet<>();

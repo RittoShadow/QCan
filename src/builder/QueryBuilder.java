@@ -31,6 +31,7 @@ import org.apache.jena.sparql.syntax.Template;
 import org.apache.jena.sparql.util.ExprUtils;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import tools.Tools;
+import static tools.CommonNodes.*;
 
 /**
  * This class builds a query out of an r-graph.
@@ -38,59 +39,8 @@ import tools.Tools;
  *
  */
 public class QueryBuilder {
-	final String URI = "http://example.org/";
 	public BiMap<Node,Node> varMap = HashBiMap.create();
-	public Map<String, String> finalVarMap = new HashMap<String, String>();
-	public final Node typeNode = NodeFactory.createURI(this.URI+"type");
-	private final Node tpNode = NodeFactory.createURI(this.URI+"TP");
-	private final Node argNode = NodeFactory.createURI(this.URI+"arg");
-	private final Node subjectNode = NodeFactory.createURI(this.URI+"subject");
-	private final Node preNode = NodeFactory.createURI(this.URI+"predicate");
-	private final Node objNode = NodeFactory.createURI(this.URI+"object");
-	private final Node joinNode = NodeFactory.createURI(this.URI+"join");
-	private final Node unionNode = NodeFactory.createURI(this.URI+"union");
-	private final Node projectNode = NodeFactory.createURI(this.URI+"projection");
-	private final Node askNode = NodeFactory.createURI(this.URI+"ask");
-	private final Node constructNode = NodeFactory.createURI(this.URI+"construct");
-	private final Node describeNode = NodeFactory.createURI(this.URI+"describe");
-	private final Node opNode = NodeFactory.createURI(this.URI+"OP");
-	private final Node subNode = NodeFactory.createURI(this.URI+"subOp");
-	private final Node limitNode = NodeFactory.createURI(this.URI+"limit");
-	private final Node offsetNode = NodeFactory.createURI(this.URI+"offset");
-	private final Node orderByNode = NodeFactory.createURI(this.URI+"orderBy");
-	public final Node varNode = NodeFactory.createURI(this.URI+"var");
-	private final Node orderNode = NodeFactory.createURI(this.URI+"order");
-	private final Node valueNode = NodeFactory.createURI(this.URI+"value");
-	private final Node dirNode = NodeFactory.createURI(this.URI+"direction");
-	private final Node patternNode = NodeFactory.createURI(this.URI+"pattern");
-	private final Node modNode = NodeFactory.createURI(this.URI+"modifier");
-	private final Node filterNode = NodeFactory.createURI(this.URI+"filter");
-	private final Node functionNode = NodeFactory.createURI(this.URI+"function");
-	private final Node andNode = NodeFactory.createURI(this.URI+"and");
-	private final Node orNode = NodeFactory.createURI(this.URI+"or");
-	private final Node notNode = NodeFactory.createURI(this.URI+"not");
-	private final Node optionalNode = NodeFactory.createURI(this.URI+"optional");
-	private final Node leftNode = NodeFactory.createURI(this.URI+"left");
-	private final Node rightNode = NodeFactory.createURI(this.URI+"right");
-	private final Node fromNode = NodeFactory.createURI(this.URI+"from");
-	private final Node fromNamedNode = NodeFactory.createURI(this.URI+"fromNamed");
-	private final Node graphNode = NodeFactory.createURI(this.URI+"graph");
-	private final Node distinctNode = NodeFactory.createURI(this.URI+"distinct");
-	private final Node reducedNode = NodeFactory.createURI(this.URI+"reduced");
-	private final Node tempNode = NodeFactory.createURI(this.URI+"temp");
-	private final Node extendNode = NodeFactory.createURI(this.URI+"extend");
-	private final Node bindNode = NodeFactory.createURI(this.URI+"binding");
-	private final Node tableNode = NodeFactory.createURI(this.URI+"table");
-	private final Node groupByNode = NodeFactory.createURI(this.URI+"group");
-	private final Node aggregateNode = NodeFactory.createURI(this.URI+"aggregate");
-	private final Node minusNode = NodeFactory.createURI(this.URI+"minus");
-	private final Node extraNode = NodeFactory.createURI(this.URI+"extra");
-	private final Node triplePathNode = NodeFactory.createURI(this.URI+"triplePath");
-	private final Node serviceNode = NodeFactory.createURI(this.URI+"service");
-	private final Node silentNode = NodeFactory.createURI(this.URI+"silent");
-	private final Node idNode = NodeFactory.createURI(this.URI+"id");
-	private final Node epsilon = NodeFactory.createURI(this.URI + "epsilon");
-	private final Node finalNode = NodeFactory.createURI(this.URI + "final");
+	public Map<String, String> finalVarMap = new HashMap<>();
 	private final Graph graph;
 	private final Node root;
 	private Op op;
@@ -258,7 +208,7 @@ public class QueryBuilder {
 					Node v = GraphUtil.listSubjects(graph, functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
-					if (exprs[0] == NodeValue.makeString("*")) {
+					if (exprs[0].equals(NodeValue.makeString("*"))) {
 						return new ExprAggregator(var, AggregatorFactory.createCount(false));
 					}
 					else{
@@ -394,7 +344,7 @@ public class QueryBuilder {
 
 	public Expr filterOperatorToString(Node n, List<Expr> expr) {
 		if (!isOrderedFunction(n)) {
-			Collections.sort(expr, new ExprComparator());
+			expr.sort(new ExprComparator());
 		}
 		if (expr.size() == 0 ) {
 			return filterOperatorToString(n);
@@ -516,17 +466,17 @@ public class QueryBuilder {
 	public boolean isOperator(Node s) {
 		if (isOrderedFunction(s)) {
 			return true;
-		} else if (s.equals(NodeFactory.createURI(this.URI + "eq"))) {
+		} else if (s.equals(NodeFactory.createURI(URI + "eq"))) {
 			return true;
-		} else if (s.equals(NodeFactory.createURI(this.URI + "neq"))) {
+		} else if (s.equals(NodeFactory.createURI(URI + "neq"))) {
 			return true;
-		} else if (s.equals(NodeFactory.createURI(this.URI + "times"))) {
+		} else if (s.equals(NodeFactory.createURI(URI + "times"))) {
 			return true;
-		} else if (s.equals(NodeFactory.createURI(this.URI + "plus"))) {
+		} else if (s.equals(NodeFactory.createURI(URI + "plus"))) {
 			return true;
-		} else if (s.equals(NodeFactory.createURI(this.URI + "subtract"))) {
+		} else if (s.equals(NodeFactory.createURI(URI + "subtract"))) {
 			return true;
-		} else if (s.equals(NodeFactory.createURI(this.URI + "divide"))) {
+		} else if (s.equals(NodeFactory.createURI(URI + "divide"))) {
 			return true;
 		} else {
 			return false;
@@ -536,8 +486,8 @@ public class QueryBuilder {
 	public Op joinToOp(Node n) {
 		Op ans = null;
 		ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
-		List<Triple> tripleList = new ArrayList<Triple>();
-		List<Op> opPaths = new ArrayList<Op>();
+		List<Triple> tripleList = new ArrayList<>();
+		List<Op> opPaths = new ArrayList<>();
 		BasicPattern bp = new BasicPattern();
 		while (args.hasNext()) {
 			Node arg = args.next();
@@ -550,7 +500,7 @@ public class QueryBuilder {
 				ans = OpJoin.create(ans, nextOpByType(arg));
 			}
 		}
-		Collections.sort(tripleList, new TripleComparator());
+		tripleList.sort(new TripleComparator());
 		for (Triple t : tripleList) {
 			bp.add(t);
 		}
@@ -716,7 +666,7 @@ public class QueryBuilder {
 		Op ans = null;
 		ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, argNode);
 		List<Node> argList = args.toList();
-		Collections.sort(argList, new NodeComparator());
+		argList.sort(new NodeComparator());
 		Node firstArg = argList.get(0);
 		ans = nextOpByType(firstArg);
 		for (int i = 1; i < argList.size(); i++) {
@@ -773,8 +723,7 @@ public class QueryBuilder {
 		leftOp = nextOpByType(left);
 		Node right = GraphUtil.listObjects(graph, n, rightNode).next();
 		rightOp = nextOpByType(right);
-		Op ans = OpLeftJoin.createLeftJoin(leftOp, rightOp, null);
-		return ans;
+		return OpLeftJoin.createLeftJoin(leftOp, rightOp, null);
 	}
 
 	public Op minusToOp(Node n) {
@@ -850,7 +799,7 @@ public class QueryBuilder {
 				i++;
 			}
 			if (!isOrderedFunction(function)) {
-				Collections.sort(params, new ExprComparator());
+				params.sort(new ExprComparator());
 			}
 			if (nParams == 1) {
 				//return filterOperatorToString(function, bindToOp(argList.get(0)));
@@ -933,7 +882,7 @@ public class QueryBuilder {
 				i++;
 			}
 			if (!isOrderedFunction(function)) {
-				Collections.sort(params, new ExprComparator());
+				params.sort(new ExprComparator());
 			}
 			if (nParams == 0) {
 				return aggregatorOperatorToExpr(n, distinct, Collections.emptyList());
@@ -976,7 +925,7 @@ public class QueryBuilder {
 
 	public Path propertyPathToOp(Node n) {
 		Path ans = null;
-		if (graph.contains(Triple.create(n,typeNode,NodeFactory.createURI(this.URI+"notOneOf")))) {
+		if (graph.contains(Triple.create(n,typeNode,NodeFactory.createURI(URI+"notOneOf")))) {
 			List<Node> predicates = GraphUtil.listObjects(graph,n,argNode).toList();
 			predicates.sort(new NodeComparator());
 			P_NegPropSet path = new P_NegPropSet();
@@ -1281,7 +1230,7 @@ public class QueryBuilder {
 					i++;
 				}
 				if (!isOrderedFunction(function)) {
-					Collections.sort(params, new ExprComparator());
+					params.sort(new ExprComparator());
 				}
 				return filterOperatorToString(function, params);
 			}
@@ -1442,7 +1391,7 @@ public class QueryBuilder {
 		}
 		String ans = q.toString();
 		for (Map.Entry<String,String> entry : newLabels.entrySet()) {
-			String skLabel = entry.getKey();;
+			String skLabel = entry.getKey();
 			String newLabel = entry.getValue();
 			ans = ans.replace(skLabel, newLabel);
 			if (varMap.inverse().containsKey(NodeFactory.createBlankNode(skLabel))) {
@@ -1462,7 +1411,7 @@ public class QueryBuilder {
 		return this.vars;
 	}
 	
-	public class TripleComparator implements Comparator<Triple>{
+	public static class TripleComparator implements Comparator<Triple>{
 
 		@Override
 		public int compare(Triple o1, Triple o2) {
@@ -1535,7 +1484,7 @@ public class QueryBuilder {
 		}
 	}
 	
-	public class NodeComparator implements Comparator<Node>{
+	public static class NodeComparator implements Comparator<Node>{
 
 		@Override
 		public int compare(Node o1, Node o2) {
@@ -1544,7 +1493,7 @@ public class QueryBuilder {
 		
 	}
 	
-	public class ExprComparator implements Comparator<Expr>{
+	public static class ExprComparator implements Comparator<Expr>{
 
 		@Override
 		public int compare(Expr o1, Expr o2) {
@@ -1553,8 +1502,8 @@ public class QueryBuilder {
 					if (o1.getFunction().equals(o2.getFunction())) {
 						List<Expr> exprs1 = new ArrayList<>(o1.getFunction().getArgs());
 						List<Expr> exprs2 = new ArrayList<>(o2.getFunction().getArgs());
-						Collections.sort(exprs1, new ExprComparator());
-						Collections.sort(exprs2, new ExprComparator());
+						exprs1.sort(new ExprComparator());
+						exprs2.sort(new ExprComparator());
 						int k = Math.min(exprs1.size(), exprs2.size());
 						for (int i = 0; i < k; i++){
 							int ans = compare(exprs1.get(i), exprs2.get(i));

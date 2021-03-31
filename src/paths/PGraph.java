@@ -43,6 +43,8 @@ import cl.uchile.dcc.blabel.label.GraphLabelling;
 import cl.uchile.dcc.blabel.label.GraphLabelling.GraphLabellingArgs;
 import cl.uchile.dcc.blabel.label.GraphLabelling.GraphLabellingResult;
 
+import static tools.CommonNodes.*;
+
 public class PGraph {
 	private Graph nfa;
 	private Graph dfa = GraphFactory.createPlainGraph();
@@ -51,20 +53,11 @@ public class PGraph {
 	private Node startState;
 	private Node endState;
 	private Node newStartState;
-	private Node epsilon = NodeFactory.createURI("http://example.org/epsilon");
 	private Set<Node> predicates;
-	private Set<Node> endStates = new HashSet<Node>();
-	private Map<Node,Set<Node>> eClosures = new HashMap<Node,Set<Node>>();
-	private Map<Set<Node>,Node> newNodes = new HashMap<Set<Node>,Node>();
-	private List<List<Set<Node>>> partitions = new ArrayList<List<Set<Node>>>();
-	final String URI = "http://example.org/";
-	private final Node preNode = NodeFactory.createURI(this.URI+"predicate");
-	private final Node typeNode = NodeFactory.createURI(this.URI+"type");
-	@SuppressWarnings("unused")
-	private final Node pathNode = NodeFactory.createURI(this.URI+"path");
-	private final Node finalNode = NodeFactory.createURI(this.URI+"final");
-	@SuppressWarnings("unused")
-	private final Node argNode = NodeFactory.createURI(this.URI+"arg");
+	private Set<Node> endStates = new HashSet<>();
+	private Map<Node,Set<Node>> eClosures = new HashMap<>();
+	private Map<Set<Node>,Node> newNodes = new HashMap<>();
+	private List<List<Set<Node>>> partitions = new ArrayList<>();
 	
 	public PGraph(TriplePath tp) {
 		this(tp.getPath());
@@ -126,7 +119,7 @@ public class PGraph {
 			return;
 		}
 		for (Node p : predicates) {
-			Set<Node> auxSet = new HashSet<Node>();
+			Set<Node> auxSet = new HashSet<>();
 			for (Node v : nodes) {
 				auxSet.addAll(eClosedTransition(v,p));
 			}
@@ -137,7 +130,7 @@ public class PGraph {
 	}
 	
 	public Set<Node> findStates(Graph g){
-		Set<Node> ans = new HashSet<Node>();
+		Set<Node> ans = new HashSet<>();
 		ExtendedIterator<Triple> triples = GraphUtil.findAll(g);
 		while (triples.hasNext()) {
 			Triple triple = triples.next();
@@ -155,9 +148,9 @@ public class PGraph {
 	
 	public void determineEClosures() {
 		Set<Node> states = findStates(nfa);
-		Map<Node,Set<Node>> startClosures = new HashMap<Node,Set<Node>>();
+		Map<Node,Set<Node>> startClosures = new HashMap<>();
 		for (Node state : states) {
-			Set<Node> closure = new HashSet<Node>();
+			Set<Node> closure = new HashSet<>();
 			ExtendedIterator<Node> eNodes = GraphUtil.listObjects(nfa, state, epsilon);
 			while (eNodes.hasNext()) {
 				Node e = eNodes.next();
@@ -171,7 +164,7 @@ public class PGraph {
 			anyChanges = false;
 			for (Node state : states) {
 				Set<Node> startClosure = startClosures.get(state);
-				Set<Node> closure = new HashSet<Node>();
+				Set<Node> closure = new HashSet<>();
 				for (Node c : startClosure) {
 					closure.addAll(startClosures.get(c));
 				}
@@ -186,9 +179,9 @@ public class PGraph {
 	
 	public void determineEClosure(Graph g) {
 		Set<Node> states = findStates(g);
-		Map<Node,Set<Node>> startClosures = new HashMap<Node,Set<Node>>();
+		Map<Node,Set<Node>> startClosures = new HashMap<>();
 		for (Node state : states) {
-			Set<Node> closure = new HashSet<Node>();
+			Set<Node> closure = new HashSet<>();
 			ExtendedIterator<Node> eNodes = GraphUtil.listObjects(g, state, epsilon);
 			while (eNodes.hasNext()) {
 				Node e = eNodes.next();
@@ -202,7 +195,7 @@ public class PGraph {
 			anyChanges = false;
 			for (Node state : states) {
 				Set<Node> startClosure = startClosures.get(state);
-				Set<Node> closure = new HashSet<Node>();
+				Set<Node> closure = new HashSet<>();
 				for (Node c : startClosure) {
 					closure.addAll(startClosures.get(c));
 				}
@@ -216,7 +209,7 @@ public class PGraph {
 	}
 	
 	public Set<Node> eClosedTransition(Node n, Node p) {
-		Set<Node> ans = new HashSet<Node>();
+		Set<Node> ans = new HashSet<>();
 		Set<Node> nodes = eClosures.get(n);
 		for (Node s : nodes) {
 			ExtendedIterator<Node> states = GraphUtil.listObjects(nfa, s, p);
@@ -230,10 +223,10 @@ public class PGraph {
 	
 	public void eliminateDeadStates(Graph g) {
 		Set<Node> states = findStates(g);
-		Set<Triple> triplesToDelete = new HashSet<Triple>();
+		Set<Triple> triplesToDelete = new HashSet<>();
 		for (Node state : states) {
 			if (!endStates.contains(state)) {
-				Set<Node> transitions = new HashSet<Node>();
+				Set<Node> transitions = new HashSet<>();
 				for (Node p : predicates) {
 					transitions.add(GraphUtil.listObjects(g, state, p).next());
 				}
@@ -263,12 +256,12 @@ public class PGraph {
 	private void minimisation() {
 		Set<Node> nonEndStates = findStates(dfa);
 		nonEndStates.removeAll(endStates);
-		List<Set<Node>> partition = new ArrayList<Set<Node>>();
+		List<Set<Node>> partition = new ArrayList<>();
 		partition.add(nonEndStates);
 		partition.add(endStates);
 		partitions.add(partition);
 		int k = 0;
-		List<Set<Node>> previousPartition = new ArrayList<Set<Node>>();
+		List<Set<Node>> previousPartition = new ArrayList<>();
 		while (!partitions.get(k).equals(previousPartition)) {
 			previousPartition = partitions.get(k);
 			partitions.add(nextPartition(partitions.get(k),k++));
@@ -283,7 +276,7 @@ public class PGraph {
 			minimalDFA.add(Triple.create(findPartition(t.getSubject()), t.getPredicate(), findPartition(t.getObject())));
 		}
 		this.newStartState = findPartition(this.newStartState);
-		Set<Node> newEndStates = new HashSet<Node>();
+		Set<Node> newEndStates = new HashSet<>();
 		for (Node n : endStates) {
 			newEndStates.add(findPartition(n));
 		}
@@ -326,10 +319,9 @@ public class PGraph {
 	}
 	
 	public List<Set<Node>> nextPartition(List<Set<Node>> p, int k) {
-		List<Set<Node>> ans = new ArrayList<Set<Node>>();
+		List<Set<Node>> ans = new ArrayList<>();
 		for (Set<Node> partition : p) {
-			ArrayList<Node> partitionList = new ArrayList<Node>();
-			partitionList.addAll(partition);
+			ArrayList<Node> partitionList = new ArrayList<>(partition);
 			boolean[][] partitionTable = new boolean[partition.size()][partition.size()];
 			String[] keys = new String[partition.size()];
 			for (int i = 0; i < partition.size(); i++) {	
@@ -351,9 +343,9 @@ public class PGraph {
 					}
 				}
 			}
-			Map<String,Set<Node>> f = new HashMap<String,Set<Node>>();
+			Map<String,Set<Node>> f = new HashMap<>();
 			for (int i = 0; i < partition.size(); i++) {
-				f.put(keys[i], new HashSet<Node>());
+				f.put(keys[i], new HashSet<>());
 			}
 			for (int i = 0; i < partition.size(); i++) {
 				Set<Node> current = f.get(keys[i]);
@@ -370,7 +362,7 @@ public class PGraph {
 				return newNodes.get(partition);
 			}
 		}
-		return null;
+		return n;
 	}
 	
 	private void complement() {
@@ -468,7 +460,7 @@ public class PGraph {
 	public Graph label(Graph g) throws InterruptedException, HashCollisionException{
 		Model model = ModelFactory.createModelForGraph(g);
 		JenaModelIterator jmi = new JenaModelIterator(model);
-		TreeSet<org.semanticweb.yars.nx.Node[]> triples = new TreeSet<org.semanticweb.yars.nx.Node[]>(NodeComparator.NC);
+		TreeSet<org.semanticweb.yars.nx.Node[]> triples = new TreeSet<>(NodeComparator.NC);
 		while(jmi.hasNext()){
 			org.semanticweb.yars.nx.Node[] triple = jmi.next();
 			triples.add(new org.semanticweb.yars.nx.Node[]{triple[0],triple[1],triple[2]});
@@ -525,7 +517,7 @@ public class PGraph {
 	}
 	
 	public Set<Node> reachableStates(Node n, Graph g, Set<Node> predicates){
-		return reachableStates(n, g, predicates, new HashSet<Node>());
+		return reachableStates(n, g, predicates, new HashSet<>());
 	}
 	
 	public Graph getNFA() {
@@ -655,24 +647,10 @@ public class PGraph {
 		return ans;
 	}
 	
-	public Path ardensTheorem() {
-		Path ans = null;
-		Set<Node> states = findStates(this.minimalDFA);
-		for (Node state : states) {
-			if (newStartState.equals(state)) {
-				
-			}
-			else {
-				
-			}
-		}
-		return ans;
-	}
-	
 	public List<Node> orderedStates(Graph g, Node n) {
-		ArrayList<Node> ans = new ArrayList<Node>();
+		ArrayList<Node> ans = new ArrayList<>();
 		Node current = n;
-		ArrayList<Node> orderedPredicates = new ArrayList<Node>();
+		ArrayList<Node> orderedPredicates = new ArrayList<>();
 		for (Node p : this.predicates) {
 			orderedPredicates.add(p);
 		}
@@ -698,11 +676,11 @@ public class PGraph {
 	
 	public Path dfaToPath(Node startState, Node finalState, Map<Pair<Node,Node>,Path> startTable, List<Node> states) {
 		Path ans = null;
-		Set<Node> statesSet = new HashSet<Node>();
+		Set<Node> statesSet = new HashSet<>();
 		statesSet.addAll(states);
 		statesSet.add(startState);
 		statesSet.add(finalState);
-		Map<Pair<Node,Node>,Path> transitionTable = new HashMap<Pair<Node,Node>,Path>();
+		Map<Pair<Node,Node>,Path> transitionTable = new HashMap<>();
 		for (Map.Entry<Pair<Node,Node>, Path> entry : startTable.entrySet()) {
 			transitionTable.put(entry.getKey(), entry.getValue());
 		}
@@ -715,8 +693,8 @@ public class PGraph {
 	}
 	
 	public void path(Node n, Map<Pair<Node,Node>,Path> transitionTable, Collection<Node> states) {
-		Set<Pair<Pair<Node,Node>,Path>> toUpdate = new HashSet<Pair<Pair<Node,Node>,Path>>();
-		Set<Pair<Node,Node>> toDelete = new HashSet<Pair<Node,Node>>();
+		Set<Pair<Pair<Node,Node>,Path>> toUpdate = new HashSet<>();
+		Set<Pair<Node,Node>> toDelete = new HashSet<>();
 		for (Node n0 : states) {
 			for (Node n1 : states) {
 				if (n0.equals(n) || n1.equals(n)) {
@@ -727,10 +705,10 @@ public class PGraph {
 				Path regex1 = null;
 				Path regex2 = null;
 				Path regex3 = null;
-				Pair<Node,Node> pair0 = new Pair<Node,Node>(n0,n);
-				Pair<Node,Node> pair1 = new Pair<Node,Node>(n,n1);
-				Pair<Node,Node> pair2 = new Pair<Node,Node>(n0,n1);
-				Pair<Node,Node> pair3 = new Pair<Node,Node>(n,n);
+				Pair<Node,Node> pair0 = new Pair<>(n0,n);
+				Pair<Node,Node> pair1 = new Pair<>(n,n1);
+				Pair<Node,Node> pair2 = new Pair<>(n0,n1);
+				Pair<Node,Node> pair3 = new Pair<>(n,n);
 				if (transitionTable.containsKey(pair0) && transitionTable.containsKey(pair1)) {
 					regex0 = transitionTable.get(pair0);
 					regex1 = transitionTable.get(pair1);
@@ -741,7 +719,7 @@ public class PGraph {
 						regex3 = transitionTable.get(pair3);
 					}
 					ans = newTransition(regex0, regex1, regex2, regex3);
-					toUpdate.add(new Pair<Pair<Node,Node>,Path>(pair2, ans));
+					toUpdate.add(new Pair<>(pair2, ans));
 				}	
 				toDelete.add(pair0);
 				toDelete.add(pair1);
@@ -824,18 +802,14 @@ public class PGraph {
 	}
 	
 	public Path finalState(Node startState, Node endState, Map<Pair<Node, Node>, Path> transitionTable) {
-		Pair<Node,Node> pair = new Pair<Node,Node>(startState,endState);
+		Pair<Node,Node> pair = new Pair<>(startState,endState);
 		if (transitionTable.get(pair) == null) {
-//			pair.remove(startState);
-//			pair.add(endState);
-			pair = new Pair<Node,Node>(endState,endState);
+			pair = new Pair<>(endState,endState);
 			return PathFactory.pathZeroOrMore1(transitionTable.get(pair));
 		}
 		else {
 			Path p0 = transitionTable.get(pair);
-//			pair.remove(startState);
-//			pair.add(endState);
-			pair = new Pair<Node,Node>(endState,endState);
+			pair = new Pair<>(endState,endState);
 			Path p1 = transitionTable.get(pair);
 			if (p1 != null) {
 				return PathFactory.pathSeq(p0, PathFactory.pathZeroOrMore1(p1));
@@ -847,8 +821,8 @@ public class PGraph {
 	}
 	
 	public List<List<Node>> permutations(List<Node> set){
-		List<List<Node>> ans = new ArrayList<List<Node>>();
-		List<Node> s = new ArrayList<Node>();
+		List<List<Node>> ans = new ArrayList<>();
+		List<Node> s = new ArrayList<>();
 		s.addAll(set);
 		if (s.size() == 1) {
 			ans.add(s);
@@ -867,7 +841,7 @@ public class PGraph {
 	}
 	
 	public List<List<Node>> permutations2(List<Node> set, List<List<Node>> ans, int k){
-		List<Node> s = new ArrayList<Node>();
+		List<Node> s = new ArrayList<>();
 		s.addAll(set);
 		Node temp = null;
 		if (k == 1) {

@@ -10,6 +10,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import com.sun.xml.internal.bind.v2.TODO;
 import org.apache.jena.graph.Graph;
 import org.apache.jena.graph.GraphUtil;
 import org.apache.jena.graph.Node;
@@ -28,10 +29,7 @@ import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprList;
 import org.apache.jena.util.iterator.ExtendedIterator;
-import transformers.FilterTransform;
-import transformers.NotOneOfTransform;
-import transformers.TransformPath;
-import transformers.UCQTransformer;
+import transformers.*;
 
 public class Tools {
 
@@ -113,8 +111,39 @@ public class Tools {
 				}
 			}
 		}
+		else if (op instanceof OpGroup) {
+			Op sub = ((OpGroup) op).getSubOp();
+			Set<Var> subVars = safeVars(sub);
+			List<Var> gVars = ((OpGroup) op).getGroupVars().getVars();
+			for (Var v : subVars) {
+				if (gVars.contains(v)) {
+					ans.add(v);
+				}
+			}
+		}
 		else if (op instanceof OpFilter) {
 			return safeVars(((OpFilter) op).getSubOp());
+		}
+		else if (op instanceof OpExtend) {
+			return safeVars(((OpExtend) op).getSubOp());
+		}
+		else if (op instanceof OpTable) {
+			ans.addAll(((OpTable) op).getTable().getVars());
+		}
+		else if (op instanceof OpGraph) {
+			Op sub = ((OpGraph) op).getSubOp();
+			if (((OpGraph) op).getNode().isVariable()) {
+				ans.add(Var.alloc(((OpGraph) op).getNode()));
+			}
+			ans.addAll(safeVars(sub));
+		}
+		else if (op instanceof OpService) {
+			if (((OpService) op).getSilent()) {
+				return safeVars(((OpService) op).getSubOp());
+			}
+			else {
+				//TODO
+			}
 		}
 		return ans;
 	}
@@ -236,9 +265,9 @@ public class Tools {
 
 	public static Op UCQTransformation(Op op) {
 		Op op2 = UCQNormalisation(op);
-//		op2 = uC2RPQCollapse(op2);
-//		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
-//		op2 = Transformer.transform(new BGPCollapser(op2,this.projectionVars,false), op2); // transform BGPs
+		BranchRenamer br = new BranchRenamer();
+		op2 = br.visit(op2);
+		op2 = Transformer.transform(new LocalVarRenamer(), op2);
 		op2 = Transformer.transform(new TransformSimplify(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
 		op2 = Transformer.transform(new TransformExtendCombine(), op2);
