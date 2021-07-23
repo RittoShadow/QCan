@@ -61,7 +61,14 @@ public class QueryBuilder {
 		else if (queryType.equals(CommonNodes.projectNode)) {
 			first = root;
 		}
-		else if (queryType.equals(CommonNodes.askNode) || queryType.equals(CommonNodes.constructNode) || queryType.equals(CommonNodes.describeNode)) {
+		else if (queryType.equals(CommonNodes.askNode) || queryType.equals(CommonNodes.describeNode)) {
+			ExtendedIterator<Node> m = GraphUtil.listObjects(graph, root, CommonNodes.opNode);
+			first = m.next();
+			if (graph.contains(Triple.create(first, CommonNodes.typeNode, CommonNodes.fromNode))){
+				first = m.next();
+			}
+		}
+		else if (queryType.equals(CommonNodes.constructNode)) {
 			ExtendedIterator<Node> m = GraphUtil.listObjects(graph, root, CommonNodes.opNode);
 			first = m.next();
 			if (graph.contains(Triple.create(first, CommonNodes.typeNode, CommonNodes.fromNode))){
@@ -1374,11 +1381,13 @@ public class QueryBuilder {
 			if (template.hasNext()) {
 				Node t = template.next();
 				Op templateOp = nextOpByType(t);
+				templateOp = newLabels(templateOp);
 				if (templateOp instanceof OpBGP) {
 					query.setConstructTemplate(new Template(((OpBGP) templateOp).getPattern()));
 				}
 			}
 			query.setQueryConstructType();
+			return query.toString();
 /*			ans = ans.substring(ans.indexOf("WHERE"));
 			ans = "CONSTRUCT " + ans;*/
 		}

@@ -47,7 +47,7 @@ public class WellDesignedTransformer extends TransformCopy {
                     return ans;
                 }
                 else {
-                    return OpLeftJoin.create(OpJoin.create(((OpLeftJoin) left).getLeft(),right),opJoin.getRight(),((OpLeftJoin) left).getExprs());
+                    return OpLeftJoin.create(OpJoin.create(((OpLeftJoin) left).getLeft(),right),((OpLeftJoin) left).getRight(),((OpLeftJoin) left).getExprs());
                 }
             }
         }

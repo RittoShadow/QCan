@@ -55,7 +55,7 @@ public class RGraphBuilder implements OpVisitor {
 	private boolean pathNormalisation = false;
 	private boolean isWellDesigned = true;
 	private int projectedQueries = 0;
-	private QueryType queryType;
+	private QueryType queryType = QueryType.SELECT;
 	public long rewriteTime = 0;
 	public long graphTime = 0;
 	public Op op;
@@ -949,11 +949,11 @@ public class RGraphBuilder implements OpVisitor {
 		BranchRenamer br = new BranchRenamer();
 		op2 = br.visit(op2);
 		op2 = Transformer.transform(new LocalVarRenamer(this.projectionVars), op2);
+		op2 = Transformer.transform(new WellDesignedTransformer(op2),op2);
 		op2 = Transformer.transform(new TransformSimplify(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
 		op2 = Transformer.transform(new TransformExtendCombine(), op2);
 		op2 = Transformer.transform(new BGPSort(), op2);
-		op2 = Transformer.transform(new WellDesignedTransformer(op2),op2);
 		return op2;
 	}
 

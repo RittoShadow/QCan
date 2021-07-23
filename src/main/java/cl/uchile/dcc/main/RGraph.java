@@ -377,25 +377,34 @@ public class RGraph {
 			graph.delete(Triple.create(this.root, typeNode, joinNode));
 			typeMap.remove(this.root);
 			graph.delete(Triple.create(root, argNode, this.root));
+			if (type1.equals(joinNode)) {
+				ExtendedIterator<Node> args1 = GraphUtil.listObjects(arg1.graph, arg1.root, argNode);
+				graph.delete(Triple.create(arg1.root, typeNode, joinNode));
+				typeMap.remove(arg1.root);
+				graph.delete(Triple.create(root, argNode, arg1.root));
+				while (args1.hasNext()) {
+					Node n = args1.next();
+					graph.add(Triple.create(root, argNode, n));
+					graph.delete(Triple.create(arg1.root, argNode, n));
+				}
+			}
 			while (args.hasNext()) {
 				Node n = args.next();
 				graph.add(Triple.create(root, argNode, n));
 				graph.delete(Triple.create(this.root, argNode, n));
 			}
-
 		}
-		if (type1.equals(joinNode)) {
+		else if (type1.equals(joinNode)) {
 			ExtendedIterator<Node> args = GraphUtil.listObjects(arg1.graph, arg1.root, argNode);
-			arg1.graph.delete(Triple.create(arg1.root, typeNode, joinNode));
+			graph.delete(Triple.create(arg1.root, typeNode, joinNode));
 			typeMap.remove(arg1.root);
 			graph.delete(Triple.create(root, argNode, arg1.root));
 			while (args.hasNext()) {
 				Node n = args.next();
-				arg1.graph.add(Triple.create(root, argNode, n));
-				arg1.graph.delete(Triple.create(arg1.root, argNode, n));
+				graph.add(Triple.create(root, argNode, n));
+				graph.delete(Triple.create(arg1.root, argNode, n));
 			}
 			arg1.root = root;
-
 		}
 		this.root = root;
 	}
@@ -423,6 +432,17 @@ public class RGraph {
 			graph.delete(Triple.create(this.root, typeNode, unionNode));
 			typeMap.remove(this.root);
 			graph.delete(Triple.create(root, argNode, this.root));
+			if (type1.equals(unionNode)) {
+				ExtendedIterator<Node> args1 = GraphUtil.listObjects(arg1.graph, arg1.root, argNode);
+				graph.delete(Triple.create(arg1.root, typeNode, unionNode));
+				typeMap.remove(arg1.root);
+				graph.delete(Triple.create(root, argNode, arg1.root));
+				while (args1.hasNext()) {
+					Node n = args1.next();
+					graph.add(Triple.create(root, argNode, n));
+					graph.delete(Triple.create(arg1.root, argNode, n));
+				}
+			}
 			while (args.hasNext()) {
 				Node n = args.next();
 				graph.add(Triple.create(root, argNode, n));
@@ -430,18 +450,17 @@ public class RGraph {
 			}
 
 		}
-		if (type1.equals(unionNode)) {
+		else if (type1.equals(unionNode)) {
 			ExtendedIterator<Node> args = GraphUtil.listObjects(arg1.graph, arg1.root, argNode);
-			arg1.graph.delete(Triple.create(arg1.root, typeNode, unionNode));
+			graph.delete(Triple.create(arg1.root, typeNode, unionNode));
 			typeMap.remove(arg1.root);
 			graph.delete(Triple.create(root, argNode, arg1.root));
 			while (args.hasNext()) {
 				Node n = args.next();
-				arg1.graph.add(Triple.create(root, argNode, n));
-				arg1.graph.delete(Triple.create(arg1.root, argNode, n));
+				graph.add(Triple.create(root, argNode, n));
+				graph.delete(Triple.create(arg1.root, argNode, n));
 			}
 			arg1.root = root;
-
 		}
 		this.root = root;
 	}
