@@ -66,6 +66,7 @@ public class RGraphBuilder implements OpVisitor {
 	
 	public RGraphBuilder(Op op) {
 		this.op = op;
+		this.op = rewrite(this.op);
 		OpWalker.walk(this.op, this);
 	}
 	
@@ -89,7 +90,7 @@ public class RGraphBuilder implements OpVisitor {
 		op = Algebra.compile(query);
 		if (rewrite) {
 			long normalTime = System.nanoTime();
-			op = UCQTransformation(op);
+			op = rewrite(op);
 			this.rewriteTime = System.nanoTime() - normalTime;
 		}
 		this.totalVars = varsContainedIn(op);
@@ -136,13 +137,13 @@ public class RGraphBuilder implements OpVisitor {
 		graphStack.add(new RGraph(Collections.singletonList(arg0.getTriple())));
 		Triple t = arg0.getTriple();
 		if (t.getSubject().isVariable()){
-			totalVars.add((Var) t.getSubject());
+			totalVars.add(Var.alloc(t.getSubject()));
 		}
 		if (t.getPredicate().isVariable()){
-			totalVars.add((Var) t.getPredicate());
+			totalVars.add(Var.alloc(t.getPredicate()));
 		}
 		if (t.getObject().isVariable()){
-			totalVars.add((Var) t.getObject());
+			totalVars.add(Var.alloc(t.getObject()));
 		}
 	}
 
@@ -646,6 +647,17 @@ public class RGraphBuilder implements OpVisitor {
 		return op2;
 	}
 
+	public Op WellDesignedPatternNormalisation(Op op) {
+		Op op1 = op;
+		Op op2 = op;
+		do {
+			op1 = op2;
+			op2 = Transformer.transform(new WellDesignedTransformer(op),op2);
+		}
+		while (!op1.equals(op2));
+		return op2;
+	}
+
 	public Set<Var> varsContainedIn(Op op) {
 		Set<Var> ans = new HashSet<>();
 		if (op instanceof OpTriple) {
@@ -939,7 +951,7 @@ public class RGraphBuilder implements OpVisitor {
 		return ans[0];
 	}
 
-	public Op UCQTransformation(Op op) {
+	public Op rewrite(Op op) {
 //		op1 = transitiveClosure(op1);
 		Op op2 = op;
 		op2 = UCQNormalisation(op2);
@@ -949,7 +961,7 @@ public class RGraphBuilder implements OpVisitor {
 		BranchRenamer br = new BranchRenamer();
 		op2 = br.visit(op2);
 		op2 = Transformer.transform(new LocalVarRenamer(this.projectionVars), op2);
-		op2 = Transformer.transform(new WellDesignedTransformer(op2),op2);
+		op2 = WellDesignedPatternNormalisation(op2);
 		op2 = Transformer.transform(new TransformSimplify(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
 		op2 = Transformer.transform(new TransformExtendCombine(), op2);

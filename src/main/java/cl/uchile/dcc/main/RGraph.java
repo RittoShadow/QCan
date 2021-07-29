@@ -1391,54 +1391,53 @@ public class RGraph {
 	public RGraph ucqMinimisation() throws InterruptedException {
 		List<RGraph> result = new ArrayList<>();
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
-		Set<Node> projectedVars = new HashSet<>();
+		//Set<Node> projectedVars = new HashSet<>();
 		Set<Node> ucqs = listMonotoneParts();
 		for (Node ucq : ucqs) {
-			projectedVars = new HashSet<>();
-			ExtendedIterator<Node> projectionNodes = GraphUtil.listSubjects(graph,typeNode,projectNode);
-			while (projectionNodes.hasNext()) {
-				Node currentProjection = projectionNodes.next();
-				ExtendedIterator<Node> currentArgs = GraphUtil.listObjects(graph,currentProjection,argNode);
-				while (currentArgs.hasNext()) {
-					Node currentArg = currentArgs.next();
-					projectedVars.add(currentArg);
-				}
-			}
+//			Set<Node> projectedVars = new HashSet<>();
+//			ExtendedIterator<Node> projectionNodes = GraphUtil.listSubjects(graph,typeNode,projectNode);
+//			while (projectionNodes.hasNext()) {
+//				Node currentProjection = projectionNodes.next();
+//				ExtendedIterator<Node> currentArgs = GraphUtil.listObjects(graph,currentProjection,argNode);
+//				while (currentArgs.hasNext()) {
+//					Node currentArg = currentArgs.next();
+//					projectedVars.add(currentArg);
+//				}
+//			}
 			if (graph.contains(Triple.create(ucq, typeNode, unionNode))) { //Make sure it's a union of conjunctive queries.
-				Node union = ucq;
 				Node subjectUnion, predicateUnion;
-				if (listSubjects(graph, opNode, union).hasNext()) {
-					subjectUnion = listSubjects(graph, opNode, union).next();
+				if (listSubjects(graph, opNode, ucq).hasNext()) {
+					subjectUnion = listSubjects(graph, opNode, ucq).next();
 					predicateUnion = opNode;
-				} else if (listSubjects(graph, leftNode, union).hasNext()) {
-					subjectUnion = listSubjects(graph, leftNode, union).next();
+				} else if (listSubjects(graph, leftNode, ucq).hasNext()) {
+					subjectUnion = listSubjects(graph, leftNode, ucq).next();
 					predicateUnion = leftNode;
-				} else if (listSubjects(graph, rightNode, union).hasNext()) {
-					subjectUnion = listSubjects(graph, rightNode, union).next();
+				} else if (listSubjects(graph, rightNode, ucq).hasNext()) {
+					subjectUnion = listSubjects(graph, rightNode, ucq).next();
 					predicateUnion = rightNode;
-				} else if (listSubjects(graph,subNode,union).hasNext()) {
-					subjectUnion = listSubjects(graph,subNode,union).next();
+				} else if (listSubjects(graph,subNode, ucq).hasNext()) {
+					subjectUnion = listSubjects(graph,subNode, ucq).next();
 					predicateUnion = subNode;
 				}
-				else if (listSubjects(graph,valueNode,union).hasNext()) {
-					subjectUnion = listSubjects(graph,valueNode,union).next();
+				else if (listSubjects(graph,valueNode, ucq).hasNext()) {
+					subjectUnion = listSubjects(graph,valueNode, ucq).next();
 					predicateUnion = valueNode;
 				}
 				else {
-					subjectUnion = listSubjects(graph, argNode, union).next();
+					subjectUnion = listSubjects(graph, argNode, ucq).next();
 					predicateUnion = argNode;
 				}
-				ExtendedIterator<Node> cQueries = listObjects(graph, union, argNode);
-				if (GraphUtil.listObjects(graph, union, argNode).toList().size() > 1) { //More than one BGP in union
-					Graph inner = ge.extract(union, graph);
+				ExtendedIterator<Node> cQueries = listObjects(graph, ucq, argNode);
+				if (GraphUtil.listObjects(graph, ucq, argNode).toList().size() > 1) { //More than one BGP in union
+					Graph inner = ge.extract(ucq, graph);
 					Graph outer = GraphFactory.createPlainGraph();
-					CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(union),null);
+					CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(ucq),null);
 					GraphExtract extract = new GraphExtract(ctb);
 					outer = extract.extract(root, graph);
 					List<Node> innerVars = GraphUtil.listSubjects(inner,typeNode,varNode).toList();
 					List<Node> outerVars = GraphUtil.listSubjects(outer,typeNode,varNode).toList();
 					Map<List<Node>,List<RGraph>> partitionsByVars = new HashMap<>();
-					outer.remove(subjectUnion, predicateUnion, union);
+					outer.remove(subjectUnion, predicateUnion, ucq);
 					for (Node p : innerVars) {
 						inner.delete(Triple.create(p,typeNode,varNode));
 					}
@@ -1482,7 +1481,7 @@ public class RGraph {
 						Node eRoot = e.root;
 						eg.merge(e);
 						eg.graph.add(Triple.create(subjectUnion, predicateUnion, eRoot));
-						eg.graph.delete(Triple.create(subjectUnion,predicateUnion,union));
+						eg.graph.delete(Triple.create(subjectUnion,predicateUnion, ucq));
 						eg.eliminateRedundantJoins();
 					} else {
 						eg.graph.add(Triple.create(subjectUnion, predicateUnion, uNode));
@@ -1493,7 +1492,7 @@ public class RGraph {
 							eg.graph.add(Triple.create(uNode, argNode, eRoot));
 							eg.eliminateRedundantJoins();
 						}
-						eg.graph.delete(Triple.create(subjectUnion,predicateUnion,union));
+						eg.graph.delete(Triple.create(subjectUnion,predicateUnion, ucq));
 					}
 					//eg.setDistinctNode(true);
 					UpdateAction.execute(branchCleanUpRule, eg.graph);
@@ -1502,39 +1501,38 @@ public class RGraph {
 				}
 			}
 			else { // BGP instead
-				Node first = ucq;
-				if (GraphUtil.listObjects(graph, first, typeNode).next().equals(joinNode)) {
-					if (isUCQ(first)) {
+				if (GraphUtil.listObjects(graph, ucq, typeNode).next().equals(joinNode)) {
+					if (isUCQ(ucq)) {
 						Node subjectBGP, predicateBGP;
-						if (listSubjects(graph, opNode, first).hasNext()) {
-							subjectBGP = listSubjects(graph, opNode, first).next();
+						if (listSubjects(graph, opNode, ucq).hasNext()) {
+							subjectBGP = listSubjects(graph, opNode, ucq).next();
 							predicateBGP = opNode;
-						} else if (listSubjects(graph, leftNode, first).hasNext()) {
-							subjectBGP = listSubjects(graph, leftNode, first).next();
+						} else if (listSubjects(graph, leftNode, ucq).hasNext()) {
+							subjectBGP = listSubjects(graph, leftNode, ucq).next();
 							predicateBGP = leftNode;
-						} else if (listSubjects(graph, rightNode, first).hasNext()) {
-							subjectBGP = listSubjects(graph, rightNode, first).next();
+						} else if (listSubjects(graph, rightNode, ucq).hasNext()) {
+							subjectBGP = listSubjects(graph, rightNode, ucq).next();
 							predicateBGP = rightNode;
-						} else if (listSubjects(graph,subNode,first).hasNext()) {
-							subjectBGP = listSubjects(graph,subNode,first).next();
+						} else if (listSubjects(graph,subNode, ucq).hasNext()) {
+							subjectBGP = listSubjects(graph,subNode, ucq).next();
 							predicateBGP = subNode;
 						}
-						else if (listSubjects(graph,valueNode,first).hasNext()) {
-							subjectBGP = listSubjects(graph,valueNode,first).next();
+						else if (listSubjects(graph,valueNode, ucq).hasNext()) {
+							subjectBGP = listSubjects(graph,valueNode, ucq).next();
 							predicateBGP = valueNode;
 						}
 						else {
-							subjectBGP = listSubjects(graph, argNode, first).next();
+							subjectBGP = listSubjects(graph, argNode, ucq).next();
 							predicateBGP = argNode;
 						}
-						Graph inner = ge.extract(first, graph);
+						Graph inner = ge.extract(ucq, graph);
 						Graph outer = GraphFactory.createPlainGraph();
-						CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(first),null);
+						CustomTripleBoundary ctb = new CustomTripleBoundary(Collections.singletonList(ucq),null);
 						GraphExtract extract = new GraphExtract(ctb);
 						outer = extract.extract(root, graph);
 						List<Node> innerVars = GraphUtil.listSubjects(inner,typeNode,varNode).toList();
 						List<Node> outerVars = GraphUtil.listSubjects(outer,typeNode,varNode).toList();
-						outer.remove(subjectBGP, predicateBGP, first);
+						outer.remove(subjectBGP, predicateBGP, ucq);
 						for (Node p : innerVars) {
 							inner.delete(Triple.create(p,typeNode,varNode));
 						}
@@ -1547,7 +1545,7 @@ public class RGraph {
 							inner.add(Triple.create(p,typeNode,varNode));
 						}
 						//Create a new r-graph based on this conjunctive query.
-						RGraph e = cqMinimisation(first,inner);
+						RGraph e = cqMinimisation(ucq,inner);
 						RGraph eg = new RGraph(root, outer, this.vars);
 						Node eRoot = e.root;
 						if (e.graph.contains(Triple.create(e.root,typeNode,joinNode))) {
@@ -1557,7 +1555,7 @@ public class RGraph {
 							}
 						}
 						eg.merge(e);
-						eg.graph.delete(Triple.create(subjectBGP,predicateBGP,first));
+						eg.graph.delete(Triple.create(subjectBGP,predicateBGP, ucq));
 						eg.graph.add(Triple.create(subjectBGP, predicateBGP, eRoot));
 						eg.root = root;
 						eg.eliminateRedundantJoins();
@@ -1586,12 +1584,7 @@ public class RGraph {
 			}
 			return ans;
 		}
-		else if (type.equals(tpNode)) {
-			return true;
-		}
-		else {
-			return false;
-		}
+		else return type.equals(tpNode);
 	}
 
 	public void removeTemporaryVars() {

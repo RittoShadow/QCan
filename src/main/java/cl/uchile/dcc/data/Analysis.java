@@ -10,17 +10,17 @@ import java.util.Map.Entry;
 public class Analysis {
 	File file;
 	BufferedReader br;
-	ArrayList<ArrayList<Double>> data = new ArrayList<ArrayList<Double>>();
-	ArrayList<Double> average = new ArrayList<Double>();
-	ArrayList<Double> median = new ArrayList<Double>();
+	ArrayList<ArrayList<Double>> data = new ArrayList<>();
+	ArrayList<Double> average = new ArrayList<>();
+	ArrayList<Double> median = new ArrayList<>();
 	int uniqueQueries = 0;
-	ArrayList<Double> MAX = new ArrayList<Double>();
-	ArrayList<Double> MIN = new ArrayList<Double>();
-	ArrayList<Double> q25 = new ArrayList<Double>();
-	ArrayList<Double> q75 = new ArrayList<Double>();
-	ArrayList<Double> nVars = new ArrayList<Double>();
-	ArrayList<Double> graphSize = new ArrayList<Double>();
-	ArrayList<Double> triples = new ArrayList<Double>();
+	ArrayList<Double> MAX = new ArrayList<>();
+	ArrayList<Double> MIN = new ArrayList<>();
+	ArrayList<Double> q25 = new ArrayList<>();
+	ArrayList<Double> q75 = new ArrayList<>();
+	ArrayList<Double> nVars = new ArrayList<>();
+	ArrayList<Double> graphSize = new ArrayList<>();
+	ArrayList<Double> triples = new ArrayList<>();
 	public int distinct = 0;
 	public int joins = 0;
 	public int unions = 0;
@@ -113,15 +113,15 @@ public class Analysis {
 				}
 			}
 		}
-		for (int i = 0; i < data.size(); i++){
-			Collections.sort(data.get(i));
+		for (ArrayList<Double> datum : data) {
+			Collections.sort(datum);
 		}
 	}
 	
 	public void shortRead() throws IOException{
 		String line;
 		for (int i = 0; i < 2; i++){
-			data.add(i, new ArrayList<Double>());
+			data.add(i, new ArrayList<>());
 			average.add(i, 0.0);
 			median.add(i,0.0);
 			MAX.add(i,0.0);
@@ -664,8 +664,8 @@ public class Analysis {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_linkedGeoQueries_results20210130_210501.log");
-		a.filterQueriesByTotalTime(1000000000);
+		Analysis a = new Analysis("resultFiles/full/sparql11/rewrite_label_min_sparql11_clean_SWDF_results20210727_184327.log");
+		a.displayInfo();
 	}
 
 }

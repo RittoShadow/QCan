@@ -45,7 +45,7 @@ public class QueryBuilder {
 	private final Graph graph;
 	private final Node root;
 	private Op op;
-	private Node queryType;
+	private final Node queryType;
 	private final Set<Var> vars = new HashSet<>();
 
 	public QueryBuilder(RGraph e) {
@@ -486,31 +486,7 @@ public class QueryBuilder {
 			return true;
 		} else if (function.equals(NodeFactory.createLiteral("substr"))) {
 			return true;
-		} else if (function.isURI()) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	public boolean isOperator(Node s) {
-		if (isOrderedFunction(s)) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "eq"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "neq"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "times"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "plus"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "subtract"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "divide"))) {
-			return true;
-		} else {
-			return false;
-		}
+		} else return function.isURI();
 	}
 
 	public Op joinToOp(Node n) {
