@@ -28,10 +28,26 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.0.0</version>
-                <configuration>
-                    <basedir>src/main/java/</basedir>
-                    <mainClass>cl.uchile.dcc.main.SingleQuery</mainClass>
-                </configuration>
+                <executions>
+                    <execution>
+                        <id>default-cli</id>
+                        <configuration>
+                            <mainClass>cl.uchile.dcc.data.Benchmark</mainClass>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>easy</id>
+                        <configuration>
+                            <mainClass>cl.uchile.dcc.main.EasyCanonicalisation</mainClass>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>single</id>
+                        <configuration>
+                            <mainClass>cl.uchile.dcc.main.SingleQuery</mainClass>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

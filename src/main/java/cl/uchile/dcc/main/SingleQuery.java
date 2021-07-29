@@ -1,17 +1,18 @@
 package cl.uchile.dcc.main;
 
-import cl.uchile.dcc.data.FeatureCounter;
+import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 import cl.uchile.dcc.builder.QueryBuilder;
 import cl.uchile.dcc.builder.RGraphBuilder;
-import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
+import cl.uchile.dcc.data.FeatureCounter;
+import cl.uchile.dcc.tools.BGPSort;
 import cl.uchile.dcc.tools.Tools;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
 import org.apache.jena.sparql.algebra.*;
 import org.apache.jena.sparql.core.Var;
-import cl.uchile.dcc.tools.BGPSort;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -282,15 +283,8 @@ public class SingleQuery {
 		return this.containsNamedGraphs;
 	}
 	
-	public static void main(String[] args) throws InterruptedException, HashCollisionException{
-		String q = "SELECT DISTINCT ?x\n" +
-				"WHERE {\n" +
-				"    { ?x <name> <John>\n" +
-				"    OPTIONAL { ?x <address> ?f } } .\n" +
-				"    { ?x <name> <Mick>\n" +
-				"    OPTIONAL { ?x <email> ?z }\n" +
-				"    }\n" +
-				"}";
+	public static void main(String[] args) throws InterruptedException, HashCollisionException, IOException {
+		String q = "SELECT DISTINCT ?var1  ?var1Label  WHERE {   ?var1  <http://www.wikidata.org/prop/direct/P31>  <http://www.wikidata.org/entity/Q5> .   ?var1  <http://www.wikidata.org/prop/direct/P106>  ?var2 .  FILTER (  ( (  ?var2  =  <http://www.wikidata.org/entity/Q177220>  ) || (  ?var2  =  <http://www.wikidata.org/entity/Q488205>  ) )  ) .   ?var1  <http://www.wikidata.org/prop/direct/P21>  <http://www.wikidata.org/entity/Q6581072> .   ?var1  <http://www.w3.org/2000/01/rdf-schema#label>  ?var1Label .   ?var1  <http://www.wikidata.org/prop/direct/P172>  <http://www.wikidata.org/entity/Q49085> .   ?var3 ( <http://www.wikidata.org/prop/direct/P106> / <http://www.wikidata.org/prop/direct/P279> *) <http://www.wikidata.org/entity/Q7366> .  FILTER (  ( (  LANG (  ?var1Label  )  =  \"en\" ) )  ) . }";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();

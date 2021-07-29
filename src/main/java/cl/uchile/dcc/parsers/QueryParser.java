@@ -1,6 +1,7 @@
 package cl.uchile.dcc.parsers;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
+import cl.uchile.dcc.data.FeatureCounter;
 import cl.uchile.dcc.main.SingleQuery;
 import org.apache.jena.ext.com.google.common.collect.HashMultiset;
 import org.apache.jena.ext.com.google.common.collect.Multiset;
@@ -11,6 +12,7 @@ import org.apache.jena.query.QueryParseException;
 import org.apache.jena.sparql.algebra.Algebra;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpAsQuery;
+import org.apache.jena.sparql.algebra.OpWalker;
 
 import java.io.*;
 import java.text.SimpleDateFormat;
@@ -262,6 +264,45 @@ public class QueryParser {
 					q = OpAsQuery.asQuery(op);
 					bw.append(s);
 					bw.newLine();
+				}
+				catch (Exception e){
+					continue;
+				}
+			}
+			bf.close();
+			bw.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public static void removeSPARQL10Queries(String path) throws IOException{
+		String s;
+		try {
+			File f = new File(path);
+			BufferedReader bf = new BufferedReader(new FileReader(f));
+			File out = new File("sparql11_" + f.getPath());
+			if (!out.exists()){
+				out.createNewFile();
+			}
+			FileWriter fw = new FileWriter(out);
+			BufferedWriter bw = new BufferedWriter(fw);
+			while ((s = bf.readLine())!=null){
+				try{
+					Query q = QueryFactory.create(s);
+					Op op = Algebra.compile(q);
+					FeatureCounter fc = new FeatureCounter(op);
+					OpWalker.walk(op,fc);
+					q = OpAsQuery.asQuery(op);
+					boolean paths = fc.getContainsPaths();
+					boolean minus = fc.getFeatures().contains("minus");
+					boolean extend = fc.getFeatures().contains("extend");
+					boolean group = (fc.getFeatures().contains("group"));
+					boolean table = (fc.getFeatures().contains("table"));
+					if (paths || minus || extend || group || table) {
+						bw.append(s);
+						bw.newLine();
+					}
 				}
 				catch (Exception e){
 					continue;

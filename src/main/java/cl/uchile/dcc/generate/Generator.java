@@ -1,5 +1,6 @@
 package cl.uchile.dcc.generate;
 
+import cl.uchile.dcc.blabel.label.GraphColouring;
 import cl.uchile.dcc.main.RGraph;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
@@ -24,7 +25,7 @@ public abstract class Generator {
 
     abstract void generateTriples() throws IOException;
 
-    abstract RGraph generateGraph();
+    abstract RGraph generateGraph() throws GraphColouring.HashCollisionException, InterruptedException;
 
 
 }

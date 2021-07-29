@@ -45,7 +45,7 @@ public class QueryBuilder {
 	private final Graph graph;
 	private final Node root;
 	private Op op;
-	private Node queryType;
+	private final Node queryType;
 	private final Set<Var> vars = new HashSet<>();
 
 	public QueryBuilder(RGraph e) {
@@ -61,7 +61,14 @@ public class QueryBuilder {
 		else if (queryType.equals(CommonNodes.projectNode)) {
 			first = root;
 		}
-		else if (queryType.equals(CommonNodes.askNode) || queryType.equals(CommonNodes.constructNode) || queryType.equals(CommonNodes.describeNode)) {
+		else if (queryType.equals(CommonNodes.askNode) || queryType.equals(CommonNodes.describeNode)) {
+			ExtendedIterator<Node> m = GraphUtil.listObjects(graph, root, CommonNodes.opNode);
+			first = m.next();
+			if (graph.contains(Triple.create(first, CommonNodes.typeNode, CommonNodes.fromNode))){
+				first = m.next();
+			}
+		}
+		else if (queryType.equals(CommonNodes.constructNode)) {
 			ExtendedIterator<Node> m = GraphUtil.listObjects(graph, root, CommonNodes.opNode);
 			first = m.next();
 			if (graph.contains(Triple.create(first, CommonNodes.typeNode, CommonNodes.fromNode))){
@@ -479,31 +486,7 @@ public class QueryBuilder {
 			return true;
 		} else if (function.equals(NodeFactory.createLiteral("substr"))) {
 			return true;
-		} else if (function.isURI()) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	public boolean isOperator(Node s) {
-		if (isOrderedFunction(s)) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "eq"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "neq"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "times"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "plus"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "subtract"))) {
-			return true;
-		} else if (s.equals(NodeFactory.createURI(CommonNodes.URI + "divide"))) {
-			return true;
-		} else {
-			return false;
-		}
+		} else return function.isURI();
 	}
 
 	public Op joinToOp(Node n) {
@@ -1374,11 +1357,13 @@ public class QueryBuilder {
 			if (template.hasNext()) {
 				Node t = template.next();
 				Op templateOp = nextOpByType(t);
+				templateOp = newLabels(templateOp);
 				if (templateOp instanceof OpBGP) {
 					query.setConstructTemplate(new Template(((OpBGP) templateOp).getPattern()));
 				}
 			}
 			query.setQueryConstructType();
+			return query.toString();
 /*			ans = ans.substring(ans.indexOf("WHERE"));
 			ans = "CONSTRUCT " + ans;*/
 		}
