@@ -32,7 +32,7 @@
                     <execution>
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>cl.uchile.dcc.data.Benchmark</mainClass>
+                            <mainClass>cl.uchile.dcc.main.Benchmark</mainClass>
                         </configuration>
                     </execution>
                     <execution>
@@ -45,6 +45,18 @@
                         <id>single</id>
                         <configuration>
                             <mainClass>cl.uchile.dcc.main.SingleQuery</mainClass>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>multi</id>
+                        <configuration>
+                            <mainClass>cl.uchile.dcc.generate.MultipleGenerator</mainClass>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>ucq</id>
+                        <configuration>
+                            <mainClass>cl.uchile.dcc.generate.UCQGenerator</mainClass>
                         </configuration>
                     </execution>
                 </executions>
