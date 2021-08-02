@@ -8,34 +8,56 @@ QCan is a free software for the canonicalisation of SPARQL queries.
 This software works with queries under SPARQL ~~1.0~~ 1.1 syntax. 
 Developed as part of a master's thesis. Extended as part of a doctorate.
 
+#Main classes
+
+In order to run any of these classes, you must first compile the project.
+
+> mvn compile
+
 # Benchmark
 
-To run this software over a text file containing SPARQL queries (one per line) execute:
+This class computes the canonical form of each query in the input file, and outputs
+runtimes for each step of the canonicalisation algorithm, as well as the features it contains,
+the number of variables in it, the size of the r-graph, and the number of triple patterns.
+Optionally, it also outputs a file containing every unique query as well as the number of
+times it appears in the input file.
+To run this software over a text file containing SPARQL queries (one per line) with Maven:
 
-> java Benchmark -x filename -n numberOfQueries -o offset
+> mvn exec:java -Dexec.args="-x filename -n numberOfQueries -o offset <options>"
 
 Options:
-* -l to enable the minimisation of monotone parts of a query.
-* -c to enable canonical labeling.
-* -r to enable the rewriting of monotone parts of a query to UCQs (may involve an exponential blow-up).
-* -d to output a file containing all distinct queries as well as how many duplicates are found.
+* -l Enables the minimisation/leaning of the monotone parts of a query.
+* -c Enables canonical labeling.
+* -r Enables the rewriting of well-designed sub-patterns, property paths into BGPs and unions where possible, and monotone parts of a query to UCQs (may involve an exponential blow-up).
+* -d Set to output a file containing all distinct queries as well as how many duplicates are found.
+
+For example:
+
+> mvn exec:java -Dexec.args="-x projection.txt -n -1 -d -c -p -r -l"
 
 The MultipleGenerator class contains a main type that creates SPARQL queries from graphs (contained in the eval folder). We create queries where nodes are variables connected by a fixed predicate.
 
-> java MultipleGenerator outputFile timeout
+> mvn exec:java@multi -Dexec.args="-x outputFile -t timeout"
 
-The UCQGeneratorTest class contains a main type that creates SPARQL queries that are "hard" to process. 
-These queries contain n conjunctions of patterns containing m disjunctions.
+Includes an EasyCanonicalisation class that encapsulates everything so you can pass
+a file containing all the queries you need to canonicalise, and output a text file
+containing the canonical form of each query.
 
-> java UCQGeneratorTest conjunctions unions
+> mvn exec:java@easy -Dexec.args="-f fileContainingQueries -o outputFile"
 
-Includes an EasyCanonicalisation class 
+For example, assuming if we want to canonicalise and minimise a text file "queries.txt" and
+output the results to "canonicalisedQueries.txt":
 
-> java EasyCanonicalisation -f fileContainingQueries -o outputFile
+> mvn exec:java@easy -Dexec.args="-f queries.txt -o canonicalisedQueries.txt -m"
 
-OR
+OR you can pass a single query as an argument:
 
-> java EasyCanonicalisation -q query
+> mvn exec:java@easy -Dexec.args="-q query"
+
+e.g.
+
+> mvn exec:java@easy -Dexec.args="-q 'PREFIX : <http://example.org/> SELECT ?x WHERE { ?x :p ?y . ?x :q ?z . { SELECT ?y WHERE { ?b :p ?y . ?b :q ?c . } } } ' "
+
 
 Options:
 * -m to enable minimisation/leaning
@@ -44,9 +66,11 @@ Options:
 
 Live demo [here](http://qcan.dcc.uchile.cl)
 
+(http://qcan.dcc.uchile.cl/QCan/assets/images/qcanWeb.png)
+
 # License
 
-Copyright 2018 Jaime Salas <rittoshadow@gmail.com>
+Copyright 2018 Jaime Salas <jaime.os.salas@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

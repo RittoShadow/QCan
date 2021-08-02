@@ -284,7 +284,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException, IOException {
-		String q = "SELECT DISTINCT ?var1  ?var1Label  WHERE {   ?var1  <http://www.wikidata.org/prop/direct/P31>  <http://www.wikidata.org/entity/Q5> .   ?var1  <http://www.wikidata.org/prop/direct/P106>  ?var2 .  FILTER (  ( (  ?var2  =  <http://www.wikidata.org/entity/Q177220>  ) || (  ?var2  =  <http://www.wikidata.org/entity/Q488205>  ) )  ) .   ?var1  <http://www.wikidata.org/prop/direct/P21>  <http://www.wikidata.org/entity/Q6581072> .   ?var1  <http://www.w3.org/2000/01/rdf-schema#label>  ?var1Label .   ?var1  <http://www.wikidata.org/prop/direct/P172>  <http://www.wikidata.org/entity/Q49085> .   ?var3 ( <http://www.wikidata.org/prop/direct/P106> / <http://www.wikidata.org/prop/direct/P279> *) <http://www.wikidata.org/entity/Q7366> .  FILTER (  ( (  LANG (  ?var1Label  )  =  \"en\" ) )  ) . }";
+		String q = "SELECT ?var1  ?var2 (  MAX (COUNT ( ?var2  ) ) AS  ?var3  ) WHERE {   ?var1  ?var2  <http://www.wikidata.org/entity/Q1726> . } GROUP BY  ?var1  ?var2  ";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();

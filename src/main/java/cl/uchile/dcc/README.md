@@ -27,7 +27,7 @@ Generates queries that *enforce* an exponential rewriting to UCQs.
 The UCQGeneratorTest class contains a main type that creates SPARQL queries that are "hard" to process. 
 These queries contain n conjunctions of patterns containing m disjunctions.
 
-> java UCQGeneratorTest conjunctions unions
+> mvn exec:java@ucq -Dexec.args="-c conjunctions -u unions"
 
 ###Generator
 
@@ -35,7 +35,11 @@ Generates queries based on graphs represented as edge lists. Files in eval/ cont
 
 The MultipleGenerator class contains a main type that creates SPARQL queries from graphs (contained in the eval folder). We create queries where nodes are variables connected by a fixed predicate.
 
-> java MultipleGenerator outputFile timeout
+> mvn exec:java@multi -Dexec.args="-x folder -t timeout"
+
+For example, assuming we want to use the files in /eval/k and set a timeout of 10 seconds:
+
+> mvn exec:java@multi -Dexec.args="-x /eval/k -t 10000"
 
 ##Main
 
