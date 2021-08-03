@@ -66,7 +66,7 @@ Options:
 
 Live demo [here](http://qcan.dcc.uchile.cl)
 
-(http://qcan.dcc.uchile.cl/QCan/assets/images/qcanWeb.png)
+![Demo](http://qcan.dcc.uchile.cl/QCan/assets/images/qcanWeb.png)
 
 # License
 
