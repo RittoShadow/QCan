@@ -1,3 +1,6 @@
 testFiles/*.nt
 /bin/
 /target/
+/resultFiles/
+/*.txt
+/*.tsv
