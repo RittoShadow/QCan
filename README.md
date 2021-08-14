@@ -8,7 +8,7 @@ QCan is a free software for the canonicalisation of SPARQL queries.
 This software works with queries under SPARQL ~~1.0~~ 1.1 syntax. 
 Developed as part of a master's thesis. Extended as part of a doctorate.
 
-#Main classes
+# Main classes
 
 In order to run any of these classes, you must first compile the project.
 
@@ -37,7 +37,45 @@ Options:
 
 For example:
 
-> java -jar qcan-1.1-jar-with-dependencies.jar benchmark -x projection.txt -n -1 -d -c -p -r -l"
+> java -jar qcan-1.1-jar-with-dependencies.jar benchmark -x projection.txt -n -1 -d -c -p -r -l
+
+In order to run the same experiments presented in our study [link comming soon], unzip
+the test files contained in QCanTestSuite.zip and run:
+
+> java -jar qcan-1.1-jar-with-dependencies.jar benchmark -x _filename_ -n -1 -d -c -p -r -l
+
+over each of the files. Results will be created in either resultFiles/label, resultFiles/rewrite or
+resultFiles/full depending on which flags are set. Times are measured in nanoseconds.
+
+>-c -> label
+
+>-c -r -> rewrite
+
+>-c -r -l -> full
+
+# Analysis
+
+This class is used to summarise the results of the experiments.
+
+> java -jar qcan-1.1-jar-with-dependencies.jar analysis -x _filename_ -d
+
+This will display the minimum, mean, maximum, etc, of each column in _filename_. This should look as follows: 
+
+```
+DBpedia	Average	Median	Q25	Q75	Max	Min
+Graph time	1.37E+07	1.01E+07	7845588	1.62E+07	4.91E+07	6925551
+Rewrite time	123560.6744	29760	17998	98978	1.57E+06	13566
+Label time	1.10E+07	9529150	7460818	1.30E+07	2.43E+07	6635002
+Minimisation	9.32E+06	4835472	4240106	6330848	1.30E+08	3302497
+Total time	3.20E+07	2.58E+07	1.97E+07	3.58E+07	1.61E+08	1.72E+07
+Triples	1.744186047	0	0	0	9	0
+Variables	2.302325581	0	0	0	12	0
+Graph size	21.79069767	5	5	5	105	5
+```
+
+In addition, it should show how many times each SPARQL features appears in the query set (once per query).
+
+# Easy Canonicalisation
 
 Includes an EasyCanonicalisation class that encapsulates everything so you can pass
 a file containing all the queries you need to canonicalise, and output a text file
@@ -61,6 +99,17 @@ e.g.
 
 Options:
 * -m to enable minimisation/leaning
+
+### UCQ Generator Test
+
+Generates queries that *enforce* an exponential rewriting to UCQs.
+
+The UCQGeneratorTest class contains a main type that creates SPARQL queries that are "hard" to process. 
+These queries contain n conjunctions of patterns containing m disjunctions.
+
+> java -jar qcan-1.1-jar-with-dependencies ucq -c conjunctions -u unions
+
+Result files will be created in the resultFiles/ucq folder. Times are measured in nanoseconds.
 
 # Demo
 
