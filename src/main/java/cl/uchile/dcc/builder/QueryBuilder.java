@@ -2,7 +2,7 @@ package cl.uchile.dcc.builder;
 
 import cl.uchile.dcc.main.RGraph;
 import cl.uchile.dcc.tools.CommonNodes;
-import cl.uchile.dcc.tools.Tools;
+import cl.uchile.dcc.tools.Utils;
 import cl.uchile.dcc.visitors.OpRenamer;
 import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -82,159 +82,263 @@ public class QueryBuilder {
 		op = newLabels(op);
 	}
 
+	public Op nextOpByType(Node n) {
+		Op ans = null;
+		Node type = typeMap.get(n);
+		if (type.equals(CommonNodes.unionNode)) {
+			ans = unionToOp(n);
+		}
+		else if (type.equals(CommonNodes.joinNode)) {
+			ans = joinToOp(n);
+		}
+		else if (type.equals(CommonNodes.tpNode)) {
+			ans = tripleToOp(n);
+		}
+		else if (type.equals(CommonNodes.triplePathNode)) {
+			ans = triplePathToOp(n);
+		}
+		else if (type.equals(CommonNodes.optionalNode)) {
+			ans = optionalToOp(n);
+		}
+		else if (type.equals(CommonNodes.graphNode)) {
+			ans = graphToOp(n);
+		}
+		else if (type.equals(CommonNodes.tableNode)) {
+			ans = tableToOp(n);
+		}
+		else if (type.equals(CommonNodes.minusNode)) {
+			ans = minusToOp(n);
+		}
+		else if (type.equals(CommonNodes.serviceNode)) {
+			ans = serviceToOp(n);
+		}
+		else if (type.equals(CommonNodes.extraNode)) {
+			ans = filterBindOrGroupToOp(n);
+		}
+		else if (type.equals(CommonNodes.projectNode)) {
+			ans = projectToOp(n);
+		}
+		return ans;
+	}
+
 	public Expr filterOperatorToString(Node n, Expr... exprs) {
 		if (n.equals(NodeFactory.createLiteral("="))) {
 			return new E_Equals(exprs[0], exprs[1]);
-		} else if (n.equals(NodeFactory.createLiteral("!="))) {
+		}
+		else if (n.equals(NodeFactory.createLiteral("!="))) {
 			return new E_NotEquals(exprs[0], exprs[1]);
-		} else if (n.equals(NodeFactory.createLiteral("<"))) {
+		}
+		else if (n.equals(NodeFactory.createLiteral("<"))) {
 			return new E_LessThan(exprs[0], exprs[1]);
-		} else if (n.equals(NodeFactory.createLiteral(">"))) {
+		}
+		else if (n.equals(NodeFactory.createLiteral(">"))) {
 			return new E_GreaterThan(exprs[0], exprs[1]);
-		} else if (n.equals(NodeFactory.createLiteral("<="))) {
+		}
+		else if (n.equals(NodeFactory.createLiteral("<="))) {
 			return new E_LessThanOrEqual(exprs[0], exprs[1]);
-		} else if (n.equals(NodeFactory.createLiteral(">="))) {
+		}
+		else if (n.equals(NodeFactory.createLiteral(">="))) {
 			return new E_GreaterThanOrEqual(exprs[0], exprs[1]);
-		} else if (n.isURI()) {
+		}
+		else if (n.isURI()) {
 			List<Expr> exprs1 = Arrays.asList(exprs);
 			return new E_Function(n.getURI(), new ExprList(exprs1));
-		} else {
+		}
+		else {
 			if (n.isLiteral()) {
 				String f = (String) n.getLiteralValue();
 				if (f.equals("bound")) {
 					return new E_Bound(exprs[0]);
-				} else if (f.equals("rand")) {
+				}
+				else if (f.equals("rand")) {
 					return new E_Random();
-				} else if (f.equals("bnode")) {
+				}
+				else if (f.equals("bnode")) {
 					if (exprs.length == 0) {
 						return new E_BNode();
-					} else {
+					}
+					else {
 						return new E_BNode(exprs[0]);
 					}
-				} else if (f.equals("now")) {
+				}
+				else if (f.equals("now")) {
 					return new E_Now();
-				} else if (f.equals("round")) {
+				}
+				else if (f.equals("round")) {
 					return new E_NumRound(exprs[0]);
-				} else if (f.equals("ceil")) {
+				}
+				else if (f.equals("ceil")) {
 					return new E_NumCeiling(exprs[0]);
-				} else if (f.equals("floor")) {
+				}
+				else if (f.equals("floor")) {
 					return new E_NumFloor(exprs[0]);
-				} else if (f.equals("tz")) {
+				}
+				else if (f.equals("tz")) {
 					return new E_DateTimeTZ(exprs[0]);
-				} else if (f.equals("timezone")) {
+				}
+				else if (f.equals("timezone")) {
 					return new E_DateTimeTimezone(exprs[0]);
-				} else if (f.equals("year")) {
+				}
+				else if (f.equals("year")) {
 					return new E_DateTimeYear(exprs[0]);
-				} else if (f.equals("month")) {
+				}
+				else if (f.equals("month")) {
 					return new E_DateTimeMonth(exprs[0]);
-				} else if (f.equals("day")) {
+				}
+				else if (f.equals("day")) {
 					return new E_DateTimeDay(exprs[0]);
-				} else if (f.equals("hours")) {
+				}
+				else if (f.equals("hours")) {
 					return new E_DateTimeHours(exprs[0]);
-				} else if (f.equals("minutes")) {
+				}
+				else if (f.equals("minutes")) {
 					return new E_DateTimeMinutes(exprs[0]);
-				} else if (f.equals("seconds")) {
+				}
+				else if (f.equals("seconds")) {
 					return new E_DateTimeSeconds(exprs[0]);
-				} else if (f.equals("MD5")) {
+				}
+				else if (f.equals("MD5")) {
 					return new E_MD5(exprs[0]);
-				} else if (f.equals("SHA1")) {
+				}
+				else if (f.equals("SHA1")) {
 					return new E_SHA1(exprs[0]);
-				} else if (f.equals("SHA224")) {
+				}
+				else if (f.equals("SHA224")) {
 					return new E_SHA224(exprs[0]);
-				} else if (f.equals("SHA256")) {
+				}
+				else if (f.equals("SHA256")) {
 					return new E_SHA256(exprs[0]);
-				} else if (f.equals("SHA384")) {
+				}
+				else if (f.equals("SHA384")) {
 					return new E_SHA384(exprs[0]);
-				} else if (f.equals("SHA512")) {
+				}
+				else if (f.equals("SHA512")) {
 					return new E_SHA512(exprs[0]);
-				} else if (f.equals("encode_for_uri")) {
+				}
+				else if (f.equals("encode_for_uri")) {
 					return new E_StrEncodeForURI(exprs[0]);
-				} else if (f.equals("str")) {
+				}
+				else if (f.equals("str")) {
 					return new E_Str(exprs[0]);
-				} else if (f.equals("concat")) {
+				}
+				else if (f.equals("concat")) {
 					ExprList eList = new ExprList();
 					for (Expr expr : exprs) {
 						eList.add(expr);
 					}
 					return new E_StrConcat(eList);
-				} else if (f.equals("strdt")) {
+				}
+				else if (f.equals("strdt")) {
 					return new E_StrDatatype(exprs[0], exprs[1]);
-				} else if (f.equals("strlang")) {
+				}
+				else if (f.equals("strlang")) {
 					return new E_StrLang(exprs[0], exprs[1]);
-				} else if (f.equals("uuid")) {
+				}
+				else if (f.equals("uuid")) {
 					return new E_UUID();
-				} else if (f.equals("struuid")) {
+				}
+				else if (f.equals("struuid")) {
 					return new E_StrUUID();
-				} else if (f.equals("strlen")) {
+				}
+				else if (f.equals("strlen")) {
 					return new E_StrLength(exprs[0]);
-				} else if (f.equals("strstarts")) {
+				}
+				else if (f.equals("strstarts")) {
 					return new E_StrStartsWith(exprs[0], exprs[1]);
-				} else if (f.equals("strends")) {
+				}
+				else if (f.equals("strends")) {
 					return new E_StrEndsWith(exprs[0], exprs[1]);
-				} else if (f.equals("contains")) {
+				}
+				else if (f.equals("contains")) {
 					return new E_StrContains(exprs[0], exprs[1]);
-				} else if (f.equals("strbefore")) {
+				}
+				else if (f.equals("strbefore")) {
 					return new E_StrBefore(exprs[0], exprs[1]);
-				} else if (f.equals("strafter")) {
+				}
+				else if (f.equals("strafter")) {
 					return new E_StrAfter(exprs[0], exprs[1]);
-				} else if (f.equals("ucase")) {
+				}
+				else if (f.equals("ucase")) {
 					return new E_StrUpperCase(exprs[0]);
-				} else if (f.equals("lcase")) {
+				}
+				else if (f.equals("lcase")) {
 					return new E_StrLowerCase(exprs[0]);
-				} else if (f.equals("substr")) {
+				}
+				else if (f.equals("substr")) {
 					if (exprs.length == 2) {
 						return new E_StrSubstring(exprs[0], exprs[1], null);
-					} else {
+					}
+					else {
 						return new E_StrSubstring(exprs[0], exprs[1], exprs[2]);
 					}
-				} else if (f.equals("datatype")) {
+				}
+				else if (f.equals("datatype")) {
 					return new E_Datatype(exprs[0]);
-				} else if (f.equals("lang")) {
+				}
+				else if (f.equals("lang")) {
 					return new E_Lang(exprs[0]);
-				} else if (f.equals("iri")) {
+				}
+				else if (f.equals("iri")) {
 					return new E_IRI(exprs[0]);
-				} else if (f.equals("uri")) {
+				}
+				else if (f.equals("uri")) {
 					return new E_URI(exprs[0]);
-				} else if (f.equals("langMatches")) {
+				}
+				else if (f.equals("langMatches")) {
 					return new E_LangMatches(exprs[0], exprs[1]);
-				} else if (f.equals("isBlank")) {
+				}
+				else if (f.equals("isBlank")) {
 					return new E_IsBlank(exprs[0]);
-				} else if (f.equals("isLiteral")) {
+				}
+				else if (f.equals("isLiteral")) {
 					return new E_IsLiteral(exprs[0]);
-				} else if (f.equals("isNumeric")) {
+				}
+				else if (f.equals("isNumeric")) {
 					return new E_IsNumeric(exprs[0]);
-				} else if (f.equals("isIRI")) {
+				}
+				else if (f.equals("isIRI")) {
 					return new E_IsIRI(exprs[0]);
-				} else if (f.equals("isURI")) {
+				}
+				else if (f.equals("isURI")) {
 					return new E_IsURI(exprs[0]);
-				} else if (f.equals("abs")) {
+				}
+				else if (f.equals("abs")) {
 					return new E_NumAbs(exprs[0]);
-				} else if (f.equals("+")) {
+				}
+				else if (f.equals("+")) {
 					return new E_Add(exprs[0], exprs[1]);
-				} else if (f.equals("*")) {
+				}
+				else if (f.equals("*")) {
 					return new E_Multiply(exprs[0], exprs[1]);
-				} else if (f.equals("-")) {
+				}
+				else if (f.equals("-")) {
 					return new E_Subtract(exprs[0], exprs[1]);
-				} else if (f.equals("/")) {
+				}
+				else if (f.equals("/")) {
 					return new E_Divide(exprs[0], exprs[1]);
-				} else if (f.equals("sameTerm")) {
+				}
+				else if (f.equals("sameTerm")) {
 					return new E_SameTerm(exprs[0], exprs[1]);
-				} else if (f.equals("MAX")) {
+				}
+				else if (f.equals("MAX")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
 					return new ExprAggregator(var, AggregatorFactory.createMax(false, exprs[0]));
-				} else if (f.equals("MIN")) {
+				}
+				else if (f.equals("MIN")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
 					return new ExprAggregator(var, AggregatorFactory.createMin(false, exprs[0]));
-				} else if (f.equals("AVG")) {
+				}
+				else if (f.equals("AVG")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
 					return new ExprAggregator(var, AggregatorFactory.createAvg(false, exprs[0]));
-				} else if (f.equals("COUNT")) {
+				}
+				else if (f.equals("COUNT")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
@@ -244,80 +348,94 @@ public class QueryBuilder {
 					else{
 						return new ExprAggregator(var, AggregatorFactory.createCountExpr(false, exprs[0]));
 					}
-				} else if (f.equals("SUM")) {
+				}
+				else if (f.equals("SUM")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
 					return new ExprAggregator(var, AggregatorFactory.createSum(false, exprs[0]));
-				} else if (f.equals("SAMPLE")) {
+				}
+				else if (f.equals("SAMPLE")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
 					return new ExprAggregator(var, AggregatorFactory.createSample(false, exprs[0]));
-				} else if (f.equals("GROUP_CONCAT")) {
+				}
+				else if (f.equals("GROUP_CONCAT")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Var var = Var.alloc(v.getBlankNodeLabel());
 					vars.add(var);
 					return new ExprAggregator(var, AggregatorFactory.createGroupConcat(false, exprs[0], f, null));
-				} else if (f.equals("exists")) {
+				}
+				else if (f.equals("exists")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Node t = GraphUtil.listObjects(graph, v, CommonNodes.argNode).next();
 					Node first = GraphUtil.listObjects(graph, t, CommonNodes.valueNode).next();
 					Op ans = nextOpByType(first);
 					return new E_Exists(ans);
-				} else if (f.equals("notexists")) {
+				}
+				else if (f.equals("notexists")) {
 					Node v = GraphUtil.listSubjects(graph, CommonNodes.functionNode, n).next();
 					Node t = GraphUtil.listObjects(graph, v, CommonNodes.argNode).next();
 					Node first = GraphUtil.listObjects(graph, t, CommonNodes.valueNode).next();
 					Op ans = null;
 					ans = nextOpByType(first);
 					return new E_NotExists(ans);
-				} else if (f.equals("regex")) {
+				}
+				else if (f.equals("regex")) {
 					Expr arg0 = exprs[0];
 					Expr arg1 = exprs.length > 1 ? exprs[1] : null;
 					Expr arg2 = exprs.length > 2 ? exprs[2] : null;
 					return new E_Regex(arg0, arg1, arg2);
-				} else if (f.equals("replace")) {
+				}
+				else if (f.equals("replace")) {
 					Expr arg0 = exprs[0];
 					Expr arg1 = exprs[1];
 					Expr arg2 = exprs[2];
 					return new E_StrReplace(arg0, arg1, arg2, null);
-				} else if (f.equals("if")) {
+				}
+				else if (f.equals("if")) {
 					Expr arg0 = exprs[0];
 					Expr arg1 = exprs[1];
 					Expr arg2 = exprs[2];
 					return new E_Conditional(arg0, arg1, arg2);
-				} else if (f.equals("notin")) {
+				}
+				else if (f.equals("notin")) {
 					ExprList eList = new ExprList();
 					for (int i = 1; i < exprs.length; i++) {
 						eList.add(exprs[i]);
 					}
 					return new E_NotOneOf(exprs[0], eList);
-				} else if (f.equals("in")) {
+				}
+				else if (f.equals("in")) {
 					ExprList eList = new ExprList();
 					for (int i = 1; i < exprs.length; i++) {
 						eList.add(exprs[i]);
 					}
 					return new E_OneOf(exprs[0], eList);
-				} else if (f.equals("coalesce")) {
+				}
+				else if (f.equals("coalesce")) {
 					ExprList eList = new ExprList();
 					for (Expr expr : exprs) {
 						eList.add(expr);
 					}
 					return new E_Coalesce(eList);
-				} else if (f.equals("function")) {
+				}
+				else if (f.equals("function")) {
 					ExprList eList = new ExprList();
 					for (Expr expr : exprs) {
 						eList.add(expr);
 					}
 					return new E_Function(f, eList);
-				} else if (Pattern.matches(".+://.+", f)) {
+				}
+				else if (Pattern.matches(".+://.+", f)) {
 					ExprList eList = new ExprList();
 					for (Expr expr : exprs) {
 						eList.add(expr);
 					}
 					return new E_Function(f, eList);
-				} else {
+				}
+				else {
 					return ExprUtils.parse(f);
 				}
 
@@ -370,7 +488,6 @@ public class QueryBuilder {
 			return filterOperatorToString(function,exprs);
 		}
 	}
-
 
 	public Expr filterOperatorToString(Node n, List<Expr> expr) {
 		if (!isOrderedFunction(n)) {
@@ -690,37 +807,6 @@ public class QueryBuilder {
 		Node silent = GraphUtil.listObjects(graph, n, CommonNodes.silentNode).next();
 		ans = nextOpByType(next);
 		ans = new OpService(value, ans, (boolean) silent.getLiteralValue());
-		return ans;
-	}
-
-	public Op nextOpByType(Node n) {
-		Op ans = null;
-		Node type = typeMap.get(n);
-		if (type.equals(CommonNodes.unionNode)) {
-			ans = unionToOp(n);
-		} else if (type.equals(CommonNodes.joinNode)) {
-			ans = joinToOp(n);
-		} else if (type.equals(CommonNodes.tpNode)) {
-			ans = tripleToOp(n);
-		} else if (type.equals(CommonNodes.triplePathNode)) {
-			ans = triplePathToOp(n);
-		} else if (type.equals(CommonNodes.optionalNode)) {
-			ans = optionalToOp(n);
-		} else if (type.equals(CommonNodes.graphNode)) {
-			ans = graphToOp(n);
-		} else if (type.equals(CommonNodes.tableNode)) {
-			ans = tableToOp(n);
-		} else if (type.equals(CommonNodes.minusNode)) {
-			ans = minusToOp(n);
-		} else if (type.equals(CommonNodes.serviceNode)) {
-			ans = serviceToOp(n);
-		}
-		else if (type.equals(CommonNodes.extraNode)) {
-			ans = filterBindOrGroupToOp(n);
-		}
-		else if (type.equals(CommonNodes.projectNode)) {
-			ans = projectToOp(n);
-		}
 		return ans;
 	}
 
@@ -1375,7 +1461,7 @@ public class QueryBuilder {
 	}
 	
 	public Op newLabels(Op op){
-		Set<Var> vars = Tools.varsContainedIn(op);
+		Set<Var> vars = Utils.varsContainedIn(op);
 		List<String> varLabels = new ArrayList<>();
 		for (Var v : vars) {
 			varLabels.add(v.getVarName());

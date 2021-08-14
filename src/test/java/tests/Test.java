@@ -138,9 +138,8 @@ public class Test {
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/optionalTest.txt"));
 			assertTrue(qp.equalQueries(0, 1));
 			//assertTrue(qp.equalQueries(2, 3));
-			assertTrue(qp.equalQueries(4, 5));
-			assertTrue(qp.equalQueries(6, 7));
-			assertFalse(qp.equalQueries(8,9));
+			assertTrue(qp.equalQueries(2, 3));
+			assertFalse(qp.equalQueries(4, 5));
 
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

@@ -664,8 +664,8 @@ public class Analysis {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_RKBExplorerQueries_results20210730_145511.log");
-		a.displayInfo();
+		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_wikidata_results20210729_163215.log");
+		a.partitionByFeatures();
 	}
 
 }

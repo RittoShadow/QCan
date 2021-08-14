@@ -1,6 +1,6 @@
 package cl.uchile.dcc.transformers;
 
-import cl.uchile.dcc.tools.Tools;
+import cl.uchile.dcc.tools.Utils;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.TransformCopy;
 import org.apache.jena.sparql.algebra.op.OpFilter;
@@ -57,7 +57,7 @@ public class FilterTransform extends TransformCopy {
 	public Op transform(OpJoin join, Op left, Op right) {
 		if (left instanceof OpFilter && !(right instanceof OpFilter)) {
 			Set<Var> eVars = ((OpFilter) left).getExprs().getVarsMentioned();
-			Set<Var> safeVars = Tools.safeVars(left);
+			Set<Var> safeVars = Utils.safeVars(left);
 			for (Var v : eVars) {
 				if (!safeVars.contains(v)) {
 					return OpJoin.create(left,right);
@@ -68,7 +68,7 @@ public class FilterTransform extends TransformCopy {
 		}
 		else if (!(left instanceof OpFilter) && right instanceof OpFilter ) {
 			Set<Var> eVars = ((OpFilter) right).getExprs().getVarsMentioned();
-			Set<Var> safeVars = Tools.safeVars(right);
+			Set<Var> safeVars = Utils.safeVars(right);
 			for (Var v : eVars) {
 				if (!safeVars.contains(v)) {
 					return OpJoin.create(left,right);
@@ -78,14 +78,14 @@ public class FilterTransform extends TransformCopy {
 		}
 		else if (left instanceof OpFilter && right instanceof OpFilter) {
 			Set<Var> leftEVars = ((OpFilter) left).getExprs().getVarsMentioned();
-			Set<Var> leftSafeVars = Tools.safeVars(left);
+			Set<Var> leftSafeVars = Utils.safeVars(left);
 			for (Var v : leftEVars) {
 				if (!leftSafeVars.contains(v)) {
 					return OpJoin.create(left,right);
 				}
 			}
 			Set<Var> rightEVars = ((OpFilter) right).getExprs().getVarsMentioned();
-			Set<Var> rightSafeVars = Tools.safeVars(right);
+			Set<Var> rightSafeVars = Utils.safeVars(right);
 			for (Var v : rightEVars) {
 				if (!rightSafeVars.contains(v)) {
 					return OpJoin.create(left,right);

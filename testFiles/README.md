@@ -595,3 +595,92 @@ WHERE {
 ````
 
 Queries 15, 16 and 17 are all congruent. In particular, queries 15 and 16 are equivalent to query 17 after minimisation.
+
+## Optional tests
+
+1
+```
+SELECT * 
+WHERE { 
+    ?a <p> ?b . 
+    OPTIONAL { 
+        { ?b <q> ?c . } 
+        UNION  
+        { ?b <r> ?c . }
+        } 
+    }
+```
+
+2
+```
+SELECT * 
+WHERE { 
+    ?x <p> ?y . 
+    OPTIONAL {  
+        { ?y <r> ?z . } 
+        UNION  
+        { ?y <q> ?z . } 
+        } 
+    }
+```
+
+Queries 1 and 2 are congruent because ?a and ?b can be mapped to ?x and ?y respectively. In addition,
+we can reorder the triple patterns inside the union pattern.
+
+3
+```
+SELECT * 
+WHERE { 
+    ?a <p> ?b . 
+    OPTIONAL {  
+        { ?b <q> ?c . } 
+        UNION  
+        { ?b <r> ?c . }  
+        { ?b <s> ?c . }    
+        UNION  
+        { ?b <t> ?c . } 
+    } 
+}
+```
+
+4
+```
+SELECT * 
+WHERE { 
+    ?a <p> ?b . 
+    OPTIONAL {  
+        { ?b <s> ?c . } 
+        UNION  
+        { ?b <t> ?c . }  
+        { ?b <r> ?c . }    
+        UNION  
+        { ?b <q> ?c . } 
+    } 
+}
+```
+
+Queries 3 and 4 are congruent. Same reason as 1 and 2.
+
+5
+```
+SELECT DISTINCT ?x 
+WHERE {    
+    { ?x <name> <John>    
+    OPTIONAL { ?x <address> ?f } } .    
+    { ?x <name> <Mick>    
+    OPTIONAL { ?x <email> ?z }    } 
+}
+```
+
+6
+```
+SELECT DISTINCT ?x 
+WHERE {    
+    { ?x <name> <John>    
+    OPTIONAL { ?y <address> ?f } } .    
+    { ?x <name> <Mick>    
+    OPTIONAL { ?x <email> ?z }    } 
+}
+```
+
+Queries 5 and 6 are NOT congruent because query 6 is not well-designed (note that ?y )
