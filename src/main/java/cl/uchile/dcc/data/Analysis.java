@@ -1,6 +1,7 @@
 package cl.uchile.dcc.data;
 
 import com.google.common.primitives.Doubles;
+import org.apache.commons.cli.*;
 import org.apache.jena.atlas.lib.Pair;
 
 import java.io.*;
@@ -664,8 +665,45 @@ public class Analysis {
 	}
 	
 	public static void main(String[] args) throws IOException{
-		Analysis a = new Analysis("resultFiles/full/rewrite_label_min_wikidata_results20210729_163215.log");
-		a.partitionByFeatures();
+		CommandLine commandLine;
+		Option option_W = new Option("d", false, "Display summary of results.");
+		Option option_C = new Option("f", false, "Show summary of results partitioned by features.");
+		Option option_N = new Option("s", false, "Show summary of results partitioned by sets of features");
+		Option option_X = new Option("x", true, "Path to file containing results.");
+		Options options = new Options();
+		CommandLineParser parser = new DefaultParser();
+
+		options.addOption(option_C);
+		options.addOption(option_W);
+		options.addOption(option_N);
+		options.addOption(option_X);
+
+		String header = "";
+		String footer = "";
+		HelpFormatter formatter = new HelpFormatter();
+		formatter.printHelp("analysis", header, options, footer, true);
+		try{
+			commandLine = parser.parse(options, args);
+			if (commandLine.hasOption("x")){
+				String file = commandLine.getOptionValue("x");
+				Analysis analysis = new Analysis(file);
+				if (commandLine.hasOption("d")) {
+					analysis.displayInfo();
+				}
+				else if (commandLine.hasOption("f")) {
+					analysis.partitionByFeatures();
+				}
+				else if (commandLine.hasOption("s")) {
+					analysis.partitionBySetsOfFeatures();
+				}
+				System.exit(0);
+			}
+		}
+		catch (ParseException exception){
+			System.out.print("Parse error: ");
+			System.out.println(exception.getMessage());
+		}
+
 	}
 
 }

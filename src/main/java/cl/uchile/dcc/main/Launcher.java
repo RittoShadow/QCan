@@ -1,6 +1,7 @@
 package cl.uchile.dcc.main;
 
 import cl.uchile.dcc.blabel.label.GraphColouring;
+import cl.uchile.dcc.data.Analysis;
 import cl.uchile.dcc.generate.MultipleGenerator;
 import cl.uchile.dcc.generate.UCQGeneratorTest;
 import cl.uchile.dcc.generate.WellDesignedPatternGenerator;
@@ -33,6 +34,9 @@ public class Launcher {
             }
             else if (exec.equals("multi")) {
                 MultipleGenerator.main(args1);
+            }
+            else if (exec.equals("analysis")) {
+                Analysis.main(args1);
             }
         }
     }
