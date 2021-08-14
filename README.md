@@ -81,12 +81,12 @@ Includes an EasyCanonicalisation class that encapsulates everything so you can p
 a file containing all the queries you need to canonicalise, and output a text file
 containing the canonical form of each query.
 
-> java -jar qcan-1.1-jar-with-dependencies.jar easy -f fileContainingQueries -o outputFile"
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -f fileContainingQueries -o outputFile
 
 For example, assuming if we want to canonicalise and minimise a text file "queries.txt" and
 output the results to "canonicalisedQueries.txt":
 
-> java -jar qcan-1.1-jar-with-dependencies.jar easy -f queries.txt -o canonicalisedQueries.txt -m"
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -f queries.txt -o canonicalisedQueries.txt -m
 
 OR you can pass a single query as an argument:
 
@@ -94,7 +94,7 @@ OR you can pass a single query as an argument:
 
 e.g.
 
-> java -jar qcan-1.1-jar-with-dependencies.jar easy -q 'PREFIX : <http://example.org/> SELECT ?x WHERE { ?x :p ?y . ?x :q ?z . { SELECT ?y WHERE { ?b :p ?y . ?b :q ?c . } } } ' "
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -q 'PREFIX : <http://example.org/> SELECT ?x WHERE { ?x :p ?y . ?x :q ?z . { SELECT ?y WHERE { ?b :p ?y . ?b :q ?c . } } } '
 
 
 Options:
