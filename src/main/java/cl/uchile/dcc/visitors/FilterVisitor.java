@@ -12,7 +12,7 @@ import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.expr.*;
 import org.apache.jena.sparql.expr.aggregate.*;
 import org.apache.jena.sparql.graph.GraphFactory;
-import cl.uchile.dcc.tools.Tools;
+import cl.uchile.dcc.tools.Utils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -114,7 +114,7 @@ public class FilterVisitor implements ExprVisitor {
 
 	@Override
 	public void visit(ExprFunctionOp funcOp) {
-		Op op = Tools.UCQTransformation(funcOp.getGraphPattern());
+		Op op = Utils.UCQTransformation(funcOp.getGraphPattern());
 		RGraphBuilder rb = new RGraphBuilder(op);
 		RGraph r = rb.getResult();
 		GraphUtil.addInto(filterGraph.graph, r.graph);

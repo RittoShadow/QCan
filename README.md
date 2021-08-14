@@ -16,6 +16,10 @@ In order to run any of these classes, you must first compile the project.
 
 > mvn compile
 
+You may also build a executable JAR using:
+
+> mvn package
+
 # Benchmark
 
 This class computes the canonical form of each query in the input file, and outputs
@@ -25,7 +29,7 @@ Optionally, it also outputs a file containing every unique query as well as the 
 times it appears in the input file.
 To run this software over a text file containing SPARQL queries (one per line) with Maven:
 
-> mvn exec:java -Dexec.args="-x filename -n numberOfQueries -o offset <options>"
+> java -jar qcan-1.1-jar-with-dependencies.jar benchmark -x filename -n numberOfQueries -o offset <options>
 
 Options:
 * -l Enables the minimisation/leaning of the monotone parts of a query.
@@ -35,30 +39,26 @@ Options:
 
 For example:
 
-> mvn exec:java -Dexec.args="-x projection.txt -n -1 -d -c -p -r -l"
-
-The MultipleGenerator class contains a main type that creates SPARQL queries from graphs (contained in the eval folder). We create queries where nodes are variables connected by a fixed predicate.
-
-> mvn exec:java@multi -Dexec.args="-x outputFile -t timeout"
+> java -jar qcan-1.1-jar-with-dependencies.jar benchmark -x projection.txt -n -1 -d -c -p -r -l"
 
 Includes an EasyCanonicalisation class that encapsulates everything so you can pass
 a file containing all the queries you need to canonicalise, and output a text file
 containing the canonical form of each query.
 
-> mvn exec:java@easy -Dexec.args="-f fileContainingQueries -o outputFile"
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -f fileContainingQueries -o outputFile"
 
 For example, assuming if we want to canonicalise and minimise a text file "queries.txt" and
 output the results to "canonicalisedQueries.txt":
 
-> mvn exec:java@easy -Dexec.args="-f queries.txt -o canonicalisedQueries.txt -m"
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -f queries.txt -o canonicalisedQueries.txt -m"
 
 OR you can pass a single query as an argument:
 
-> mvn exec:java@easy -Dexec.args="-q query"
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -q query
 
 e.g.
 
-> mvn exec:java@easy -Dexec.args="-q 'PREFIX : <http://example.org/> SELECT ?x WHERE { ?x :p ?y . ?x :q ?z . { SELECT ?y WHERE { ?b :p ?y . ?b :q ?c . } } } ' "
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -q 'PREFIX : <http://example.org/> SELECT ?x WHERE { ?x :p ?y . ?x :q ?z . { SELECT ?y WHERE { ?b :p ?y . ?b :q ?c . } } } ' "
 
 
 Options:

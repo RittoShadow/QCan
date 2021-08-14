@@ -5,7 +5,7 @@ import cl.uchile.dcc.op.OpWDLeftJoin;
 import cl.uchile.dcc.paths.PGraph;
 import cl.uchile.dcc.paths.PathTransform;
 import cl.uchile.dcc.tools.BGPSort;
-import cl.uchile.dcc.tools.Tools;
+import cl.uchile.dcc.tools.Utils;
 import cl.uchile.dcc.transformers.*;
 import cl.uchile.dcc.visitors.FilterVisitor;
 import com.github.jsonldjava.shaded.com.google.common.collect.Sets;
@@ -192,7 +192,7 @@ public class RGraphBuilder implements OpVisitor {
 	@Override
 	public void visit(OpTable arg0) {
 		Table t = arg0.getTable();
-		RGraph table = RGraph.table(t);
+		RGraph table = new RGraph(t);
 		graphStack.add(table);		
 	}
 
@@ -440,7 +440,7 @@ public class RGraphBuilder implements OpVisitor {
 
 	@Override
 	public void visit(OpGroup arg0) {
-		RGraph r = RGraph.group(arg0);
+		RGraph r = new RGraph(arg0);
 		List<ExprAggregator> agg = arg0.getAggregators();
 		List<RGraph> rGraphs = new ArrayList<>();
 		for (ExprAggregator a : agg) {
@@ -815,7 +815,7 @@ public class RGraphBuilder implements OpVisitor {
 
 			@Override
 			public void visit(OpFilter opFilter) {
-				Set<Var> subVars = Tools.varsContainedIn(opFilter.getSubOp());
+				Set<Var> subVars = Utils.varsContainedIn(opFilter.getSubOp());
 				if (opFilter.getExprs() != null) {
 					if (opFilter.getExprs().getVarsMentioned() != null) {
 						Set<Var> filterVars = opFilter.getExprs().getVarsMentioned();
@@ -866,9 +866,9 @@ public class RGraphBuilder implements OpVisitor {
 
 			@Override
 			public void visit(OpLeftJoin opLeftJoin) {
-				Set<Var> outerVars = Tools.varsContainedInExcept(op,opLeftJoin);
-				Set<Var> leftVars = Tools.varsContainedIn(opLeftJoin.getLeft());
-				Set<Var> rightVars = Tools.varsContainedIn(opLeftJoin.getRight());
+				Set<Var> outerVars = Utils.varsContainedInExcept(op,opLeftJoin);
+				Set<Var> leftVars = Utils.varsContainedIn(opLeftJoin.getLeft());
+				Set<Var> rightVars = Utils.varsContainedIn(opLeftJoin.getRight());
 				Set<Var> intersection = Sets.intersection(outerVars,rightVars);
 				for (Var var : intersection) {
 					if (!leftVars.contains(var)) {

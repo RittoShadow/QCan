@@ -30,7 +30,7 @@ import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.sparql.graph.NodeTransformLib;
 import org.apache.jena.sparql.path.*;
 import cl.uchile.dcc.tools.CommonNodes;
-import cl.uchile.dcc.tools.Tools;
+import cl.uchile.dcc.tools.Utils;
 import cl.uchile.dcc.transformers.UCQTransformer;
 import cl.uchile.dcc.visitors.OpRenamer;
 import cl.uchile.dcc.visitors.TopDownVisitor;
@@ -466,7 +466,7 @@ public class RPQMinimiser extends TopDownVisitor {
 
     public Op transformBNodesToVariables(Op op) {
         Op ans = op;
-        Set<Var> vars = Tools.allVarsContainedIn(op);
+        Set<Var> vars = Utils.allVarsContainedIn(op);
         Set<Var> blankVars = new HashSet<>();
         Map<Var,Var> varVarMap = new HashMap<>();
         for (Var var : vars) {
@@ -596,7 +596,7 @@ public class RPQMinimiser extends TopDownVisitor {
                     otherOps.add(op1);
                 }
             }
-            Set<Set<OpEpsilon>> epsilonSet = Tools.powerSet(new HashSet<>(epsilonOps));
+            Set<Set<OpEpsilon>> epsilonSet = Utils.powerSet(new HashSet<>(epsilonOps));
             for (Op op1 : otherOps) {
                 if (op1 instanceof OpTriple) {
                     Triple triple = ((OpTriple) op1).getTriple();

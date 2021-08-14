@@ -27,7 +27,7 @@ Generates queries that *enforce* an exponential rewriting to UCQs.
 The UCQGeneratorTest class contains a main type that creates SPARQL queries that are "hard" to process. 
 These queries contain n conjunctions of patterns containing m disjunctions.
 
-> mvn exec:java@ucq -Dexec.args="-c conjunctions -u unions"
+> java -jar qcan-1.1-jar-with-dependencies ucq -c conjunctions -u unions
 
 ### Generator
 
@@ -35,11 +35,11 @@ Generates queries based on graphs represented as edge lists. Files in eval/ cont
 
 The MultipleGenerator class contains a main type that creates SPARQL queries from graphs (contained in the eval folder). We create queries where nodes are variables connected by a fixed predicate.
 
-> mvn exec:java@multi -Dexec.args="-x folder -t timeout"
+> java -jar qcan-1.1-jar-with-dependencies.jar multi -x folder -t timeout
 
 For example, assuming we want to use the files in /eval/k and set a timeout of 10 seconds:
 
-> mvn exec:java@multi -Dexec.args="-x /eval/k -t 10000"
+> java -jar qcan-1.1-jar-with-dependencies.jar multi -x /eval/k -t 10000"
 
 ## Main
 
@@ -47,7 +47,7 @@ For example, assuming we want to use the files in /eval/k and set a timeout of 1
 
 To run this software over a text file containing SPARQL queries (one per line) execute:
 
-> java Benchmark -x filename -n numberOfQueries -o offset
+> java -jar qcan-1.1-jar-with-dependencies.jar benchmark -x filename -n numberOfQueries -o offset <options>
 
 Options:
 * -l to enable the minimisation of monotone parts of a query.
@@ -61,20 +61,20 @@ The EasyCanonicalisation class encapsulates everything so you can pass
 a file containing all the queries you need to canonicalise, and output a text file
 containing the canonical form of each query.
 
-> mvn exec:java@easy -Dexec.args="-f fileContainingQueries -o outputFile"
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -f fileContainingQueries -o outputFile"
 
 For example, assuming if we want to canonicalise and minimise a text file "queries.txt" and
 output the results to "canonicalisedQueries.txt":
 
-> mvn exec:java@easy -Dexec.args="-f queries.txt -o canonicalisedQueries.txt -m"
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -f queries.txt -o canonicalisedQueries.txt -m"
 
 OR you can pass a single query as an argument:
 
-> mvn exec:java@easy -Dexec.args="-q query"
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -q query
 
 e.g.
 
-> mvn exec:java@easy -Dexec.args="-q 'PREFIX : <http://example.org/> SELECT ?x WHERE { ?x :p ?y . ?x :q ?z . { SELECT ?y WHERE { ?b :p ?y . ?b :q ?c . } } } ' "
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -q 'PREFIX : <http://example.org/> SELECT ?x WHERE { ?x :p ?y . ?x :q ?z . { SELECT ?y WHERE { ?b :p ?y . ?b :q ?c . } } } ' "
 
 
 Options:
