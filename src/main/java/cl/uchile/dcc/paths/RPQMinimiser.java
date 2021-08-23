@@ -1,8 +1,14 @@
 package cl.uchile.dcc.paths;
 
-import cl.uchile.dcc.main.SingleQuery;
 import cl.uchile.dcc.blabel.label.GraphColouring;
+import cl.uchile.dcc.main.SingleQuery;
 import cl.uchile.dcc.op.OpEpsilon;
+import cl.uchile.dcc.tools.CommonNodes;
+import cl.uchile.dcc.tools.OpUtils;
+import cl.uchile.dcc.tools.Utils;
+import cl.uchile.dcc.transformers.UCQTransformer;
+import cl.uchile.dcc.visitors.OpRenamer;
+import cl.uchile.dcc.visitors.TopDownVisitor;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.atlas.lib.RandomLib;
@@ -29,11 +35,6 @@ import org.apache.jena.sparql.expr.ExprVar;
 import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.sparql.graph.NodeTransformLib;
 import org.apache.jena.sparql.path.*;
-import cl.uchile.dcc.tools.CommonNodes;
-import cl.uchile.dcc.tools.Utils;
-import cl.uchile.dcc.transformers.UCQTransformer;
-import cl.uchile.dcc.visitors.OpRenamer;
-import cl.uchile.dcc.visitors.TopDownVisitor;
 
 import java.util.*;
 
@@ -466,7 +467,7 @@ public class RPQMinimiser extends TopDownVisitor {
 
     public Op transformBNodesToVariables(Op op) {
         Op ans = op;
-        Set<Var> vars = Utils.allVarsContainedIn(op);
+        Set<Var> vars = OpUtils.allVarsContainedIn(op);
         Set<Var> blankVars = new HashSet<>();
         Map<Var,Var> varVarMap = new HashMap<>();
         for (Var var : vars) {

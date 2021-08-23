@@ -306,6 +306,12 @@ public class RGraph {
         }
     }
 
+    public RGraph() {
+        this(NodeFactory.createBlankNode(),GraphFactory.createDefaultGraph(),new HashSet<>());
+        graph.add(Triple.create(root,typeNode,nullNode));
+        typeMap.put(root,nullNode);
+    }
+
     /**
      * Creates an r-graph that represents the projection of variables (SELECT vars) and adds it to this r-graph.
      *

@@ -1,6 +1,6 @@
 package cl.uchile.dcc.transformers;
 
-import cl.uchile.dcc.tools.Utils;
+import cl.uchile.dcc.tools.OpUtils;
 import com.github.jsonldjava.shaded.com.google.common.collect.Sets;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.OpVisitor;
@@ -119,7 +119,7 @@ public class WellDesignedTransformer extends TransformCopy {
 
             @Override
             public void visit(OpFilter opFilter) {
-                Set<Var> subVars = Utils.varsContainedIn(opFilter.getSubOp());
+                Set<Var> subVars = OpUtils.varsContainedIn(opFilter.getSubOp());
                 if (opFilter.getExprs() != null) {
                     if (opFilter.getExprs().getVarsMentioned() != null) {
                         Set<Var> filterVars = opFilter.getExprs().getVarsMentioned();
@@ -170,9 +170,9 @@ public class WellDesignedTransformer extends TransformCopy {
 
             @Override
             public void visit(OpLeftJoin opLeftJoin) {
-                Set<Var> outerVars = Utils.varsContainedInExcept(op,opLeftJoin);
-                Set<Var> leftVars = Utils.varsContainedIn(opLeftJoin.getLeft());
-                Set<Var> rightVars = Utils.varsContainedIn(opLeftJoin.getRight());
+                Set<Var> outerVars = OpUtils.varsContainedInExcept(op,opLeftJoin);
+                Set<Var> leftVars = OpUtils.varsContainedIn(opLeftJoin.getLeft());
+                Set<Var> rightVars = OpUtils.varsContainedIn(opLeftJoin.getRight());
                 Set<Var> intersection = Sets.intersection(outerVars,rightVars);
                 for (Var var : intersection) {
                     if (!leftVars.contains(var)) {

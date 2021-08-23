@@ -175,6 +175,18 @@ public class Test {
 	}
 
 	@org.junit.Test
+	public void unsatisfiableBGPTest() {
+		try {
+			QueryParserTest qp = new QueryParserTest(new File("testFiles/unsatisfiableBGPTest.txt"));
+			assertTrue(qp.equalQueries(0,1));
+			assertTrue(qp.equalQueries(2,3));
+			assertTrue(qp.equalQueries(3,4));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@org.junit.Test
 	public void minusTest() {
 		try {
 			QueryParserTest qp = new QueryParserTest(new File("testFiles/minusDistTest.txt"));

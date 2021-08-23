@@ -1,6 +1,6 @@
 package cl.uchile.dcc.transformers;
 
-import cl.uchile.dcc.tools.Utils;
+import cl.uchile.dcc.tools.OpUtils;
 import cl.uchile.dcc.visitors.OpRenamer;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.TransformCopy;
@@ -12,7 +12,9 @@ import org.apache.jena.sparql.expr.E_NotExists;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.graph.NodeTransformLib;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Set;
 
 public class LocalVarRenamer extends TransformCopy {
     Collection<Var> pVars = Collections.emptyList();
@@ -28,7 +30,7 @@ public class LocalVarRenamer extends TransformCopy {
     public Op transform(OpFilter op, Op subOp) {
         Op ans = op;
         if (!op.getExprs().isEmpty()) {
-            Set<Var> vars = Utils.varsContainedIn(subOp);
+            Set<Var> vars = OpUtils.varsContainedIn(subOp);
             Expr expr = op.getExprs().get(0);
             if (expr instanceof E_Exists) {
                 Op op1 = ((E_Exists) expr).getGraphPattern();
@@ -50,8 +52,8 @@ public class LocalVarRenamer extends TransformCopy {
     public Op transform(OpMinus op, Op left, Op right) {
         Op ans = op;
         boolean rename = false;
-        Set<Var> leftVars = Utils.varsContainedIn(left);
-        Set<Var> rightVars = Utils.varsContainedIn(right);
+        Set<Var> leftVars = OpUtils.varsContainedIn(left);
+        Set<Var> rightVars = OpUtils.varsContainedIn(right);
         for (Var v : rightVars) {
             if (!leftVars.contains(v)) {
                 rename = true;

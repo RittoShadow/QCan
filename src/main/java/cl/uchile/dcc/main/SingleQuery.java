@@ -5,7 +5,6 @@ import cl.uchile.dcc.builder.QueryBuilder;
 import cl.uchile.dcc.builder.RGraphBuilder;
 import cl.uchile.dcc.data.FeatureCounter;
 import cl.uchile.dcc.tools.BGPSort;
-import cl.uchile.dcc.tools.Utils;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
@@ -120,7 +119,6 @@ public class SingleQuery {
 	public void parseQuery(String q, boolean rewrite) throws UnsupportedOperationException, QueryParseException{
 		Query query = QueryFactory.create(q);
 		this.op = Algebra.compile(query);
-		System.out.println(Utils.isWellDesigned(this.op));
 		RGraphBuilder rgb = new RGraphBuilder(query,rewrite,pathNormalisation);
 		graph = rgb.getResult();
 		graphTime = rgb.graphTime;
@@ -284,7 +282,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException, IOException {
-		String q = "PREFIX : <http://data.example/> SELECT DISTINCT (AVG(?size) AS ?asize) WHERE {{  ?x :size ?size } UNION { ?x ?y ?size }} GROUP BY ?x HAVING(AVG(?size) > 10)";
+		String q = "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT ?x ?name WHERE  {     ?x  foaf:mbox <mailto:alice@example> .     ?x  foaf:knows [ foaf:knows [ foaf:name ?name ]].   }\n";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();

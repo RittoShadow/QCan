@@ -68,7 +68,7 @@
                     <execution>
                         <id>ucq</id>
                         <configuration>
-                            <mainClass>cl.uchile.dcc.generate.UCQGenerator</mainClass>
+                            <mainClass>cl.uchile.dcc.generate.UCQGeneratorTest</mainClass>
                         </configuration>
                     </execution>
                     <execution>

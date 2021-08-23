@@ -2,7 +2,7 @@ package cl.uchile.dcc.builder;
 
 import cl.uchile.dcc.main.RGraph;
 import cl.uchile.dcc.tools.CommonNodes;
-import cl.uchile.dcc.tools.Utils;
+import cl.uchile.dcc.tools.OpUtils;
 import cl.uchile.dcc.visitors.OpRenamer;
 import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
@@ -79,7 +79,14 @@ public class QueryBuilder {
 			first = root;
 		}
 		op = nextOpByType(first);
-		op = newLabels(op);
+		if (!OpUtils.isNull(op)) {
+			op = newLabels(op);
+		}
+		else {
+			BasicPattern bp = new BasicPattern();
+			bp.add(Triple.create(NodeFactory.createLiteral("subject"),NodeFactory.createURI("predicate"),NodeFactory.createLiteral("object")));
+			op = new OpBGP(bp);
+		}
 	}
 
 	public Op nextOpByType(Node n) {
@@ -117,6 +124,9 @@ public class QueryBuilder {
 		}
 		else if (type.equals(CommonNodes.projectNode)) {
 			ans = projectToOp(n);
+		}
+		else if (type.equals(CommonNodes.nullNode)) {
+			ans = OpNull.create();
 		}
 		return ans;
 	}
@@ -1461,7 +1471,7 @@ public class QueryBuilder {
 	}
 	
 	public Op newLabels(Op op){
-		Set<Var> vars = Utils.varsContainedIn(op);
+		Set<Var> vars = OpUtils.varsContainedIn(op);
 		List<String> varLabels = new ArrayList<>();
 		for (Var v : vars) {
 			varLabels.add(v.getVarName());
