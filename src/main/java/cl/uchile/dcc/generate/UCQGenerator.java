@@ -16,21 +16,30 @@ import org.apache.jena.sparql.core.Var;
 import java.io.*;
 import java.util.*;
 
-public class UCQGenerator extends Generator {
+public class  UCQGenerator extends Generator {
 	protected List<Triple> conjunctions = new ArrayList<>();
 	protected List<Triple> unions = new ArrayList<>();
 	protected Node predicate;
+	protected List<Node> predicateList = new ArrayList<>();
 	protected int x = 0;
 	protected int y = 0;
+	protected int numberOfPredicates = 0;
 	public long graphTime;
 	public long rewriteTime;
 	public long leaningTime;
 	public long canonTime;
 	
-	public UCQGenerator(File f) throws FileNotFoundException{
+	public UCQGenerator(File f, int x, int y, int numberOfPredicates) throws FileNotFoundException{
 		super(f);
 		br = new BufferedReader(new FileReader(f));
 		predicate = NodeFactory.createURI("http://example.org/p");
+		this.numberOfPredicates = numberOfPredicates;
+		predicateList.add(predicate);
+		for (int i = 0; i < numberOfPredicates; i++) {
+			predicateList.add(NodeFactory.createURI(predicate.getURI() + i));
+		}
+		this.x = x;
+		this.y = y;
 	}
 	
 	public void generateTriples() throws IOException{
@@ -49,7 +58,8 @@ public class UCQGenerator extends Generator {
 				hm.put(v1, NodeFactory.createVariable("v"+(v1+r)));
 				vars.add(Var.alloc("v"+(v1+r)));
 			}
-			triples.add(Triple.create(hm.get(v0), predicate, hm.get(v1)));
+			int p = Math.abs(rng.nextInt(numberOfPredicates));
+			triples.add(Triple.create(hm.get(v0), predicateList.get(p), hm.get(v1)));
 		}
 		br.close();
 	}
@@ -103,16 +113,10 @@ public class UCQGenerator extends Generator {
 		return ans;
 	}
 	
-	public RGraph generateGraph(int x, int y){
-		this.x = x;
-		this.y = y;
-		return generateGraph();
-	}
-	
 	public static void main(String[] args) throws IOException, InterruptedException, HashCollisionException{
-		UCQGenerator g = new UCQGenerator(new File("eval/k/k-12"));
+		UCQGenerator g = new UCQGenerator(new File("eval/k/k-12"),4,8,2);
 		g.generateTriples();
-		RGraph e = g.generateGraph(1,8  );
+		RGraph e = g.generateGraph();
 		System.out.println(e.graph.size());
 		System.out.println(e.getNumberOfTriples());
 		RGraph a = e.getCanonicalForm(false);

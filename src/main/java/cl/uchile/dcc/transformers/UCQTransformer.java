@@ -1,5 +1,7 @@
 package cl.uchile.dcc.transformers;
 
+import cl.uchile.dcc.op.OpEpsilon;
+import cl.uchile.dcc.tools.OpUtils;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.sparql.algebra.Algebra;
@@ -9,7 +11,6 @@ import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.op.*;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
-import cl.uchile.dcc.op.OpEpsilon;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,7 @@ public class UCQTransformer extends TransformCopy{
 			}
 			List<Op> newOps = new ArrayList<>();
 			for (Op o : ops) {
-				newOps.add(OpJoin.create(o,right));
+				newOps.add(OpUtils.joinOps(o,right));
 			}
 			Op ans = newOps.get(0);
 			for (int i = 1; i < newOps.size(); i++) {
@@ -42,7 +43,7 @@ public class UCQTransformer extends TransformCopy{
 			}
 			List<Op> newOps = new ArrayList<>();
 			for (Op o : ops) {
-				newOps.add(OpJoin.create(left, o));
+				newOps.add(OpUtils.joinOps(left,o));
 			}
         	Op ans = newOps.get(0);
 			for (int i = 1; i < newOps.size(); i++) {
@@ -58,7 +59,7 @@ public class UCQTransformer extends TransformCopy{
 			List<Op> newOps = new ArrayList<>();
 			for (Op leftOp : leftOps) {
 				for (Op rightOp : rightOps) {
-					newOps.add(OpJoin.create(leftOp,rightOp));
+					newOps.add(OpUtils.joinOps(leftOp,rightOp));
 				}
 			}
 			Op ans = newOps.get(0);

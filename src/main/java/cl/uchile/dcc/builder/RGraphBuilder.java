@@ -5,7 +5,7 @@ import cl.uchile.dcc.op.OpWDLeftJoin;
 import cl.uchile.dcc.paths.PGraph;
 import cl.uchile.dcc.paths.PathTransform;
 import cl.uchile.dcc.tools.BGPSort;
-import cl.uchile.dcc.tools.Utils;
+import cl.uchile.dcc.tools.OpUtils;
 import cl.uchile.dcc.transformers.*;
 import cl.uchile.dcc.visitors.FilterVisitor;
 import com.github.jsonldjava.shaded.com.google.common.collect.Sets;
@@ -105,20 +105,6 @@ public class RGraphBuilder implements OpVisitor {
 	public void visit(OpBGP arg0) {
 		nTriples += arg0.getPattern().size();
 		graphStack.add(new RGraph(arg0.getPattern().getList()));
-		for (Triple t : arg0.getPattern().getList()){
-			Node s = t.getSubject();
-			Node p = t.getPredicate();
-			Node o = t.getObject();
-			if (s.isVariable()){
-				totalVars.add(Var.alloc(s));
-			}
-			if (p.isVariable()){
-				totalVars.add(Var.alloc(p));
-			}
-			if (o.isVariable()){
-				totalVars.add(Var.alloc(o));
-			}
-		}
 	}
 
 	@Override
@@ -198,8 +184,8 @@ public class RGraphBuilder implements OpVisitor {
 
 	@Override
 	public void visit(OpNull arg0) {
-		throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
-		
+		graphStack.add(new RGraph());
+		//throw new UnsupportedOperationException("Unsupported SPARQL feature: "+arg0.getName());
 	}
 
 	@Override
@@ -501,6 +487,21 @@ public class RGraphBuilder implements OpVisitor {
 			graphStack.peek().fromNamedGraph(namedGraphURI);
 		}
 		graphStack.peek().containsPaths = this.containsPaths;
+		if (this.queryType.equals(QueryType.SELECT)) {
+			if (!isDistinct) {
+				if (totalVars.containsAll(projectionVars) && projectionVars.containsAll(totalVars)) {
+					if (!OpUtils.checkBranchVars(op)) {
+						graphStack.peek().setDistinctNode(true);
+					} else {
+						graphStack.peek().setDistinctNode(isDistinct);
+					}
+				} else {
+					graphStack.peek().setDistinctNode(isDistinct);
+				}
+			} else {
+				graphStack.peek().setDistinctNode(true);
+			}
+		}
 		return graphStack.peek();
 	}
 
@@ -815,7 +816,7 @@ public class RGraphBuilder implements OpVisitor {
 
 			@Override
 			public void visit(OpFilter opFilter) {
-				Set<Var> subVars = Utils.varsContainedIn(opFilter.getSubOp());
+				Set<Var> subVars = OpUtils.varsContainedIn(opFilter.getSubOp());
 				if (opFilter.getExprs() != null) {
 					if (opFilter.getExprs().getVarsMentioned() != null) {
 						Set<Var> filterVars = opFilter.getExprs().getVarsMentioned();
@@ -866,9 +867,9 @@ public class RGraphBuilder implements OpVisitor {
 
 			@Override
 			public void visit(OpLeftJoin opLeftJoin) {
-				Set<Var> outerVars = Utils.varsContainedInExcept(op,opLeftJoin);
-				Set<Var> leftVars = Utils.varsContainedIn(opLeftJoin.getLeft());
-				Set<Var> rightVars = Utils.varsContainedIn(opLeftJoin.getRight());
+				Set<Var> outerVars = OpUtils.varsContainedInExcept(op,opLeftJoin);
+				Set<Var> leftVars = OpUtils.varsContainedIn(opLeftJoin.getLeft());
+				Set<Var> rightVars = OpUtils.varsContainedIn(opLeftJoin.getRight());
 				Set<Var> intersection = Sets.intersection(outerVars,rightVars);
 				for (Var var : intersection) {
 					if (!leftVars.contains(var)) {
@@ -962,6 +963,7 @@ public class RGraphBuilder implements OpVisitor {
 		op2 = br.visit(op2);
 		op2 = Transformer.transform(new LocalVarRenamer(this.projectionVars), op2);
 		op2 = WellDesignedPatternNormalisation(op2);
+		op2 = Transformer.transform(new RemoveUnsatisfiableBGPs(), op2);
 		op2 = Transformer.transform(new TransformSimplify(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
 		op2 = Transformer.transform(new TransformExtendCombine(), op2);

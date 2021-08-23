@@ -23,6 +23,7 @@ public class UCQGeneratorTest {
 	private UCQGenerator generator;
 	private int conjunctions;
 	private int unions;
+	private int numberOfPredicates;
 	private File file;
 	private FileWriter fw;
 	private BufferedWriter bw;
@@ -38,13 +39,13 @@ public class UCQGeneratorTest {
 		bw.newLine();
 	}
 	
-	public void setup(int a, int b) throws IOException, InterruptedException, HashCollisionException{
-		int c = a+b;
+	public void setup(int a, int b, int n) throws IOException, InterruptedException, HashCollisionException{
+		int c = a + b;
 		conjunctions = a;
 		unions = b;
-		generator = new UCQGenerator(new File("eval/k/k-"+c));
+		numberOfPredicates = n;
+		generator = new UCQGenerator(new File("eval/k/k-"+c),a,b,n);
 		generator.generateTriples();
-		generator.selectTriples(a, b);
 		
 	}
 	
@@ -53,8 +54,8 @@ public class UCQGeneratorTest {
 			String line = "eval/k/k-"+(conjunctions+unions);
 			line += "\t"+conjunctions;
 			line += "\t"+unions;
-			generator.selectTriples(conjunctions, unions);
-			RGraph e = generator.generateGraph(conjunctions, unions);
+			generator.selectTriples(conjunctions,unions);
+			RGraph e = generator.generateGraph();
 			int triplesIn = e.getNumberOfTriples();
 			line += "\t"+generator.graphTime;
 			line += "\t"+generator.rewriteTime;
@@ -69,10 +70,10 @@ public class UCQGeneratorTest {
 		}
 	}
 	
-	public void testAll(int a, int b) throws IOException, InterruptedException, HashCollisionException{
+	public void testAll(int a, int b, int n) throws IOException, InterruptedException, HashCollisionException{
 		for (int x = 1; x < a; x++){
 			for (int y = 1; y < b; y++){
-				setup(x,y);
+				setup(x,y,n);
 				try{
 					execute();
 				}
@@ -95,24 +96,32 @@ public class UCQGeneratorTest {
 		CommandLine commandLine;
 		Option option_X = new Option("c", true, "Number of different values for conjunctions. Starts with 1 and increases by powers of 2. Default is 3.");
 		Option option_T = new Option("u", true, "Number of different values for unions. Starts with 1 and increases by powers of 2. Default is 3.");
-		
+		Option option_N = new Option("n", true, "Number of different predicates. Default is 2.");
+
+
 	    Options options = new Options();
 	    CommandLineParser parser = new DefaultParser();
 	    options.addOption(option_X);
 	    options.addOption(option_T);
+	    options.addOption(option_N);
 	    try{
 		    commandLine = parser.parse(options, args);
-		    int conjunctions = 3;
-		    int unions = 3;
+		    int conjunctions = 8;
+		    int unions = 8;
+		    int numberOfPredicates = 20;
 		    if (commandLine.hasOption("c")){
 				conjunctions = Integer.valueOf(commandLine.getOptionValue("c"));
 			}
 			if (commandLine.hasOption("u")){
 				unions = Integer.valueOf(commandLine.getOptionValue("u"));
 			}
+			if (commandLine.hasOption("n")) {
+				numberOfPredicates = Integer.valueOf(commandLine.getOptionValue("n"));
+			}
 			UCQGeneratorTest test = new UCQGeneratorTest();
-			test.testAll(conjunctions,unions);
+			test.testAll(conjunctions,unions,numberOfPredicates);
 			test.close();
+			System.exit(0);
 	    }
 	    catch (ParseException exception){
 	        System.out.print("Parse error: ");
