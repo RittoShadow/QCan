@@ -14,10 +14,20 @@ import java.util.*;
 
 public class BranchRenamer extends TopDownVisitor {
     Set<Var> varsInScope = new HashSet<>();
+    private int projectionDepth = 0;
 
     public Op visit(OpProject project) {
         varsInScope.addAll(project.getVars());
-        return new OpProject(visit(project.getSubOp()), project.getVars());
+        projectionDepth++;
+        if (projectionDepth > 1) {
+            OpRenamer or = new OpRenamer(varsInScope);
+            Op op = visit(NodeTransformLib.transform(or,project.getSubOp()));
+            return new OpProject(op,project.getVars());
+        }
+        else {
+            return new OpProject(visit(project.getSubOp()), project.getVars());
+        }
+
     }
 
     public Op visit(OpOrder order) {

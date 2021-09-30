@@ -5,6 +5,7 @@ import cl.uchile.dcc.data.Analysis;
 import cl.uchile.dcc.generate.MultipleGenerator;
 import cl.uchile.dcc.generate.UCQGeneratorTest;
 import cl.uchile.dcc.generate.WellDesignedPatternGenerator;
+import cl.uchile.dcc.parsers.BGPParser;
 
 import java.io.IOException;
 
@@ -37,6 +38,9 @@ public class Launcher {
             }
             else if (exec.equals("analysis")) {
                 Analysis.main(args1);
+            }
+            else if (exec.equals("bgp")) {
+                BGPParser.main(args1);
             }
         }
     }

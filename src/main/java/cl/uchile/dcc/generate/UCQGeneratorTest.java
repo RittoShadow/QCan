@@ -71,15 +71,15 @@ public class UCQGeneratorTest {
 	}
 	
 	public void testAll(int a, int b, int n) throws IOException, InterruptedException, HashCollisionException{
-		for (int x = 1; x < a; x++){
-			for (int y = 1; y < b; y++){
+		for (int x = 1; x <= a; x++){
+			for (int y = 1; y <= b; y++){
 				setup(x,y,n);
 				try{
 					execute();
 				}
 				catch (StackOverflowError e) {
 					System.err.println("Stopped at: c = "+a+" and u = "+b);
-					return;
+					break;
 				}
 				catch(Exception e){
 					e.printStackTrace();
@@ -94,8 +94,8 @@ public class UCQGeneratorTest {
 	
 	public static void main(String[] args) throws IOException, InterruptedException, HashCollisionException{
 		CommandLine commandLine;
-		Option option_X = new Option("c", true, "Number of different values for conjunctions. Starts with 1 and increases by powers of 2. Default is 3.");
-		Option option_T = new Option("u", true, "Number of different values for unions. Starts with 1 and increases by powers of 2. Default is 3.");
+		Option option_X = new Option("c", true, "Number of conjunctions. Starts with 1. Default is 3.");
+		Option option_T = new Option("u", true, "Number of triples per union patterns. Starts with 1. Default is 3.");
 		Option option_N = new Option("n", true, "Number of different predicates. Default is 2.");
 
 
@@ -106,9 +106,9 @@ public class UCQGeneratorTest {
 	    options.addOption(option_N);
 	    try{
 		    commandLine = parser.parse(options, args);
-		    int conjunctions = 8;
-		    int unions = 8;
-		    int numberOfPredicates = 20;
+		    int conjunctions = 4;
+		    int unions = 16;
+		    int numberOfPredicates = 16;
 		    if (commandLine.hasOption("c")){
 				conjunctions = Integer.valueOf(commandLine.getOptionValue("c"));
 			}
