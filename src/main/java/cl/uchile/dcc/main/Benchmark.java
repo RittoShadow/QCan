@@ -53,7 +53,8 @@ public class Benchmark {
 			if (!out.exists()) {
 				out.createNewFile();
 			}
-			jp = new JenaParser(f, out, upTo, true, true);
+			jp = new JenaParser();
+			jp.read(f,out,upTo,offset);
 			if (printDist){
 				jp.getDistributionInfo(filename);
 			}
@@ -72,7 +73,8 @@ public class Benchmark {
 			if (!out.exists()) {
 				out.createNewFile();
 			}
-			pq = new QueryParser(f, out, upTo, offset, enableLeaning, enableCanonicalisation, enableRewrite, pathNormalisation);
+			pq = new QueryParser();
+			pq.read(f, out, upTo, offset, enableLeaning, enableCanonicalisation, enableRewrite, pathNormalisation);
 			if (printDist){
 				pq.getDistributionInfo(filename);
 			}

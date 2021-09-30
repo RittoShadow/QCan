@@ -189,7 +189,7 @@ public class FilterVisitor implements ExprVisitor {
     public RGraph getGraph(){
 		if (var == null) {
 			filterGraph.root = nodeStack.peek();
-			filterGraph.filterNormalisation();
+			//filterGraph.filterNormalisation();
 		}
 		else {
 			Node exprNode = nodeStack.peek();

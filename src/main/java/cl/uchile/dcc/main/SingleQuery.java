@@ -4,11 +4,13 @@ import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
 import cl.uchile.dcc.builder.QueryBuilder;
 import cl.uchile.dcc.builder.RGraphBuilder;
 import cl.uchile.dcc.data.FeatureCounter;
-import cl.uchile.dcc.tools.BGPSort;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QueryParseException;
-import org.apache.jena.sparql.algebra.*;
+import org.apache.jena.sparql.algebra.Algebra;
+import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.OpAsQuery;
+import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.core.Var;
 
 import java.io.IOException;
@@ -68,6 +70,7 @@ public class SingleQuery {
 		long t = System.nanoTime();
 		parseQuery(q,true);
 		graphTime = System.nanoTime() - t;
+		setFeatures();
 		if (canon || leaning){
 			canonicalise(verbose);
 		}
@@ -83,6 +86,7 @@ public class SingleQuery {
 		long t = System.nanoTime();
 		parseQuery(q,rewrite);
 		graphTime = System.nanoTime() - t;
+		setFeatures();
 		this.graph.canonical = canon;
 		if (canon || minimise){
 			canonicalise(verbose);
@@ -96,24 +100,9 @@ public class SingleQuery {
 	
 	public SingleQuery(Op op) throws InterruptedException, HashCollisionException {
 		this.op = op;
-		String q = OpAsQuery.asQuery(op).toString();
-		parseQuery(q,true);
+		parseQuery(op);
 		canonicalise();
 		buildQuery();
-	}
-	
-	public boolean checkBranchVars(Op op){
-		BGPSort bgps = new BGPSort();
-		@SuppressWarnings("unused")
-		Op op2 = Transformer.transform(bgps, op);
-		for (int i = 0; i < bgps.ucqVars.size(); i++){
-			for (int j = i + 1; j < bgps.ucqVars.size(); j++){
-				if (bgps.ucqVars.get(i).equals(bgps.ucqVars.get(j))){
-					return true;
-				}
-			}
-		}
-		return false;
 	}
 	
 	public void parseQuery(String q, boolean rewrite) throws UnsupportedOperationException, QueryParseException{
@@ -124,21 +113,17 @@ public class SingleQuery {
 		graphTime = rgb.graphTime;
 		rewriteTime = rgb.rewriteTime;
 		vars = rgb.varsContainedIn(op);
-		if (query.isSelectType()) {
-			if (!rgb.isDistinct) {
-				if (vars.containsAll(rgb.projectionVars) && rgb.projectionVars.containsAll(vars)) {
-					if (!checkBranchVars(op)) {
-						graph.setDistinctNode(true);
-					} else {
-						graph.setDistinctNode(rgb.isDistinct);
-					}
-				} else {
-					graph.setDistinctNode(rgb.isDistinct);
-				}
-			} else {
-				graph.setDistinctNode(true);
-			}
-		}
+	}
+
+	public void parseQuery(Op op) {
+		this.op = op;
+		Query query = OpAsQuery.asQuery(op);
+		RGraphBuilder rgb = new RGraphBuilder(query);
+		graph = rgb.getResult();
+		vars = rgb.varsContainedIn(op);
+	}
+
+	public void setFeatures() {
 		FeatureCounter fc = new FeatureCounter(op);
 		OpWalker.walk(op, fc);
 		nTriples = graph.getNumberOfTriples();
@@ -256,15 +241,7 @@ public class SingleQuery {
 	public Op getCanonOp() {
 		return this.canonOp;
 	}
-	
-	public boolean getContainsUnion(){
-		return this.containsUnion;
-	}
-	
-	public boolean getContainsJoin(){
-		return this.containsJoin;
-	}
-	
+
 	public boolean getContainsOptional(){
 		return this.containsOptional;
 	}
@@ -282,7 +259,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException, IOException {
-		String q = "PREFIX foaf: <http://xmlns.com/foaf/0.1/> SELECT ?x ?name WHERE  {     ?x  foaf:mbox <mailto:alice@example> .     ?x  foaf:knows [ foaf:knows [ foaf:name ?name ]].   }\n";
+		String q = "PREFIX : <http://example.org/> SELECT DISTINCT ?z WHERE{ {?w :mother ?x . } UNION {?w :father ?x . ?x :sister ?y .} UNION {?c :mother ?d . ?d :sister ?y .} ?d ?p ?e . ?e :name ?f . ?x :sister ?y . ?y :name ?z .}";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();

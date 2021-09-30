@@ -34,9 +34,6 @@ import org.apache.jena.sparql.graph.GraphFactory;
 import org.apache.jena.sparql.path.Path;
 import org.apache.jena.sparql.sse.writers.WriterPath;
 import org.apache.jena.sparql.syntax.Template;
-import org.apache.jena.update.UpdateAction;
-import org.apache.jena.update.UpdateFactory;
-import org.apache.jena.update.UpdateRequest;
 import org.apache.jena.util.iterator.ExtendedIterator;
 import org.semanticweb.yars.nx.BNode;
 
@@ -53,14 +50,12 @@ import static org.apache.jena.graph.GraphUtil.listSubjects;
  */
 public class RGraph {
 
-    private final UpdateRequest duplicatesRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("normalisation/duplicates.ru")));
-    private final UpdateRequest conjunctionRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("normalisation/conjunction.ru")));
-    private final UpdateRequest disjunctionRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("normalisation/disjunction.ru")));
-    private final UpdateRequest joinRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("join.ru")));
-    private final UpdateRequest branchCleanUpRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("branchLabel/cleanUp.ru")));
-    private final UpdateRequest branchUnionRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("branchLabel/branchUnion.ru")));
-    private final UpdateRequest filterVarsRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("branchLabel/filterVars.ru")));
-    private final UpdateRequest subgraphRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("subLabel.ru")));
+    //private static final UpdateRequest conjunctionRule = UpdateFactory.read(Objects.requireNonNull(RGraph.class.getClassLoader().getResourceAsStream("normalisation/conjunction.ru")));
+    //private static final UpdateRequest disjunctionRule = UpdateFactory.read(Objects.requireNonNull(RGraph.class.getClassLoader().getResourceAsStream("normalisation/disjunction.ru")));
+    //private static final UpdateRequest joinRule = UpdateFactory.read(Objects.requireNonNull(RGraph.class.getClassLoader().getResourceAsStream("join.ru")));
+    //private final UpdateRequest branchCleanUpRule = UpdateFactory.read(Objects.requireNonNull(getClass().getClassLoader().getResourceAsStream("branchLabel/cleanUp.ru")));
+    //private static final UpdateRequest branchUnionRule = UpdateFactory.read(Objects.requireNonNull(RGraph.class.getClassLoader().getResourceAsStream("branchLabel/branchUnion.ru")));
+    //private static final UpdateRequest filterVarsRule = UpdateFactory.read(Objects.requireNonNull(RGraph.class.getClassLoader().getResourceAsStream("branchLabel/filterVars.ru")));
     public Graph graph = GraphFactory.createDefaultGraph();
     public Set<Var> vars = new HashSet<>();
     public int nTriples;
@@ -75,6 +70,7 @@ public class RGraph {
     public Map<Node, Node> typeMap = new HashMap<>();
     private long labelTime = 0;
     private long minimisationTime = 0;
+    private HashCode hashCode = null;
 
 
     /**
@@ -654,8 +650,36 @@ public class RGraph {
         Node o = NodeFactory.createBlankNode();
         graph.add(Triple.create(o, typeNode, andNode));
         typeMap.put(o, andNode);
-        graph.add(Triple.create(o, argNode, arg1));
-        graph.add(Triple.create(o, argNode, arg2));
+        List<Node> args = new ArrayList<>();
+        if (typeMap.containsKey(arg1) && typeMap.get(arg1).equals(andNode)) {
+            ExtendedIterator<Node> argNodes = GraphUtil.listObjects(graph,arg1,argNode);
+            while (argNodes.hasNext()) {
+                Node arg = argNodes.next();
+                graph.delete(Triple.create(arg1,argNode,arg));
+                args.add(arg);
+            }
+            graph.delete(Triple.create(arg1,typeNode,andNode));
+            typeMap.remove(arg1);
+        }
+        else {
+            args.add(arg1);
+        }
+        if (typeMap.containsKey(arg2) && typeMap.get(arg2).equals(andNode)) {
+            ExtendedIterator<Node> argNodes = GraphUtil.listObjects(graph,arg2,argNode);
+            while (argNodes.hasNext()) {
+                Node arg = argNodes.next();
+                graph.delete(Triple.create(arg2,argNode,arg));
+                args.add(arg);
+            }
+            graph.delete(Triple.create(arg2,typeNode,andNode));
+            typeMap.remove(arg2);
+        }
+        else {
+            args.add(arg2);
+        }
+        for (Node arg : args) {
+            graph.add(Triple.create(o, argNode, arg));
+        }
         return o;
     }
 
@@ -670,8 +694,36 @@ public class RGraph {
         Node o = NodeFactory.createBlankNode();
         graph.add(Triple.create(o, typeNode, orNode));
         typeMap.put(o, orNode);
-        graph.add(Triple.create(o, argNode, arg1));
-        graph.add(Triple.create(o, argNode, arg2));
+        List<Node> args = new ArrayList<>();
+        if (typeMap.containsKey(arg1) && typeMap.get(arg1).equals(orNode)) {
+            ExtendedIterator<Node> argNodes = GraphUtil.listObjects(graph,arg1,argNode);
+            while (argNodes.hasNext()) {
+                Node arg = argNodes.next();
+                graph.delete(Triple.create(arg1,argNode,arg));
+                args.add(arg);
+            }
+            graph.delete(Triple.create(arg1,typeNode,orNode));
+            typeMap.remove(arg1);
+        }
+        else {
+            args.add(arg1);
+        }
+        if (typeMap.containsKey(arg2) && typeMap.get(arg2).equals(orNode)) {
+            ExtendedIterator<Node> argNodes = GraphUtil.listObjects(graph,arg2,argNode);
+            while (argNodes.hasNext()) {
+                Node arg = argNodes.next();
+                graph.delete(Triple.create(arg2,argNode,arg));
+                args.add(arg);
+            }
+            graph.delete(Triple.create(arg2,typeNode,orNode));
+            typeMap.remove(arg2);
+        }
+        else {
+            args.add(arg2);
+        }
+        for (Node arg : args) {
+            graph.add(Triple.create(o, argNode, arg));
+        }
         return o;
     }
 
@@ -769,15 +821,15 @@ public class RGraph {
         return n;
     }
 
-    public void filterNormalisation() {
-        Graph before = GraphFactory.createPlainGraph();
-        while (!before.isIsomorphicWith(graph)) {
-            before = GraphFactory.createPlainGraph();
-            GraphUtil.addInto(before, graph);
-            UpdateAction.execute(conjunctionRule, graph);
-            UpdateAction.execute(disjunctionRule, graph);
-        }
-    }
+//    public void filterNormalisation() {
+//        Graph before = GraphFactory.createPlainGraph();
+//        while (!before.isIsomorphicWith(graph)) {
+//            before = GraphFactory.createPlainGraph();
+//            GraphUtil.addInto(before, graph);
+//            UpdateAction.execute(conjunctionRule, graph);
+//            UpdateAction.execute(disjunctionRule, graph);
+//        }
+//    }
 
     public void service(Node service, boolean silent) {
         Node n = NodeFactory.createBlankNode();
@@ -1084,53 +1136,53 @@ public class RGraph {
         return gl.call();
     }
 
-	public void subQueryRelabelling() {
-        ExtendedIterator<Node> projections = GraphUtil.listSubjects(graph, typeNode, projectNode);
-        if (projections.hasNext()) {
-            List<Node> projectionList = projections.toList();
-            int n = 0;
-            if (projectionList.size() > 1) {
-                Map<Node, Graph> map = new HashMap<>();
-                for (Node p : projectionList) {
-                    graph.add(Triple.create(p, idNode, NodeFactory.createLiteralByValue(n++, XSDDatatype.XSDinteger)));
-                    GraphExtract ge = new GraphExtract(new CustomTripleBoundary(projectionList, p));
-                    Graph g = ge.extract(p, graph);
-                    map.put(p, g);
-                }
-                List<Graph> subGraphs = new ArrayList<>();
-                for (Map.Entry<Node, Graph> entry : map.entrySet()) {
-                    Graph currentGraph = entry.getValue();
-                    Node currentNode = entry.getKey();
-                    List<Node> currentProjectionNodes = GraphUtil.listObjects(currentGraph, currentNode, argNode).toList();
-                    Node id = GraphUtil.listObjects(currentGraph, currentNode, idNode).hasNext() ? GraphUtil.listObjects(currentGraph, currentNode, idNode).next() : NodeFactory.createLiteralByValue(0, XSDDatatype.XSDinteger);
-                    ExtendedIterator<Node> nodes = GraphUtil.listSubjects(currentGraph, typeNode, varNode);
-                    while (nodes.hasNext()) {
-                        Node node = nodes.next();
-                        if (node.isBlank()) {
-                            if (!currentProjectionNodes.contains(node)) {
-                                currentGraph.add(Triple.create(node, idNode, id));
-                            }
-                        }
-                    }
-                    UpdateAction.execute(subgraphRule, currentGraph);
-                    subGraphs.add(currentGraph);
-                    currentGraph.delete(Triple.create(currentNode, idNode, id));
-                }
-                Graph ans = GraphFactory.createDefaultGraph();
-                for (Graph g : subGraphs) {
-                    GraphUtil.addInto(ans, g);
-                }
-                this.graph = ans;
-            } else {
-                Node p = projectionList.get(0);
-                ExtendedIterator<Node> ids = GraphUtil.listObjects(graph, p, idNode);
-                if (ids.hasNext()) {
-                    Node id = ids.next();
-                    graph.delete(Triple.create(p, idNode, id));
-                }
-            }
-        }
-    }
+//	public void subQueryRelabelling() {
+//        ExtendedIterator<Node> projections = GraphUtil.listSubjects(graph, typeNode, projectNode);
+//        if (projections.hasNext()) {
+//            List<Node> projectionList = projections.toList();
+//            int n = 0;
+//            if (projectionList.size() > 1) {
+//                Map<Node, Graph> map = new HashMap<>();
+//                for (Node p : projectionList) {
+//                    graph.add(Triple.create(p, idNode, NodeFactory.createLiteralByValue(n++, XSDDatatype.XSDinteger)));
+//                    GraphExtract ge = new GraphExtract(new CustomTripleBoundary(projectionList, p));
+//                    Graph g = ge.extract(p, graph);
+//                    map.put(p, g);
+//                }
+//                List<Graph> subGraphs = new ArrayList<>();
+//                for (Map.Entry<Node, Graph> entry : map.entrySet()) {
+//                    Graph currentGraph = entry.getValue();
+//                    Node currentNode = entry.getKey();
+//                    List<Node> currentProjectionNodes = GraphUtil.listObjects(currentGraph, currentNode, argNode).toList();
+//                    Node id = GraphUtil.listObjects(currentGraph, currentNode, idNode).hasNext() ? GraphUtil.listObjects(currentGraph, currentNode, idNode).next() : NodeFactory.createLiteralByValue(0, XSDDatatype.XSDinteger);
+//                    ExtendedIterator<Node> nodes = GraphUtil.listSubjects(currentGraph, typeNode, varNode);
+//                    while (nodes.hasNext()) {
+//                        Node node = nodes.next();
+//                        if (node.isBlank()) {
+//                            if (!currentProjectionNodes.contains(node)) {
+//                                currentGraph.add(Triple.create(node, idNode, id));
+//                            }
+//                        }
+//                    }
+//                    UpdateAction.execute(subgraphRule, currentGraph);
+//                    subGraphs.add(currentGraph);
+//                    currentGraph.delete(Triple.create(currentNode, idNode, id));
+//                }
+//                Graph ans = GraphFactory.createDefaultGraph();
+//                for (Graph g : subGraphs) {
+//                    GraphUtil.addInto(ans, g);
+//                }
+//                this.graph = ans;
+//            } else {
+//                Node p = projectionList.get(0);
+//                ExtendedIterator<Node> ids = GraphUtil.listObjects(graph, p, idNode);
+//                if (ids.hasNext()) {
+//                    Node id = ids.next();
+//                    graph.delete(Triple.create(p, idNode, id));
+//                }
+//            }
+//        }
+//    }
 
     /**
      * Performs a leaning of the current r-graph.
@@ -1162,6 +1214,7 @@ public class RGraph {
                 varMap.put(in, NodeFactory.createBlankNode("SK00" + entry.getValue().toString()));
             }
         }
+        ans.hashCode = glr.getUniqueGraphHash();
         return ans;
     }
 
@@ -1182,13 +1235,6 @@ public class RGraph {
             if (verbose) {
                 System.out.println("Branch relabelling");
             }
-            try {
-                if (!containsPaths) {
-                    subQueryRelabelling();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
             if (verbose) {
                 System.out.println("UCQ minimisation");
             }
@@ -1208,7 +1254,6 @@ public class RGraph {
                 ans.graph.delete(Triple.create(var, typeNode, varNode));
             }
             long time1 = System.nanoTime() - t;
-            UpdateAction.execute(duplicatesRule, ans.graph);
             if (verbose) {
                 System.out.println("Beginning labelling");
             }
@@ -1225,13 +1270,6 @@ public class RGraph {
             ans.setMinimisationTime(time1);
             result = ans;
         } else {
-            try {
-                if (!containsPaths) {
-                    subQueryRelabelling();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
             ExtendedIterator<Node> vars = GraphUtil.listSubjects(graph, typeNode, varNode);
             while (vars.hasNext()) {
                 Node var = vars.next();
@@ -1368,7 +1406,7 @@ public class RGraph {
                         eg.graph.delete(Triple.create(subjectUnion, predicateUnion, ucq));
                     }
                     //eg.setDistinctNode(true);
-                    UpdateAction.execute(branchCleanUpRule, eg.graph);
+                    //UpdateAction.execute(branchCleanUpRule, eg.graph);
                     eg.branchUnion(varMap);
                     this.graph = eg.graph;
                 }
@@ -1436,10 +1474,10 @@ public class RGraph {
             }
             result = new ArrayList<>();
         }
-        UpdateAction.execute(branchCleanUpRule, graph);
-        UpdateAction.execute(branchUnionRule, graph);
+        //UpdateAction.execute(branchCleanUpRule, graph);
+        //UpdateAction.execute(branchUnionRule, graph);
         removeTemporaryVars();
-        UpdateAction.execute(joinRule, graph);
+        //UpdateAction.execute(joinRule, graph);
         return this;
     }
 
@@ -1472,14 +1510,17 @@ public class RGraph {
     }
 
     public void branchUnion(Map<Node, Node> varMap) {
-        UpdateAction.execute(branchUnionRule, graph);
+        //UpdateAction.execute(branchUnionRule, graph);
         ExtendedIterator<Node> vars = GraphUtil.listSubjects(graph, typeNode, varNode);
         while (vars.hasNext()) {
             Node var = vars.next();
             Node value = GraphUtil.listObjects(graph, var, valueNode).hasNext() ? GraphUtil.listObjects(graph, var, valueNode).next() : null;
             if (value != null) {
                 String string = value.toString().replace("\"", "");
-                varMap.put(Var.alloc(string), var);
+                Var var1 = Var.alloc(string);
+                if (!varMap.containsKey(var1)) {
+                    varMap.put(var1, var);
+                }
                 graph.delete(Triple.create(var, valueNode, value));
             }
         }
@@ -1522,7 +1563,7 @@ public class RGraph {
 	 */
     public RGraph cqMinimisation(Node cRoot, Graph cGraph) throws InterruptedException {
         RGraph e = new RGraph(cRoot, cGraph, this.vars);
-        UpdateAction.execute(filterVarsRule, e.graph);
+        //UpdateAction.execute(filterVarsRule, e.graph);
         ExtendedIterator<Node> cqFilterVars = listSubjects(e.graph, tempNode, NodeFactory.createLiteralByValue(true, XSDDatatype.XSDboolean));
         while (cqFilterVars.hasNext()) {
             Node p = cqFilterVars.next();
@@ -1550,6 +1591,10 @@ public class RGraph {
             result.addAll(minPartition);
         }
         return result;
+    }
+
+    public void branchCleanUp(Graph graph) {
+
     }
 
     public List<RGraph> containmentChecks(List<RGraph> result) {
@@ -1658,7 +1703,7 @@ public class RGraph {
             Node ans = NodeFactory.createBlankNode(n.getName());
             graph.add(Triple.create(ans, typeNode, varNode));
             typeMap.put(ans, varNode);
-            varMap.put(n, ans);
+            varMap.put(Var.alloc(n), ans);
             return ans;
         }
         if (n.isLiteral()) {
@@ -1669,6 +1714,16 @@ public class RGraph {
             }
         } else {
             return n;
+        }
+    }
+
+    @Override
+    public int hashCode() {
+        if (hashCode != null) {
+            return this.hashCode.asInt();
+        }
+        else {
+            return this.graph.hashCode();
         }
     }
 
