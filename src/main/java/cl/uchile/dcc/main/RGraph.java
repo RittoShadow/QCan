@@ -1702,8 +1702,7 @@ public class RGraph {
         if (n.isVariable()) {
             Node ans = NodeFactory.createBlankNode(n.getName());
             graph.add(Triple.create(ans, typeNode, varNode));
-            typeMap.put(ans, varNode);
-            varMap.put(Var.alloc(n), ans);
+            typeMap.put(ans, varNode);            varMap.put(Var.alloc(n), ans);
             return ans;
         }
         if (n.isLiteral()) {
