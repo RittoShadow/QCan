@@ -12,6 +12,10 @@ Developed as part of a master's thesis. Extended as part of a doctorate.
 
 # Main classes
 
+(Optionally) In order to install the local jars into the local maven repository:
+
+> mvn clean
+
 In order to run any of these classes, you must first compile the project.
 
 > mvn compile
