@@ -1,0 +1,5 @@
+PREFIX : <http://ex.org#> SELECT DISTINCT ?x WHERE { { ?x :x "x" } UNION { "x" :y ?x } }
+PREFIX : <http://ex.org#> SELECT ?y WHERE { ?y :x "x" }
+PREFIX : <http://ex.org#> SELECT DISTINCT ?x WHERE { "x" :x ?x }
+PREFIX : <http://ex.org#> SELECT ?z WHERE { "x" :y ?z }
+PREFIX : <http://ex.org#> SELECT ?z WHERE { { "x" :y ?z } UNION { "y" :y ?z } }
