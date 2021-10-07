@@ -7,7 +7,6 @@ import cl.uchile.dcc.qcan.paths.PathTransform;
 import cl.uchile.dcc.qcan.tools.BGPSort;
 import cl.uchile.dcc.qcan.tools.OpUtils;
 import cl.uchile.dcc.qcan.transformers.*;
-import cl.uchile.dcc.transformers.*;
 import cl.uchile.dcc.qcan.visitors.FilterVisitor;
 import com.github.jsonldjava.shaded.com.google.common.collect.Sets;
 import org.apache.jena.graph.Node;
