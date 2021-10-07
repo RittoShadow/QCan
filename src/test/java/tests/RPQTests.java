@@ -7,7 +7,7 @@ import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.optimize.TransformPathFlattern;
 import org.junit.Before;
-import cl.uchile.dcc.paths.RPQMinimiser;
+import cl.uchile.dcc.qcan.paths.RPQMinimiser;
 
 import java.io.BufferedReader;
 import java.io.File;

@@ -1,7 +1,7 @@
 package tests;
 
-import cl.uchile.dcc.builder.QueryBuilder;
-import cl.uchile.dcc.main.SingleQuery;
+import cl.uchile.dcc.qcan.builder.QueryBuilder;
+import cl.uchile.dcc.qcan.main.SingleQuery;
 import org.apache.jena.ext.com.google.common.collect.HashMultiset;
 import org.apache.jena.ext.com.google.common.collect.Multiset;
 import org.apache.jena.query.QueryParseException;

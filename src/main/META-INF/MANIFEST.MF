@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Main-Class: cl.uchile.dcc.main.EasyCanonicalisation
+Main-Class: cl.uchile.dcc.qcan.main.EasyCanonicalisation
 Class-Path: nxparser-1.2.3.jar commons-math3-3.6.1.jar commons-math3-3.6
  .1-tests.jar commons-math3-3.6.1-tools.jar commons-math3-3.6.1-javadoc.
  jar commons-math3-3.6.1-sources.jar commons-math3-3.6.1-test-sources.ja

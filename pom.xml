@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <name>QCan</name>
     <description>A software for the canonicalisation of SPARQL queries.</description>
-    <groupId>cl.dcc.uchile</groupId>
+    <groupId>cl.uchile.dcc.qcan</groupId>
     <developers>
         <developer>
             <name>Jaime Salas</name>
@@ -44,37 +44,37 @@
                     <execution>
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>cl.uchile.dcc.main.Benchmark</mainClass>
+                            <mainClass>cl.uchile.dcc.qcan.main.Benchmark</mainClass>
                         </configuration>
                     </execution>
                     <execution>
                         <id>easy</id>
                         <configuration>
-                            <mainClass>cl.uchile.dcc.main.EasyCanonicalisation</mainClass>
+                            <mainClass>cl.uchile.dcc.qcan.main.EasyCanonicalisation</mainClass>
                         </configuration>
                     </execution>
                     <execution>
                         <id>single</id>
                         <configuration>
-                            <mainClass>cl.uchile.dcc.main.SingleQuery</mainClass>
+                            <mainClass>cl.uchile.dcc.qcan.main.SingleQuery</mainClass>
                         </configuration>
                     </execution>
                     <execution>
                         <id>multi</id>
                         <configuration>
-                            <mainClass>cl.uchile.dcc.generate.MultipleGenerator</mainClass>
+                            <mainClass>cl.uchile.dcc.qcan.generate.MultipleGenerator</mainClass>
                         </configuration>
                     </execution>
                     <execution>
                         <id>ucq</id>
                         <configuration>
-                            <mainClass>cl.uchile.dcc.generate.UCQGeneratorTest</mainClass>
+                            <mainClass>cl.uchile.dcc.qcan.generate.UCQGeneratorTest</mainClass>
                         </configuration>
                     </execution>
                     <execution>
                         <id>analysis</id>
                         <configuration>
-                            <mainClass>cl.uchile.dcc.data.Analysis</mainClass>
+                            <mainClass>cl.uchile.dcc.qcan.data.Analysis</mainClass>
                         </configuration>
                     </execution>
                 </executions>
@@ -157,7 +157,7 @@
                             <archive>
                                 <manifest>
                                     <mainClass>
-                                        cl.uchile.dcc.main.Launcher
+                                        cl.uchile.dcc.qcan.main.Launcher
                                     </mainClass>
                                 </manifest>
                             </archive>
