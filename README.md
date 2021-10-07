@@ -117,6 +117,36 @@ These queries contain n conjunctions of patterns containing m disjunctions.
 
 Result files will be created in the resultFiles/ucq folder. Times are measured in nanoseconds.
 
+# How to include in your projects
+
+One option to include this in your own (Maven) project is building the jar with dependencies
+using 
+> mvn package
+
+Then, assuming the JAR is located in a lib folder in your project, add the following in your pom.xml file:
+
+```
+<execution>
+    <id>install-qcan</id>
+        <phase>clean</phase>
+        <configuration>
+            <file>${basedir}/lib/qcan-1.1-jar-with-dependencies.jar</file>
+            <repositoryLayout>default</repositoryLayout>
+            <groupId>cl.uchile.dcc.qcan</groupId>
+            <artifactId>qcan</artifactId>
+            <version>1.1</version>
+            <packaging>jar</packaging>
+            <generatePom>true</generatePom>
+        </configuration>
+        <goals>
+            <goal>install-file</goal>
+        </goals>
+</execution>
+```
+
+If you know of an easier way to do it, please let me know at <jaime.os.salas@gmail.com>
+so I can add it here.
+
 # Demo
 
 Live demo [here](http://qcan.dcc.uchile.cl)
