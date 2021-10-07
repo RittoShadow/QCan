@@ -20,129 +20,18 @@
     </licenses>
     <artifactId>qcan</artifactId>
     <version>1.1</version>
-    <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <build>
-        <resources>
-            <resource>
-                <directory>
-                    src/main/resources/rules
-                </directory>
-                <includes>
-                    <include>**/*.ru</include>
-                </includes>
-            </resource>
-        </resources>
         <plugins>
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.0.0</version>
-                <executions>
-                    <execution>
-                        <id>default-cli</id>
-                        <configuration>
-                            <mainClass>cl.uchile.dcc.qcan.main.Benchmark</mainClass>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>easy</id>
-                        <configuration>
-                            <mainClass>cl.uchile.dcc.qcan.main.EasyCanonicalisation</mainClass>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>single</id>
-                        <configuration>
-                            <mainClass>cl.uchile.dcc.qcan.main.SingleQuery</mainClass>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>multi</id>
-                        <configuration>
-                            <mainClass>cl.uchile.dcc.qcan.generate.MultipleGenerator</mainClass>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>ucq</id>
-                        <configuration>
-                            <mainClass>cl.uchile.dcc.qcan.generate.UCQGeneratorTest</mainClass>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>analysis</id>
-                        <configuration>
-                            <mainClass>cl.uchile.dcc.qcan.data.Analysis</mainClass>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.6.2</version>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.12.4</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
-                    <encoding>UTF-8</encoding>
+                    <skipTests>true</skipTests>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-install-plugin</artifactId>
-                <version>2.5.2</version>
-                <executions>
-                    <execution>
-                        <id>install-nxparser</id>
-                        <phase>clean</phase>
-                        <configuration>
-                            <file>${basedir}/lib/nxparser-1.2.3.jar</file>
-                            <repositoryLayout>default</repositoryLayout>
-                            <groupId>org.semanticweb</groupId>
-                            <artifactId>nxparser</artifactId>
-                            <version>1.2.3</version>
-                            <packaging>jar</packaging>
-                            <generatePom>true</generatePom>
-                        </configuration>
-                        <goals>
-                            <goal>install-file</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>install-blabel</id>
-                        <phase>clean</phase>
-                        <configuration>
-                            <file>${basedir}/lib/blabel.jar</file>
-                            <repositoryLayout>default</repositoryLayout>
-                            <groupId>cl.uchile.dcc.blabel</groupId>
-                            <artifactId>blabel</artifactId>
-                            <version>1.0</version>
-                            <packaging>jar</packaging>
-                            <generatePom>true</generatePom>
-                        </configuration>
-                        <goals>
-                            <goal>install-file</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>install-automaton</id>
-                        <phase>clean</phase>
-                        <configuration>
-                            <file>${basedir}/lib/automaton.jar</file>
-                            <repositoryLayout>default</repositoryLayout>
-                            <groupId>dk.brics.automaton</groupId>
-                            <artifactId>automaton</artifactId>
-                            <version>1.0</version>
-                            <packaging>jar</packaging>
-                            <generatePom>true</generatePom>
-                        </configuration>
-                        <goals>
-                            <goal>install-file</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
