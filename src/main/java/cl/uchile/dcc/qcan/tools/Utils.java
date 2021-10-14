@@ -1,5 +1,6 @@
 package cl.uchile.dcc.qcan.tools;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.graph.*;
 import org.apache.jena.query.Query;
@@ -74,6 +75,21 @@ public class Utils {
 			sets.add(set);
 		}
 		return sets;
+	}
+
+	public static <T> List<T> randomSample(List<T> originalList) {
+		List<T> list = new ArrayList<>();
+		int n = list.size();
+		for (T element : originalList) {
+			if (RandomUtils.nextBoolean()) {
+				list.add(element);
+			}
+		}
+		if (list.isEmpty()) {
+			int i = RandomUtils.nextInt(0,n);
+			list.add(originalList.get(i));
+		}
+		return list;
 	}
 
 	/**

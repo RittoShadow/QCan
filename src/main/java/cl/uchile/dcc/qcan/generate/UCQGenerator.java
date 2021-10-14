@@ -3,6 +3,7 @@ package cl.uchile.dcc.qcan.generate;
 import cl.uchile.dcc.qcan.builder.RGraphBuilder;
 import cl.uchile.dcc.qcan.main.RGraph;
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
+import cl.uchile.dcc.qcan.tools.Utils;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
@@ -84,7 +85,7 @@ public class  UCQGenerator extends Generator {
 				op = OpJoin.create(op, op1);
 			}
 		}
-		op = new OpProject(op, Arrays.asList(Var.alloc(triples.get(0).getSubject())));
+		op = new OpProject(op, Utils.randomSample(vars));
 		op = new OpDistinct(op);
 		Query q = OpAsQuery.asQuery(op);
 		RGraphBuilder visitor = new RGraphBuilder(q);

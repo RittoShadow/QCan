@@ -63,7 +63,7 @@ public class FilterTransform extends TransformCopy {
 					return OpJoin.create(left,right);
 				}
 			}
-			Op ans = OpFilter.filter(((OpFilter) left).getExprs(), OpJoin.create(((OpFilter) left).getSubOp(), right));
+			Op ans = OpFilter.filterAlways(((OpFilter) left).getExprs(), OpJoin.create(((OpFilter) left).getSubOp(), right));
 			return ans;
 		}
 		else if (!(left instanceof OpFilter) && right instanceof OpFilter ) {
@@ -76,7 +76,7 @@ public class FilterTransform extends TransformCopy {
 			}
 			return OpFilter.filterBy(((OpFilter) right).getExprs(), OpJoin.create(left, ((OpFilter) right).getSubOp()));
 		}
-		else if (left instanceof OpFilter && right instanceof OpFilter) {
+		else if (left instanceof OpFilter) {
 			Set<Var> leftEVars = ((OpFilter) left).getExprs().getVarsMentioned();
 			Set<Var> leftSafeVars = OpUtils.safeVars(left);
 			for (Var v : leftEVars) {

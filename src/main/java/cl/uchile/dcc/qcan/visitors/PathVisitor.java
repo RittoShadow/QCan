@@ -42,8 +42,7 @@ public class PathVisitor extends TopDownVisitor {
 
 	public Op visit(OpProject op) {
 		Op subOp = op.getSubOp();
-		List<Var> copy = new ArrayList<>();
-		copy.addAll(namedVars);
+		List<Var> copy = new ArrayList<>(namedVars);
 		namedVars.addAll(op.getVars());
 		Op ans = new OpProject(visit(subOp), op.getVars());
 		this.namedVars = copy;
@@ -56,15 +55,14 @@ public class PathVisitor extends TopDownVisitor {
 		List<Var> copy = new ArrayList<>();
 		Set<Var> filterVars = op.getExprs().getVarsMentioned();
 		namedVars.addAll(filterVars);
-		ans = OpFilter.filter(op.getExprs(), visit(subOp));
+		ans = OpFilter.filterAlways(op.getExprs(), visit(subOp));
 		this.namedVars = copy;
 		return ans;
 	}
 	
 	public Op visit(OpGraph op) {
 		Op subOp = op.getSubOp();
-		List<Var> copy = new ArrayList<>();
-		copy.addAll(namedVars);
+		List<Var> copy = new ArrayList<>(namedVars);
 		if (op.getNode().isVariable()) {
 			namedVars.add((Var) op.getNode());
 		}
@@ -76,8 +74,7 @@ public class PathVisitor extends TopDownVisitor {
 	public Op visit(OpGroup op) {
 		Op subOp = op.getSubOp();
 		Op ans;
-		List<Var> copy = new ArrayList<Var>();
-		copy.addAll(namedVars);
+		List<Var> copy = new ArrayList<>(namedVars);
 		List<Var> groupVars = op.getGroupVars().getVars();
 		namedVars.addAll(groupVars);
 		ans = new OpGroup(visit(subOp), op.getGroupVars(), op.getAggregators());
@@ -95,8 +92,7 @@ public class PathVisitor extends TopDownVisitor {
 	public Op visit(OpOrder op) {
 		Op subOp = op.getSubOp();
 		Op ans;
-		List<Var> copy = new ArrayList<Var>();
-		copy.addAll(namedVars);
+		List<Var> copy = new ArrayList<>(namedVars);
 		for (SortCondition lc : op.getConditions()) {
 			namedVars.addAll(lc.getExpression().getVarsMentioned());
 		}
@@ -107,8 +103,6 @@ public class PathVisitor extends TopDownVisitor {
 	
 	public Op visit(OpTopN op) {
 		Op subOp = op.getSubOp();
-		List<Var> copy = new ArrayList<Var>();
-		copy.addAll(namedVars);
 		for (SortCondition lc : op.getConditions()) {
 			namedVars.addAll(lc.getExpression().getVarsMentioned());
 		}
@@ -159,8 +153,7 @@ public class PathVisitor extends TopDownVisitor {
 	public Op visit(OpExtendAssign op) {
 		Op subOp = op.getSubOp();
 		Op ans;
-		List<Var> copy = new ArrayList<Var>();
-		copy.addAll(namedVars);
+		List<Var> copy = new ArrayList<>(namedVars);
 		VarExprList vExprList = op.getVarExprList();
 		for (Entry<Var, Expr> entry : vExprList.getExprs().entrySet()) {
 			namedVars.add(entry.getKey());

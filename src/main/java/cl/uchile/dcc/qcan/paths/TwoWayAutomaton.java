@@ -64,9 +64,9 @@ public class TwoWayAutomaton {
         List<TwoWayState> initialStates = new ArrayList<>();
         List<TwoWayState> newAcceptStates = new ArrayList<>();
         List<Pair<Set<TwoWayState>,Set<TwoWayState>>> pairs = new ArrayList<>();
-        Map<Set<TwoWayState>,TwoWayState> combinationSet = new HashMap();
-        Map<Pair<Set<TwoWayState>,Set<TwoWayState>>,TwoWayState> pairStates = new HashMap<>();
-        Map<TwoWayState,Set<TwoWayTransition>> newTransitions = new HashMap<>();
+        HashMap<Set<TwoWayState>,TwoWayState> combinationSet = new HashMap<>();
+        HashMap<Pair<Set<TwoWayState>,Set<TwoWayState>>,TwoWayState> pairStates = new HashMap<>();
+        HashMap<TwoWayState,Set<TwoWayTransition>> newTransitions = new HashMap<>();
         for (Set<TwoWayState> c : combinations) {
             TwoWayState singleState = new TwoWayState();
             combinationSet.put(c,singleState);
@@ -207,7 +207,6 @@ public class TwoWayAutomaton {
                 result.add(state);
             }
         }
-        return;
     }
 
     public Set<TwoWayState> DFSLoop(TwoWayState state, Map<TwoWayState,Set<TwoWayTransition>> transitionSet) {
@@ -261,7 +260,7 @@ public class TwoWayAutomaton {
             }
             sb.append(": \n");
             for (TwoWayTransition transition : transitionSet.get(state)) {
-                sb.append("\t" + transition + "\n");
+                sb.append("\t").append(transition).append("\n");
             }
         }
         return sb.toString();

@@ -198,7 +198,7 @@ public abstract class TopDownVisitor {
     }
 
     public Op visit(OpFilter op) {
-        return OpFilter.filter(op.getExprs(),visit(op.getSubOp()));
+        return OpFilter.filterAlways(op.getExprs(),visit(op.getSubOp()));
     }
 
     public Op visit(OpGraph op) {

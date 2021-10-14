@@ -19,42 +19,38 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class QueryFeaturesCounter {
-	
-	String queryInfo = "";
-	String distInfo = "";
+
 	BufferedReader bf;
 	File file;
 	FileWriter fw;
 	BufferedWriter bw;
 	Multiset<String> features = HashMultiset.create();
-	public ArrayList<String> canonQueries = new ArrayList<String>();
+	public ArrayList<String> canonQueries = new ArrayList<>();
 	long totalTime = 0;
 	int totalQueries = 0;
-	int supportedQueries = 0;
 	int unsupportedQueries = 0;
 	int badSyntaxQueries = 0;
 	int otherUnspecifiedExceptions = 0;
-	int numberOfDuplicates = 0;
 	
 	
-	public String pathFeatures(String s) throws Exception {
-		String ans = "{ ";
+	public String pathFeatures(String s)  {
+		StringBuilder ans = new StringBuilder("{ ");
 		Query q = QueryFactory.create(s);
 		Op op = Algebra.compile(q);
 		FeatureCounter fc = new FeatureCounter(op);
 		OpWalker.walk(op, fc);
 		if (fc.getContainsPaths()) {
 			for (String f : fc.getPathStats()) {
-				ans += f + "\n";
+				ans.append(f).append("\n");
 			}
-			ans = ans.substring(0, ans.length() - 1) + "} : " + fc.nPaths;
+			ans = new StringBuilder(ans.substring(0, ans.length() - 1) + "} : " + fc.nPaths);
 		}
 		else {
 			return null;
 		}
-		return ans;
+		return ans.toString();
 	}
-	public String parsePaths(String s) throws Exception {
+	public String parsePaths(String s) {
 		Query q = QueryFactory.create(s);
 		Op op = Algebra.compile(q);
 		if (!q.getGraphURIs().isEmpty() || !q.getNamedGraphURIs().isEmpty()){
@@ -71,30 +67,28 @@ public class QueryFeaturesCounter {
 		}
 	}
 	
-	public void parse(String s) throws Exception{
+	public void parse(String s) {
 		Query q = QueryFactory.create(s);
 		Op op = Algebra.compile(q);
 		if (!q.getGraphURIs().isEmpty() || !q.getNamedGraphURIs().isEmpty()){
 			this.features.add("named");
 		}
-		if (q.getQueryType() == Query.QueryTypeAsk) {
+		if (q.isAskType()) {
 			this.features.add("ask");
 		}
-		if (q.getQueryType() == Query.QueryTypeConstruct) {
+		if (q.isConstructType()) {
 			this.features.add("construct");
 		}
-		if (q.getQueryType() == Query.QueryTypeDescribe) {
+		if (q.isDescribeType()) {
 			this.features.add("describe");
 		}
-		if (q.getQueryType() == Query.QueryTypeSelect) {
+		if (q.isSelectType()) {
 			this.features.add("select");
 		}
 		FeatureCounter fc = new FeatureCounter(op);
 		OpWalker.walk(op, fc);
 		HashSet<String> features = fc.getFeatures();
-		for (String f : features){
-			this.features.add(f);
-		}
+		this.features.addAll(features);
 		
 		this.features.addAll(fc.getPathFeatures());
 		boolean unions = features.contains("union");
@@ -194,7 +188,7 @@ public class QueryFeaturesCounter {
 					}
 				}
 			}
-			catch (FileNotFoundException e) {
+			catch (FileNotFoundException ignored) {
 				
 			}
 			bw.close();
@@ -241,23 +235,23 @@ public class QueryFeaturesCounter {
 			e.printStackTrace();
 		}		
 		for (String h : features.elementSet()){
-			bw.append(h + ": "+features.count(h));
+			bw.append(h).append(": ").append(String.valueOf(features.count(h)));
 			bw.newLine();
 		}
-		bw.append("query parse exception: " + badSyntaxQueries);
+		bw.append("query parse exception: ").append(String.valueOf(badSyntaxQueries));
 		bw.newLine();
-		bw.append("unspecified exceptions: " + otherUnspecifiedExceptions);
+		bw.append("unspecified exceptions: ").append(String.valueOf(otherUnspecifiedExceptions));
 		bw.newLine();
-		bw.append("total: " + totalQueries);
+		bw.append("total: ").append(String.valueOf(totalQueries));
 		bw.close();
 	}
 	
 	public static void combineFiles(Path f) throws IOException {
-		final Map<String,Integer> featureMap = new HashMap<String,Integer>();
+		final Map<String,Integer> featureMap = new HashMap<>();
 		FileVisitor<Path> fv = new FileVisitor<Path>(){
 
 			@Override
-			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
 				return FileVisitResult.CONTINUE;
 			}
 
@@ -271,7 +265,7 @@ public class QueryFeaturesCounter {
 						continue;
 					}
 					String number = s.substring(s.indexOf(":") + 2);
-					int n = Integer.valueOf(number);
+					int n = Integer.parseInt(number);
 					if (featureMap.containsKey(feature)) {
 						featureMap.put(feature, featureMap.get(feature) + n);
 					}
@@ -284,12 +278,12 @@ public class QueryFeaturesCounter {
 			}
 
 			@Override
-			public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+			public FileVisitResult visitFileFailed(Path file, IOException exc) {
 				return FileVisitResult.TERMINATE;
 			}
 
 			@Override
-			public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
 				return FileVisitResult.CONTINUE;
 			}
 			
@@ -344,9 +338,9 @@ public class QueryFeaturesCounter {
 		int minNPaths = 0;
 		int maxNPaths = 0;
 		int unsupported = 0;
-		HashMap<String,Integer> instances = new HashMap<String,Integer>();
-		HashMap<String,Integer> normalInstances = new HashMap<String,Integer>();
-		HashMap<String,Integer> featuresInstances = new HashMap<String,Integer>();
+		HashMap<String,Integer> instances = new HashMap<>();
+		HashMap<String,Integer> normalInstances = new HashMap<>();
+		HashMap<String,Integer> featuresInstances = new HashMap<>();
 		long lengths = 0;
 		long normalLengths = 0;
 		long totalNPaths = 0;
@@ -473,8 +467,7 @@ public class QueryFeaturesCounter {
 				}
 				else {
 					System.out.println(s);
-					System.out.println(params);
-					continue;
+					System.out.println(Arrays.toString(params));
 				}
 			}
 			else {
@@ -617,11 +610,11 @@ public class QueryFeaturesCounter {
 		for (String str : instances.keySet()) {
 			System.out.println(str + ": " + instances.get(str));
 		}
-		System.out.println("");
+		System.out.println();
 		for (String str : normalInstances.keySet()) {
 			System.out.println(str + ": " + normalInstances.get(str));
 		}
-		System.out.println("");
+		System.out.println();
 		for (String str : featuresInstances.keySet()) {
 			System.out.println(str + ": " + featuresInstances.get(str));
 		}
@@ -634,7 +627,7 @@ public class QueryFeaturesCounter {
 	
 	@SuppressWarnings("unused")
 	public static void main(String[] args) throws Exception{
-		List<File> in = new ArrayList<File>();
+		List<File> in = new ArrayList<>();
 //		for (int i = 100; i < 183; i++) {
 //			in.add(new File("testFiles/utf8WikiDataQueries/utfWikiData" + String.valueOf(i).substring(1)));
 //		}

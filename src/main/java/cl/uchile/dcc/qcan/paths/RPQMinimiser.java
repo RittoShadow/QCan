@@ -57,7 +57,7 @@ public class RPQMinimiser extends TopDownVisitor {
         for (Expr expr : filter.getExprs()) {
             varsInScope.addAll(expr.getVarsMentioned());
         }
-        return OpFilter.filter(filter.getExprs(),visit(filter.getSubOp()));
+        return OpFilter.filterAlways(filter.getExprs(),visit(filter.getSubOp()));
     }
 
     public Op visit(OpExtend extend) {
@@ -171,9 +171,9 @@ public class RPQMinimiser extends TopDownVisitor {
                     sequence.add(o);
                 }
             }
-            for (Triple t : groundTriples) {
+            //for (Triple t : groundTriples) {
                 //sequence.add(new OpTriple(t));
-            }
+           // }
             UCQTransformer ucqTransformer = new UCQTransformer();
             Op newOp = Transformer.transform(ucqTransformer,sequence);
             newOp = Transformer.transform(ucqTransformer,newOp);
@@ -206,9 +206,7 @@ public class RPQMinimiser extends TopDownVisitor {
                 else {
                     return ans;
                 }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (GraphColouring.HashCollisionException e) {
+            } catch (InterruptedException | GraphColouring.HashCollisionException e) {
                 e.printStackTrace();
             }
             return newOp;
@@ -527,9 +525,6 @@ public class RPQMinimiser extends TopDownVisitor {
             else if (path instanceof P_Inverse) {
                 ans.add(path);
             }
-            else {
-
-            }
             return ans;
         }
         else {
@@ -742,9 +737,7 @@ public class RPQMinimiser extends TopDownVisitor {
         else if (op instanceof OpBGP) {
             Set<Triple> set = new HashSet<>();
             BasicPattern bp = ((OpBGP) op).getPattern();
-            for (Triple t : bp.getList()) {
-                set.add(t);
-            }
+            set.addAll(bp.getList());
             ans.add(set);
         }
         else if (op instanceof OpTriple) {
