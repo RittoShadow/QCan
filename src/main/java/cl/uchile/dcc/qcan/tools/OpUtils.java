@@ -588,6 +588,47 @@ public class OpUtils {
         return true;
     }
 
+    public static boolean isMonotonic(Op op) {
+        if (op instanceof Op0) {
+            if (op instanceof OpBGP) {
+                return true;
+            }
+            else if (op instanceof OpTriple) {
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        else if (op instanceof Op1){
+            if (op instanceof OpDistinct) {
+                return isMonotonic(((OpDistinct) op).getSubOp());
+            }
+            else if (op instanceof OpProject) {
+                return isMonotonic(((OpProject) op).getSubOp());
+            }
+            else {
+                return false;
+            }
+        }
+        else if (op instanceof Op2) {
+            Op leftOp = ((Op2) op).getLeft();
+            Op rightOp = ((Op2) op).getRight();
+            if (op instanceof OpUnion) {
+                return isMonotonic(leftOp) && isMonotonic(rightOp);
+            }
+            else if (op instanceof OpJoin) {
+                return isMonotonic(leftOp) && isMonotonic(rightOp);
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            return false;
+        }
+    }
+
     public static boolean isNull(Op op) {
         if (op instanceof OpNull) {
             return true;

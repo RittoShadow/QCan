@@ -3,8 +3,8 @@ package cl.uchile.dcc.qcan.builder;
 import cl.uchile.dcc.qcan.main.RGraph;
 import cl.uchile.dcc.qcan.tools.CommonNodes;
 import cl.uchile.dcc.qcan.tools.OpUtils;
+import cl.uchile.dcc.qcan.tools.PathUtils;
 import cl.uchile.dcc.qcan.visitors.OpRenamer;
-import org.apache.jena.atlas.lib.Pair;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.ext.com.google.common.collect.BiMap;
 import org.apache.jena.ext.com.google.common.collect.HashBiMap;
@@ -131,7 +131,7 @@ public class QueryBuilder {
 		return ans;
 	}
 
-	public Expr filterOperatorToString(Node n, Expr... exprs) {
+	public Expr filterOperatorToExpr(Node n, Expr... exprs) {
 		if (n.equals(NodeFactory.createLiteral("="))) {
 			return new E_Equals(exprs[0], exprs[1]);
 		}
@@ -495,23 +495,23 @@ public class QueryBuilder {
 			return new ExprAggregator(var, AggregatorFactory.createGroupConcat(distinct, exprs.get(0), f, null));
 		}
 		else {
-			return filterOperatorToString(function,exprs);
+			return filterOperatorToExpr(function,exprs);
 		}
 	}
 
-	public Expr filterOperatorToString(Node n, List<Expr> expr) {
+	public Expr filterOperatorToExpr(Node n, List<Expr> expr) {
 		if (!isOrderedFunction(n)) {
 			expr.sort(new ExprComparator());
 		}
 		if (expr.size() == 0 ) {
-			return filterOperatorToString(n);
+			return filterOperatorToExpr(n);
 		}
 		if (expr.size() == 1) {
-			return filterOperatorToString(n, expr.get(0));
+			return filterOperatorToExpr(n, expr.get(0));
 		} else if (expr.size() == 2) {
-			return filterOperatorToString(n, expr.get(0), expr.get(1));
+			return filterOperatorToExpr(n, expr.get(0), expr.get(1));
 		} else if (expr.size() == 3) {
-			return filterOperatorToString(n, expr.get(0), expr.get(1), expr.get(2));
+			return filterOperatorToExpr(n, expr.get(0), expr.get(1), expr.get(2));
 		}
 		if (n.isLiteral()) {
 			String f = (String) n.getLiteralValue();
@@ -669,7 +669,7 @@ public class QueryBuilder {
 		ExtendedIterator<Node> bindings = GraphUtil.listObjects(graph,n, CommonNodes.extendNode);
 		Expr filterExpr = null;
 		if (filter != null) {
-			filterExpr = filterToOp(GraphUtil.listObjects(graph, filter, CommonNodes.argNode).next());
+			filterExpr = nodeToExpr(GraphUtil.listObjects(graph, filter, CommonNodes.argNode).next());
 		}
 		while (bindings.hasNext()) {
 			Node f = bindings.next();
@@ -692,7 +692,7 @@ public class QueryBuilder {
 				Expr expr = null;
 				if (GraphUtil.listObjects(graph, g, CommonNodes.valueNode).hasNext()) {
 					Node value = GraphUtil.listObjects(graph, g, CommonNodes.valueNode).next();
-					expr = filterToOp(value);
+					expr = nodeToExpr(value);
 				}
 				groupByVars.add(var, expr);
 			}
@@ -870,7 +870,7 @@ public class QueryBuilder {
 			int nParams = argList.size();
 			int i = 0;
 			if (nParams == 0) {
-				return filterOperatorToString(function);
+				return filterOperatorToExpr(function);
 			}
 			List<Expr> params = new ArrayList<>();
 			for (int k = 0; k < nParams; k++) {
@@ -911,9 +911,9 @@ public class QueryBuilder {
 			}
 			if (nParams == 1) {
 				//return filterOperatorToString(function, bindToOp(argList.get(0)));
-				return filterOperatorToString(function, params.get(0));
+				return filterOperatorToExpr(function, params.get(0));
 			}
-			return filterOperatorToString(function, params);
+			return filterOperatorToExpr(function, params);
 		}
 		if (GraphUtil.listObjects(graph, n, CommonNodes.valueNode).hasNext()) {
 			Node v = GraphUtil.listObjects(graph, n, CommonNodes.valueNode).next();
@@ -982,9 +982,9 @@ public class QueryBuilder {
 				if (GraphUtil.listObjects(graph, arg, CommonNodes.functionNode).hasNext()) {
 					if (isOrderedFunction(function)) {
 						int order = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, arg, CommonNodes.orderNode).next()));
-						params.set(order, filterToOp(arg));
+						params.set(order, nodeToExpr(arg));
 					} else {
-						params.set(i, filterToOp(arg));
+						params.set(i, nodeToExpr(arg));
 					}
 				}
 				i++;
@@ -996,7 +996,7 @@ public class QueryBuilder {
 				return aggregatorOperatorToExpr(n, distinct, Collections.emptyList());
 			}
 			else if (nParams == 1) {
-				return aggregatorOperatorToExpr(n, distinct, Collections.singletonList(filterToOp(argList.get(0))));
+				return aggregatorOperatorToExpr(n, distinct, Collections.singletonList(nodeToExpr(argList.get(0))));
 			}
 			else {
 				return aggregatorOperatorToExpr(n, distinct,params);
@@ -1032,17 +1032,15 @@ public class QueryBuilder {
 	}
 
 	public Path propertyPathToOp(Node n) {
-		Path ans = null;
-		if (graph.contains(Triple.create(n, CommonNodes.typeNode,NodeFactory.createURI(CommonNodes.URI+"notOneOf")))) {
-			List<Node> predicates = GraphUtil.listObjects(graph,n, CommonNodes.argNode).toList();
+		if (graph.contains(Triple.create(n, CommonNodes.typeNode, NodeFactory.createURI(CommonNodes.URI + "notOneOf")))) {
+			List<Node> predicates = GraphUtil.listObjects(graph, n, CommonNodes.argNode).toList();
 			predicates.sort(new NodeComparator());
 			P_NegPropSet path = new P_NegPropSet();
 			for (Node p : predicates) {
 				if (p.isURI()) {
 					path.add((P_Path0) PathFactory.pathLink(p));
-				}
-				else {
-					String uri = p.toString().substring(p.toString().indexOf("^")+1).replaceAll("\"","");
+				} else {
+					String uri = p.toString().substring(p.toString().indexOf("^") + 1).replaceAll("\"", "");
 					path.add(new P_ReverseLink(NodeFactory.createURI(uri)));
 				}
 			}
@@ -1050,218 +1048,11 @@ public class QueryBuilder {
 		}
 		List<Node> predicates = GraphUtil.listObjects(graph, n, CommonNodes.preNode).toList();
 		GraphExtract ge = new GraphExtract(TripleBoundary.stopNowhere);
-		Map<Pair<Node, Node>, Path> transitionTable = new HashMap<>();
 		Graph dfa = ge.extract(n, graph);
-		boolean needStartState = false;
-		Node startState = n;
-		Node newFinalState = null;
-		for (Node p : predicates) {
-			ExtendedIterator<Node> aux = GraphUtil.listSubjects(dfa, p, n);
-			if (aux.hasNext()) {
-				needStartState = true;
-			}
-		}
-		for (Node p : predicates) {
-			dfa.remove(n, CommonNodes.preNode, p);
-		}
-		if (needStartState) {
-			startState = NodeFactory.createBlankNode("start");
-			dfa.add(Triple.create(startState, CommonNodes.epsilon, n));
-		}
-		List<Node> finalStates = GraphUtil.listSubjects(dfa, CommonNodes.typeNode, CommonNodes.finalNode).toList();
-		newFinalState = NodeFactory.createBlankNode("final");
-		for (Node finalState : finalStates) {
-			dfa.add(Triple.create(finalState, CommonNodes.epsilon, newFinalState));
-			dfa.remove(finalState, CommonNodes.typeNode, CommonNodes.finalNode);
-		}
-		dfa.add(Triple.create(newFinalState, CommonNodes.typeNode, CommonNodes.finalNode));
-		Set<Node> states = findStates(dfa);
-		ExtendedIterator<Triple> transitions = GraphUtil.findAll(dfa);
-		while (transitions.hasNext()) {
-			Triple t = transitions.next();
-			if (!t.getPredicate().equals(CommonNodes.typeNode)) {
-				Pair<Node, Node> pair = new Pair<>(t.getSubject(), t.getObject());
-				if (t.getPredicate().toString().startsWith("\"^")) {
-					String u = t.getPredicate().toString();
-					u = u.substring(2, u.length() - 1);
-					transitionTable.put(pair, PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(u))));
-				}
-				else if (t.getPredicate().toString().contains("negatedPropertySet")) {
-					String u = t.getPredicate().toString();
-					u = u.substring(u.lastIndexOf("negatedPropertySet") + 19);
-					String[] links = u.split("&#");
-					P_NegPropSet neg = new P_NegPropSet();
-					for (String link : links) {
-						if (link.startsWith("\"^")) {
-							neg.add((P_Path0) PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(link.substring(2)))));
-						}
-						else {
-							neg.add((P_Path0) PathFactory.pathLink(NodeFactory.createURI(link)));
-						}
-					}
-					transitionTable.put(pair,neg);
-				}
-				else {
-					transitionTable.put(pair, PathFactory.pathLink(t.getPredicate()));
-				}
-
-			}
-			if (t.getPredicate().equals(CommonNodes.epsilon)) {
-				Pair<Node, Node> pair = new Pair<>(t.getSubject(), t.getObject());
-				transitionTable.put(pair, PathFactory.pathLink(CommonNodes.epsilon));
-			}
-		}
-		Set<Node> tempNodes = new HashSet<>(states);
-		Iterator<Node> tempStates = tempNodes.iterator();
-		while (states.size() > 2) { // Should iterate until only the start node and final node remain.
-			Node state = tempStates.next();
-			if (!state.equals(startState) && !state.equals(newFinalState)) {
-				path(state, transitionTable, states);
-				states.remove(state);
-			}
-		}
-		ans = finalState(startState, newFinalState, transitionTable);
-		return ans;
+		return PathUtils.dfaToPath(dfa,n,predicates);
 	}
 
-	public Set<Node> findStates(Graph g) {
-		Set<Node> ans = new HashSet<>();
-		ExtendedIterator<Triple> triples = GraphUtil.findAll(g);
-		while (triples.hasNext()) {
-			Triple triple = triples.next();
-			Node subject = triple.getSubject();
-			Node object = triple.getObject();
-			if (subject.isBlank()) {
-				ans.add(subject);
-			}
-			if (object.isBlank()) {
-				ans.add(object);
-			}
-		}
-		return ans;
-	}
-
-	public void path(Node n, Map<Pair<Node, Node>, Path> transitionTable, Set<Node> states) {
-		Set<Pair<Pair<Node, Node>, Path>> toUpdate = new HashSet<>();
-		Set<Pair<Node, Node>> toDelete = new HashSet<>();
-		for (Node n0 : states) {
-			for (Node n1 : states) {
-				if (n1.equals(n) || n0.equals(n)) {
-					continue;
-				}
-				Path ans = null;
-				Path regex0 = null;
-				Path regex1 = null;
-				Path regex2 = null;
-				Path regex3 = null;
-				Pair<Node, Node> pair0 = new Pair<>(n0, n);
-				Pair<Node, Node> pair1 = new Pair<>(n, n1);
-				Pair<Node, Node> pair2 = new Pair<>(n0, n1);
-				Pair<Node, Node> pair3 = new Pair<>(n, n);
-				if (transitionTable.containsKey(pair0) && transitionTable.containsKey(pair1)) {
-					regex0 = transitionTable.get(pair0);
-					regex1 = transitionTable.get(pair1);
-					if (transitionTable.containsKey(pair2)) {
-						regex2 = transitionTable.get(pair2);
-					}
-					if (transitionTable.containsKey(pair3)) {
-						regex3 = transitionTable.get(pair3);
-					}
-					ans = newTransition(regex0, regex1, regex2, regex3);
-					toUpdate.add(new Pair<>(pair2, ans));
-				}
-				toDelete.add(pair0);
-				toDelete.add(pair1);
-				toDelete.add(pair3);
-			}
-		}
-		for (Pair<Pair<Node, Node>, Path> pair : toUpdate) {
-			if (transitionTable.containsKey(pair.getLeft())) {
-				Path p = transitionTable.get(pair.getLeft());
-				if (p.equals(PathFactory.pathLink(CommonNodes.epsilon))) {
-					p = pair.getRight();
-				} else {
-					p = new P_Alt(p, pair.getRight());
-				}
-				transitionTable.put(pair.getLeft(), p);
-			} else {
-				transitionTable.put(pair.getLeft(), pair.getRight());
-			}
-		}
-		for (Pair<Node, Node> pair : toDelete) {
-			transitionTable.remove(pair);
-		}
-	}
-
-	public Path newTransition(Path regex0, Path regex1, Path regex2, Path regex3) {
-		Path ans = null;
-		if (regex0 != null && !regex0.equals(PathFactory.pathLink(CommonNodes.epsilon))) {
-			ans = regex0;
-		}
-		if (regex3 != null) {
-			if (ans == null) {
-				ans = PathFactory.pathZeroOrMore1(regex3);
-			} else {
-				ans = PathFactory.pathSeq(ans, PathFactory.pathZeroOrMore1(regex3));
-			}
-		}
-		if (regex1 != null) {
-			if (ans == null || ans.equals(PathFactory.pathLink(CommonNodes.epsilon))) {
-				ans = regex1;
-			} else {
-				if (!regex1.equals(PathFactory.pathLink(CommonNodes.epsilon))) {
-					ans = PathFactory.pathSeq(ans, regex1);
-				}
-			}
-		}
-		if (regex2 != null) {
-			if (ans == null) {
-				ans = regex2;
-			} else if (ans.equals(PathFactory.pathLink(CommonNodes.epsilon))) {
-				if (regex2 instanceof P_ZeroOrMore1) {
-					ans = regex2;
-				} else {
-					ans = PathFactory.pathAlt(ans, regex2);
-				}
-			} else if (regex2.equals(PathFactory.pathLink(CommonNodes.epsilon))) {
-				if (ans instanceof P_Seq) { // p / p* | epsilon = p*
-					Path pLeft = ((P_Seq) ans).getLeft();
-					Path pRight = ((P_Seq) ans).getRight();
-					if (pRight instanceof P_ZeroOrMore1) {
-						if (((P_ZeroOrMore1) pRight).getSubPath().equals(pLeft)) {
-							ans = pRight;
-						} else {
-							ans = PathFactory.pathAlt(ans, regex2);
-						}
-					} else {
-						ans = PathFactory.pathAlt(ans, regex2);
-					}
-				}
-			} else {
-				ans = PathFactory.pathAlt(ans, regex2);
-			}
-		}
-		return ans;
-	}
-
-	public Path finalState(Node startState, Node endState, Map<Pair<Node, Node>, Path> transitionTable) {
-		Pair<Node, Node> pair = new Pair<>(startState, endState);
-		if (transitionTable.get(pair) == null) {
-			pair = new Pair<>(endState, endState);
-			return PathFactory.pathZeroOrMore1(transitionTable.get(pair));
-		} else {
-			Path p0 = transitionTable.get(pair);
-			pair = new Pair<>(endState, endState);
-			Path p1 = transitionTable.get(pair);
-			if (p1 != null) {
-				return PathFactory.pathSeq(p0, PathFactory.pathZeroOrMore1(p1));
-			} else {
-				return p0;
-			}
-		}
-	}
-
-	public Expr filterToOp(Node n) {
+	public Expr nodeToExpr(Node n) {
 		Expr e = null;
 		Node type = typeMap.get(n);
 		if (type != null) {
@@ -1270,9 +1061,9 @@ public class QueryBuilder {
 				while (args.hasNext()) {
 					Node a = args.next();
 					if (e == null) {
-						e = filterToOp(a);
+						e = nodeToExpr(a);
 					} else {
-						e = new E_LogicalAnd(e, filterToOp(a));
+						e = new E_LogicalAnd(e, nodeToExpr(a));
 					}
 				}
 			}
@@ -1281,15 +1072,15 @@ public class QueryBuilder {
 				while (args.hasNext()) {
 					Node a = args.next();
 					if (e == null) {
-						e = filterToOp(a);
+						e = nodeToExpr(a);
 					} else {
-						e = new E_LogicalOr(e, filterToOp(a));
+						e = new E_LogicalOr(e, nodeToExpr(a));
 					}
 				}
 			}
 			else if (type.equals(CommonNodes.notNode)) {
 				Node args = GraphUtil.listObjects(graph, n, CommonNodes.argNode).next();
-				e = new E_LogicalNot(filterToOp(args));
+				e = new E_LogicalNot(nodeToExpr(args));
 			}
 		}
 		else {
@@ -1300,10 +1091,10 @@ public class QueryBuilder {
 				int nParams = argList.size();
 				int i = 0;
 				if (nParams == 0) {
-					return filterOperatorToString(function);
+					return filterOperatorToExpr(function);
 				}
 				if (nParams == 1) {
-					return filterOperatorToString(function, filterToOp(argList.get(0)));
+					return filterOperatorToExpr(function, nodeToExpr(argList.get(0)));
 				}
 				List<Expr> params = new ArrayList<>();
 				for (int k = 0; k < nParams; k++) {
@@ -1333,9 +1124,9 @@ public class QueryBuilder {
 					if (GraphUtil.listObjects(graph, arg, CommonNodes.functionNode).hasNext()) {
 						if (isOrderedFunction(function)) {
 							int order = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, arg, CommonNodes.orderNode).next()));
-							params.set(order, filterToOp(arg));
+							params.set(order, nodeToExpr(arg));
 						} else {
-							params.set(i, filterToOp(arg));
+							params.set(i, nodeToExpr(arg));
 						}
 					}
 					i++;
@@ -1343,7 +1134,7 @@ public class QueryBuilder {
 				if (!isOrderedFunction(function)) {
 					params.sort(new ExprComparator());
 				}
-				return filterOperatorToString(function, params);
+				return filterOperatorToExpr(function, params);
 			}
 			if (GraphUtil.listObjects(graph, n, CommonNodes.valueNode).hasNext()) { //If it's a variable representing a function.
 				Node v = GraphUtil.listObjects(graph, n, CommonNodes.valueNode).next();
@@ -1396,7 +1187,7 @@ public class QueryBuilder {
 			}
 			for (Node a : args){
 				int order = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, a, CommonNodes.orderNode).next()));
-				Expr expr = filterToOp(a);
+				Expr expr = nodeToExpr(a);
 				int dir = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, a, CommonNodes.dirNode).next()));
 				SortCondition sc = new SortCondition(expr, dir);
 				params.set(order, sc);

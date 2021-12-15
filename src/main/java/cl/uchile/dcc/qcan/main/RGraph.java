@@ -1637,7 +1637,7 @@ public class RGraph {
                     numberOfChecks++;
                 }
                 if (a && b) {
-                    redundant.add(e);
+                    //redundant.add(e);
                     redundantIds.add(i);
                 } else if (a) {
                     redundant.add(e);

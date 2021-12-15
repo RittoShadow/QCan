@@ -217,4 +217,8 @@ public class UCQTransformer extends TransformCopy{
 		}
 		return ans;
 	}
+
+	public Op transform(OpQuad opQuad) {
+		return new OpQuad(opQuad.getQuad());
+	}
 }

@@ -6,6 +6,7 @@ import cl.uchile.dcc.qcan.generate.MultipleGenerator;
 import cl.uchile.dcc.qcan.generate.UCQGeneratorTest;
 import cl.uchile.dcc.qcan.generate.WellDesignedPatternGenerator;
 import cl.uchile.dcc.qcan.parsers.BGPParser;
+import cl.uchile.dcc.qcan.paths.RPQMinimiser;
 
 import java.io.IOException;
 
@@ -38,6 +39,9 @@ public class Launcher {
             }
             else if (exec.equals("analysis")) {
                 Analysis.main(args1);
+            }
+            else if (exec.equals("rpq")) {
+                RPQMinimiser.main(args1);
             }
             else if (exec.equals("bgp")) {
                 BGPParser.main(args1);

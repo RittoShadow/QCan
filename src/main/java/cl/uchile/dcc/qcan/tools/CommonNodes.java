@@ -2,10 +2,11 @@ package cl.uchile.dcc.qcan.tools;
 
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
+import org.apache.jena.vocabulary.RDF;
 
 public class CommonNodes {
     public static final String URI = "http://example.org/";
-    public static final Node typeNode = NodeFactory.createURI(URI + "type");
+    public static final Node typeNode = NodeFactory.createURI(RDF.type.getURI());
     public static final Node tpNode = NodeFactory.createURI(URI + "TP");
     public static final Node argNode = NodeFactory.createURI(URI + "arg");
     public static final Node subjectNode = NodeFactory.createURI(URI + "subject");

@@ -9,6 +9,7 @@ import cl.uchile.dcc.qcan.tools.OpUtils;
 import cl.uchile.dcc.qcan.transformers.*;
 import cl.uchile.dcc.qcan.visitors.FilterVisitor;
 import com.github.jsonldjava.shaded.com.google.common.collect.Sets;
+import org.apache.jena.atlas.lib.SetUtils;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.Query;
@@ -31,7 +32,6 @@ import org.apache.jena.sparql.path.Path;
 import org.apache.jena.sparql.syntax.Template;
 
 import java.util.*;
-import java.util.Map.Entry;
 
 /**
  * This class implements Jena's OpVisitor. It recursively builds an r-graph from a query.
@@ -43,6 +43,7 @@ public class RGraphBuilder implements OpVisitor {
 	private final Stack<RGraph> graphStack = new Stack<>();
 	public List<Var> projectionVars;
 	public Set<Var> totalVars = new HashSet<>();
+	public Set<Var> blankNodes = new HashSet<>();
 	Template template = null;
 	private List<String> graphURI = Collections.emptyList();
 	private List<String> namedGraphURI = Collections.emptyList();
@@ -93,7 +94,9 @@ public class RGraphBuilder implements OpVisitor {
 			op = rewrite(op);
 			this.rewriteTime = System.nanoTime() - normalTime;
 		}
-		this.totalVars = varsContainedIn(op);
+		this.totalVars = OpUtils.varsContainedIn(op);
+		this.blankNodes = OpUtils.allVarsContainedIn(op);
+		this.blankNodes = SetUtils.difference(blankNodes,totalVars);
 		this.setEnableFilter(true);
 		this.setEnableOptional(true);
 		long graphTime = System.nanoTime();
@@ -344,8 +347,8 @@ public class RGraphBuilder implements OpVisitor {
 	@Override
 	public void visit(OpMinus arg0) {
 		RGraph e1, e2;
-		Set<Var> leftVars = varsContainedIn(arg0.getLeft());
-		Set<Var> rightVars = varsContainedIn(arg0.getRight());
+		Set<Var> leftVars = OpUtils.varsContainedIn(arg0.getLeft());
+		Set<Var> rightVars = OpUtils.varsContainedIn(arg0.getRight());
 		boolean shared = false;
 		for (Var v : rightVars) {
 			if (leftVars.contains(v)) {
@@ -488,18 +491,20 @@ public class RGraphBuilder implements OpVisitor {
 		}
 		graphStack.peek().containsPaths = this.containsPaths;
 		if (this.queryType.equals(QueryType.SELECT)) {
-			if (!isDistinct) {
-				if (totalVars.containsAll(projectionVars) && projectionVars.containsAll(totalVars)) {
-					if (!OpUtils.checkBranchVars(op)) {
-						graphStack.peek().setDistinctNode(true);
+			if (OpUtils.isMonotonic(op)) {
+				if (!isDistinct && blankNodes.isEmpty()) {
+					if (totalVars.containsAll(projectionVars) && projectionVars.containsAll(totalVars)) {
+						if (!OpUtils.checkBranchVars(op)) {
+							graphStack.peek().setDistinctNode(true);
+						} else {
+							graphStack.peek().setDistinctNode(isDistinct);
+						}
 					} else {
 						graphStack.peek().setDistinctNode(isDistinct);
 					}
 				} else {
-					graphStack.peek().setDistinctNode(isDistinct);
+					graphStack.peek().setDistinctNode(true);
 				}
-			} else {
-				graphStack.peek().setDistinctNode(true);
 			}
 		}
 		return graphStack.peek();
@@ -657,103 +662,6 @@ public class RGraphBuilder implements OpVisitor {
 		}
 		while (!op1.equals(op2));
 		return op2;
-	}
-
-	public Set<Var> varsContainedIn(Op op) {
-		Set<Var> ans = new HashSet<>();
-		if (op instanceof OpTriple) {
-			Triple t = ((OpTriple) op).getTriple();
-			if (t.getSubject().isVariable()) {
-				if (!t.getSubject().getName().startsWith("?")) {
-					ans.add(Var.alloc(t.getSubject().getName()));
-				}
-			}
-			if (t.getPredicate().isVariable()) {
-				if (!t.getPredicate().getName().startsWith("?")) {
-					ans.add(Var.alloc(t.getPredicate().getName()));
-				}
-			}
-			if (t.getObject().isVariable()) {
-				if (!t.getObject().getName().startsWith("?")) {
-					ans.add(Var.alloc(t.getObject().getName()));
-				}
-			}
-		}
-		else if (op instanceof OpBGP) {
-			for (Triple t : ((OpBGP) op).getPattern().getList()) {
-				if (t.getSubject().isVariable()) {
-					if (!t.getSubject().getName().startsWith("?")) {
-						ans.add(Var.alloc(t.getSubject().getName()));
-					}
-				}
-				if (t.getPredicate().isVariable()) {
-					if (!t.getPredicate().getName().startsWith("?")) {
-						ans.add(Var.alloc(t.getPredicate().getName()));
-					}
-				}
-				if (t.getObject().isVariable()) {
-					if (!t.getObject().getName().startsWith("?")) {
-						ans.add(Var.alloc(t.getObject().getName()));
-					}
-				}
-			}
-		}
-		else if (op instanceof OpPath) {
-			TriplePath tp = ((OpPath) op).getTriplePath();
-			if (tp.getSubject().isVariable()) {
-				ans.add(Var.alloc(tp.getSubject().getName()));
-			}
-			if (tp.getObject().isVariable()) {
-				ans.add(Var.alloc(tp.getObject().getName()));
-			}
-		}
-		else if (op instanceof OpGraph) {
-			Node n = ((OpGraph) op).getNode();
-			if (n.isVariable()) {
-				ans.add(Var.alloc(n.getName()));
-			}
-			ans.addAll(varsContainedIn(((OpGraph) op).getSubOp()));
-		}
-		else if (op instanceof OpFilter) {
-			ExprList eList = ((OpFilter) op).getExprs();
-			ans.addAll(eList.getVarsMentioned());
-			ans.addAll(varsContainedIn(((OpFilter) op).getSubOp()));
-		}
-		else if (op instanceof OpExtend) {
-			Map<Var,Expr> map = ((OpExtend) op).getVarExprList().getExprs();
-			for (Entry<Var, Expr> entry : map.entrySet()) {
-				ans.add(entry.getKey());
-				ans.addAll(entry.getValue().getVarsMentioned());
-			}
-			ans.addAll(varsContainedIn(((OpExtend) op).getSubOp()));
-		}
-		else if (op instanceof OpAssign) {
-			Map<Var,Expr> map = ((OpAssign) op).getVarExprList().getExprs();
-			for (Entry<Var, Expr> entry : map.entrySet()) {
-				ans.add(entry.getKey());
-				ans.addAll(entry.getValue().getVarsMentioned());
-			}
-			ans.addAll(varsContainedIn(((OpAssign) op).getSubOp()));
-		}
-		else if (op instanceof OpTable) {
-			ans.addAll(((OpTable) op).getTable().getVars());
-		}
-		else if (op instanceof Op1) {
-			Op subOp = ((Op1) op).getSubOp();
-			ans.addAll(varsContainedIn(subOp));
-		}
-		else if (op instanceof Op2) {
-			Op left = ((Op2) op).getLeft();
-			Op right = ((Op2) op).getRight();
-			ans.addAll(varsContainedIn(left));
-			ans.addAll(varsContainedIn(right));
-		}
-		else if (op instanceof OpN) {
-			for (Op o : ((OpN) op).getElements()) {
-				ans.addAll(varsContainedIn(o));
-			}
-		}
-		return ans;
 	}
 
 	public boolean isWellDesigned(Op op) {

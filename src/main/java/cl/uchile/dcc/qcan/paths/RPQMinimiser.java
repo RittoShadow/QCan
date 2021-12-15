@@ -125,6 +125,13 @@ public class RPQMinimiser extends TopDownVisitor {
                         e = new OpPath(new TriplePath(tp.getObject(),new P_ZeroOrMore1(subSubPath),tp.getSubject()));
                     }
                 }
+                else if (tp.getPath() instanceof P_OneOrMore1) {
+                    Path subPath = ((P_OneOrMore1) tp.getPath()).getSubPath();
+                    if (subPath instanceof P_Inverse) {
+                        Path subSubPath = ((P_Inverse) subPath).getSubPath();
+                        e = new OpPath(new TriplePath(tp.getObject(),new P_OneOrMore1(subSubPath),tp.getSubject()));
+                    }
+                }
                 else if (tp.getPath() instanceof P_Inverse) { //Case (x,^p,y) == (y,p,x)
                     Path subPath = ((P_Inverse) tp.getPath()).getSubPath();
                     if (subPath instanceof P_Link) {
@@ -156,16 +163,21 @@ public class RPQMinimiser extends TopDownVisitor {
             for (Op o : newOps) {
                 if (o instanceof OpPath) {
                     TriplePath tp = ((OpPath) o).getTriplePath();
+                    Node subject = tp.getSubject();
+                    Node object = tp.getObject();
                     if (tp.getPath() instanceof P_ZeroOrMore1) {
-                        Node subject = tp.getSubject();
                         Path subPath = ((P_ZeroOrMore1) tp.getPath()).getSubPath();
-                        Node object = tp.getObject();
                         Op emptyTransition = epsilonBetween(subject, object);
                         if (subPath instanceof P_Link) {
                             emptyTransition = unionOfN(subject, object, subPath, n);
                             sequence.add(emptyTransition);
                         }
-
+                    }
+                    else if (tp.getPath() instanceof P_OneOrMore1) {
+                        Path subPath = ((P_OneOrMore1) tp.getPath()).getSubPath();
+                        if (subPath instanceof P_Link) {
+                            sequence.add(unionOfN(subject,object,subPath,n));
+                        }
                     }
                 } else {
                     sequence.add(o);
@@ -180,10 +192,10 @@ public class RPQMinimiser extends TopDownVisitor {
             List<Op> opsInUnion = ucqTransformer.opsInUnion(newOp);
             int CQs = opsInUnion.size();
             newOp = modifiedUnion(opsInUnion);
-            //newOp = new OpProject(newOp,new ArrayList<>(varsInScope));
-            //newOp = new OpDistinct(newOp);
             newOp = transformBNodesToVariables(newOp);
             newOp = Transformer.transform(new TransformMergeBGPs(),newOp);
+            newOp = new OpProject(newOp,new ArrayList<>(varsInScope));
+            newOp = new OpDistinct(newOp);
             try {
                 SingleQuery sq = new SingleQuery(newOp);
                 newOp = sq.getCanonOp();
@@ -282,7 +294,7 @@ public class RPQMinimiser extends TopDownVisitor {
 //                        graph.add(Triple.create(s,p,o));
 //                    }
 //                    for (Var var : varsInScope) { //Grounding variables that appear elsewhere.
-//                        Triple t = Triple.create(var,CommonNodes.valueNode,NodeFactory.createLiteral(var.getVarName()));
+//                        Triple t = Triple.create(var, CommonNodes.valueNode,NodeFactory.createLiteral(var.getVarName()));
 //                        graph.add(Triple.create(NodeFactory.createURI(var.getVarName()),CommonNodes.valueNode,NodeFactory.createLiteral(var.getVarName())));
 //                        groundTriples.add(t);
 //                    }
@@ -291,16 +303,22 @@ public class RPQMinimiser extends TopDownVisitor {
 //                for (Op o : newOps) {
 //                    if (o instanceof OpPath) {
 //                        TriplePath tp = ((OpPath) o).getTriplePath();
+//                        Node subject = tp.getSubject();
+//                        Node object = tp.getObject();
 //                        if (tp.getPath() instanceof P_ZeroOrMore1) {
-//                            Node subject = tp.getSubject();
 //                            Path subPath = ((P_ZeroOrMore1) tp.getPath()).getSubPath();
-//                            Node object = tp.getObject();
 //                            Op emptyTransition = epsilonBetween(subject,object);
 //                            if (subPath instanceof P_Link) {
 //                                emptyTransition = unionOfN(subject,object,subPath,2);
 //                                sequence.add(emptyTransition);
 //                            }
 //
+//                        }
+//                        else if (tp.getPath() instanceof P_OneOrMore1) {
+//                            Path subPath = ((P_OneOrMore1) tp.getPath()).getSubPath();
+//                            if (subPath instanceof P_Link) {
+//                                sequence.add(unionOfN(subject,object,subPath,2));
+//                            }
 //                        }
 //                    }
 //                    else {
@@ -348,7 +366,7 @@ public class RPQMinimiser extends TopDownVisitor {
 //                        previousMinBinding = minList;
 //                        minimalBindings.add(minList);
 //                    }
-//                    if (SetUtils.disjoint(previousMinBinding,minList)) {
+//                    if (SetUtils.intersection(previousMinBinding,minList).isEmpty()) {
 //                        System.out.println("Cannot lean.");
 //                        //return op;
 //                    }
@@ -747,7 +765,7 @@ public class RPQMinimiser extends TopDownVisitor {
     }
 
     public static void main(String[] args) {
-        Query query = QueryFactory.create("SELECT DISTINCT ?a ?e WHERE { ?a <p> ?b . ?b <p>* ?c . ?c <p> ?d . ?d <p>* ?e . }");
+        Query query = QueryFactory.create("SELECT DISTINCT ?a WHERE { ?a <p> ?b . ?b <p>+ ?d . ?a <p>+ ?c . ?c <p> ?d . }");
         Op op = Algebra.compile(query);
         op = Transformer.transform(new TransformPathFlattern(), op);
         System.out.println(new RPQMinimiser().visit(op));
