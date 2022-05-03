@@ -41,82 +41,88 @@ public class Analysis {
 	}
 	
 	public void read() throws IOException{
-		String line;
-		for (int i = 0; i < 8; i++){
-			data.add(i, new ArrayList<>());
-			average.add(i, 0.0);
-			median.add(i,0.0);
-			MAX.add(i,0.0);
-			MIN.add(i,0.0);
-			q25.add(i,0.0);
-			q75.add(i,0.0);
+		String line = br.readLine();
+		if (line.split("\t").length < 5) {
+			shortRead();
 		}
-		while(true){
-			line = br.readLine();
-			if (line == null || line.startsWith("Total")){
-				break;
+		else {
+			for (int i = 0; i < 8; i++){
+				data.add(i, new ArrayList<>());
+				average.add(i, 0.0);
+				median.add(i,0.0);
+				MAX.add(i,0.0);
+				MIN.add(i,0.0);
+				q25.add(i,0.0);
+				q75.add(i,0.0);
 			}
-			else{
-				String[] params = line.split("\t");
-				for (int i = 0; i < 4; i++){
-					double value = Double.parseDouble(params[i+1]);
-					if (value > 0) {
-						data.get(i).add(value);
-					}
+			while(true){
+				if (line == null || line.startsWith("Total")){
+					break;
 				}
+				else{
+					String[] params = line.split("\t");
+					for (int i = 0; i < 4; i++){
+						double value = Double.parseDouble(params[i+1]);
+						if (value > 0) {
+							data.get(i).add(value);
+						}
+					}
 //				data.get(2).add(Double.parseDouble(params[4]) - Double.parseDouble(params[6]));
 //				data.get(3).add(Double.parseDouble(params[5]) - Double.parseDouble(params[7]));
 //				data.get(4).add(Double.parseDouble(params[8]) - Double.parseDouble(params[9]));
-				
-				data.get(4).add(Double.parseDouble(params[1])+Double.parseDouble(params[2])+Double.parseDouble(params[3])+Double.parseDouble(params[4]));
-				data.get(5).add(Double.parseDouble(params[6])); //triple patterns in
-				data.get(6).add(Double.parseDouble(params[7])); //variables in
-				data.get(7).add(Double.parseDouble(params[10])); //graph size in
-				uniqueQueries++;
-				if (params[12].equals("true")){
-					distinct++;
+
+					data.get(4).add(Double.parseDouble(params[1])+Double.parseDouble(params[2])+Double.parseDouble(params[3])+Double.parseDouble(params[4]));
+					data.get(5).add(Double.parseDouble(params[6])); //triple patterns in
+					data.get(6).add(Double.parseDouble(params[7])); //variables in
+					data.get(7).add(Double.parseDouble(params[10])); //graph size in
+					uniqueQueries++;
+					if (params[12].equals("true")){
+						distinct++;
+					}
+					if (params[13].equals("true")){
+						joins++;
+					}
+					if (params[14].equals("true")){
+						unions++;
+					}
+					if (params[15].equals("true")){
+						optional++;
+					}
+					if (params[16].equals("true")){
+						filter++;
+					}
+					if (params[17].equals("true")){
+						namedGraphs++;
+					}
+					if (params[18].equals("true")){
+						solutionMods++;
+					}
+					if (params[19].equals("true")){
+						bind++;
+					}
+					if (params[20].equals("true")){
+						groupBy++;
+					}
+					if (params[21].equals("true")){
+						minus++;
+					}
+					if (params[22].equals("true")){
+						paths++;
+					}
+					if (params[23].equals("true")){
+						values++;
+					}
+					if (uniqueQueries%10000 == 0){
+						System.out.println(uniqueQueries + " queries read.");
+					}
 				}
-				if (params[13].equals("true")){
-					joins++;
-				}
-				if (params[14].equals("true")){
-					unions++;
-				}
-				if (params[15].equals("true")){
-					optional++;
-				}
-				if (params[16].equals("true")){
-					filter++;
-				}
-				if (params[17].equals("true")){
-					namedGraphs++;
-				}				
-				if (params[18].equals("true")){
-					solutionMods++;
-				}
-				if (params[19].equals("true")){
-					bind++;
-				}
-				if (params[20].equals("true")){
-					groupBy++;
-				}
-				if (params[21].equals("true")){
-					minus++;
-				}
-				if (params[22].equals("true")){
-					paths++;
-				}
-				if (params[23].equals("true")){
-					values++;
-				}
-				if (uniqueQueries%10000 == 0){
-					System.out.println(uniqueQueries + " queries read.");
-				}
+				line = br.readLine();
+			}
+			for (ArrayList<Double> datum : data) {
+				Collections.sort(datum);
 			}
 		}
-		for (ArrayList<Double> datum : data) {
-			Collections.sort(datum);
-		}
+
 	}
 	
 	public void shortRead() throws IOException{
@@ -248,45 +254,46 @@ public class Analysis {
 		getMax();
 		getMin();
 		String s = "";
-		for (int i = 0; i < data.size(); i++){
-			
+		if (data.size() < 8) {
+			shortDisplayInfo();
+		}
+		else {
+			for (int i = 0; i < data.size(); i++){
+
+				s += average.get(i) + "\t";
+				s += median.get(i) + "\t";
+				s += q25.get(i) + "\t";
+				s += q75.get(i) + "\t";
+				s += MAX.get(i) + "\t";
+				s += MIN.get(i) + "\n";
+			}
+			System.out.println(s);
+			System.out.println("DISTINCT: "+distinct);
+			System.out.println("UNION: "+unions);
+			System.out.println("JOIN: "+joins);
+			System.out.println("FILTER: "+filter);
+			System.out.println("OPTIONAL: "+optional);
+			System.out.println("SOLUTION MODIFIERS: "+solutionMods);
+			System.out.println("NAMED GRAPH: "+namedGraphs);
+			System.out.println("BIND: "+bind);
+			System.out.println("GROUP BY: "+groupBy);
+			System.out.println("MINUS: "+minus);
+			System.out.println("Paths: "+paths);
+			System.out.println("VALUES: "+values);
+			System.out.println("Total: "+data.get(0).size());
+		}
+
+	}
+	
+	public void shortDisplayInfo() throws IOException{
+		String s = "";
+		for (int i = 0; i < data.size(); i++){	
 			s += average.get(i) + "\t";
 			s += median.get(i) + "\t";
 			s += q25.get(i) + "\t";
 			s += q75.get(i) + "\t";
 			s += MAX.get(i) + "\t";
-			s += MIN.get(i) + "\n";		
-		}
-		System.out.println(s);
-		System.out.println("DISTINCT: "+distinct);
-		System.out.println("UNION: "+unions);
-		System.out.println("JOIN: "+joins);
-		System.out.println("FILTER: "+filter);
-		System.out.println("OPTIONAL: "+optional);
-		System.out.println("SOLUTION MODIFIERS: "+solutionMods);
-		System.out.println("NAMED GRAPH: "+namedGraphs);
-		System.out.println("BIND: "+bind);
-		System.out.println("GROUP BY: "+groupBy);
-		System.out.println("MINUS: "+minus);
-		System.out.println("Paths: "+paths);
-		System.out.println("VALUES: "+values);
-		System.out.println("Total: "+data.get(0).size());
-	}
-	
-	public void shortDisplayInfo() throws IOException{
-		shortRead();
-		getAverage();
-		getMedian();
-		getMax();
-		getMin();
-		String s = "";
-		for (int i = 0; i < data.size(); i++){	
-			s += average.get(i) + ",";
-			s += median.get(i) + ",";
-			s += q25.get(i) + ",";
-			s += q75.get(i) + ",";
-			s += MAX.get(i) + ",";
-			s += MIN.get(i) + ",";		
+			s += MIN.get(i) + "\n";
 		}
 		System.out.println(s);
 	}

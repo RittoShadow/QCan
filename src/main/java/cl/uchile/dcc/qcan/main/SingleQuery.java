@@ -260,7 +260,7 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException, IOException {
-		String q = "SELECT ?var1  ?var2 (  MAX (COUNT ( ?var2  ) ) AS  ?var3  ) WHERE {   ?var1  ?var2  <http://www.wikidata.org/entity/Q1726> . } GROUP BY  ?var1  ?var2  ";
+		String q = "SELECT ?var1 ?var9 WHERE {   ?var1  ?var2  <http://www.wikidata.org/entity/Q1726> . }";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();

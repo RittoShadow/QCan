@@ -95,6 +95,15 @@ public class RGraphBuilder implements OpVisitor {
 			this.rewriteTime = System.nanoTime() - normalTime;
 		}
 		this.totalVars = OpUtils.varsContainedIn(op);
+		List<Var> unboundVars = new ArrayList<>();
+		for (Var var : projectionVars) {
+			if (!totalVars.contains(var)) {
+				unboundVars.add(var);
+			}
+		}
+		for (Var var : unboundVars) {
+			projectionVars.remove(var);
+		}
 		this.blankNodes = OpUtils.allVarsContainedIn(op);
 		this.blankNodes = SetUtils.difference(blankNodes,totalVars);
 		this.setEnableFilter(true);
@@ -863,6 +872,7 @@ public class RGraphBuilder implements OpVisitor {
 	public Op rewrite(Op op) {
 //		op1 = transitiveClosure(op1);
 		Op op2 = op;
+		op2 = Transformer.transform(new RemoveUnboundVariables(),op2);
 		op2 = UCQNormalisation(op2);
 //		op2 = uC2RPQCollapse(op2);
 //		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
