@@ -1640,13 +1640,14 @@ public class RGraph {
                     //redundant.add(e);
                     redundantIds.add(i);
                 } else if (a) {
-                    redundant.add(e);
                     redundantIds.add(i);
                 } else if (b) {
-                    redundant.add(e1);
                     redundantIds.add(j);
                 }
             }
+        }
+        for (int i : redundantIds) {
+            redundant.add(result.get(i));
         }
         for (RGraph e : redundant) {
             result.remove(e);

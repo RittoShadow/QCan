@@ -260,7 +260,29 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException, IOException {
-		String q = "SELECT ?var1 ?var9 WHERE {   ?var1  ?var2  <http://www.wikidata.org/entity/Q1726> . }";
+		String q = "SELECT ?var1 (  SUM ( ?var2  ) AS  ?var3  ) ?var4Label  \n" +
+				"WHERE {  \n" +
+				"\t\t{   SELECT ?var4Label  ?var5  ?var1 (  (  SAMPLE ( ?var6  )/COUNT ( ?var7  ) )  AS  ?var2  )   \n" +
+				"\t\t\tWHERE   {    \n" +
+				"\t\t\t\t\t\t{      ?var8  <http://www.wikidata.org/prop/direct/P108>  <http://www.wikidata.org/entity/Q24283660> .    }     \n" +
+				"\t\t\t\t\t\tUNION    \n" +
+				"\t\t\t\t\t\t{      ?var8  <http://www.wikidata.org/prop/direct/P1416>  <http://www.wikidata.org/entity/Q24283660> .    }     \n" +
+				"\t\t\t\t\t\tUNION    \n" +
+				"\t\t\t\t\t\t{      ?var8  <http://www.wikidata.org/prop/direct/P1416>  ?var9 .      \n" +
+				"\t\t\t\t\t\t\t?var9  <http://www.wikidata.org/prop/direct/P361>  <http://www.wikidata.org/entity/Q24283660> .    \n" +
+				"\t\t\t\t\t\t}     \n" +
+				"\t\t\t\t\t\tBIND (  STR (  YEAR (  ?var10  )  )  AS  ?var1 ).     \n" +
+				"\t\t\t\t\t\t?var5 ( <http://www.wikidata.org/prop/direct/P50> | <http://www.wikidata.org/prop/direct/P2093> ) ?var7 .     \n" +
+				"\t\t\t\t\t\t?var5  <http://www.wikidata.org/prop/direct/P31>  <http://www.wikidata.org/entity/Q13442814> .     \n" +
+				"\t\t\t\t\t\t?var5  <http://www.wikidata.org/prop/direct/P50>  ?var8 .     \n" +
+				"\t\t\t\t\t\t?var5  <http://www.wikidata.org/prop/direct/P1104>  ?var6 .     \n" +
+				"\t\t\t\t\t\t?var5  <http://www.wikidata.org/prop/direct/P577>  ?var10 .     \n" +
+				"\t\t\t\t\t\t?var8  <http://www.w3.org/2000/01/rdf-schema#label>  ?var4Label .  \n" +
+				"\t\t\t\t\t\tFILTER (    ( (  LANG (  ?var4Label  )  =  \"en\" ) )  ) .   \n" +
+				"\t\t\t\t\t}   \n" +
+				"\t\t\t\t\t\tGROUP BY  ?var5  ?var4Label  ?var1   \n" +
+				"\t\t} \n" +
+				"\t} GROUP BY  ?var1  ?var4Label  ORDER BY ASC( ?var1 ) ";
 		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();

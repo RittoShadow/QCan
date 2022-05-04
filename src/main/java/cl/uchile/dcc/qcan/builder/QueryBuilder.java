@@ -616,6 +616,33 @@ public class QueryBuilder {
 		} else return function.isURI();
 	}
 
+	public boolean isAggregateFunction(Node function) {
+		if (function.isLiteral()) {
+			String f = function.getLiteralLexicalForm();
+			if (f.equals("MAX")) {
+				return true;
+			} else if (f.equals("MIN")) {
+				return true;
+			} else if (f.equals("AVG")) {
+				return true;
+			} else if (f.equals("COUNT")) {
+				return true;
+			} else if (f.equals("SUM")) {
+				return true;
+			} else if (f.equals("SAMPLE")) {
+				return true;
+			} else if (f.equals("GROUP_CONCAT")) {
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+		else {
+			return false;
+		}
+	}
+
 	public Op joinToOp(Node n) {
 		Op ans = null;
 		ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, CommonNodes.argNode);
@@ -675,11 +702,11 @@ public class QueryBuilder {
 			Node f = bindings.next();
 			Var var = Var.alloc(GraphUtil.listObjects(graph, f, CommonNodes.varNode).next().getBlankNodeLabel());
 			vars.add(var);
-			Expr expr = bindToOp(GraphUtil.listObjects(graph, f, CommonNodes.argNode).next());
-			if (expr instanceof ExprAggregator) {
-				Node anon = GraphUtil.listObjects(graph,f, CommonNodes.argNode).next();
-				expr = new ExprVar(Var.alloc(anon.getBlankNodeLabel()));
-			}
+			Expr expr = nodeToExpr(GraphUtil.listObjects(graph, f, CommonNodes.argNode).next());
+//			if (expr instanceof ExprAggregator) {
+//				Node anon = GraphUtil.listObjects(graph,f, CommonNodes.argNode).next();
+//				expr = new ExprVar(Var.alloc(anon.getBlankNodeLabel()));
+//			}
 			varExprList.add(var, expr);
 		}
 		if (group != null) {
@@ -689,10 +716,9 @@ public class QueryBuilder {
 				Node g = groupVars.next();
 				Var var = Var.alloc(g.getBlankNodeLabel());
 				this.vars.add(var);
-				Expr expr = null;
-				if (GraphUtil.listObjects(graph, g, CommonNodes.valueNode).hasNext()) {
-					Node value = GraphUtil.listObjects(graph, g, CommonNodes.valueNode).next();
-					expr = nodeToExpr(value);
+				Expr expr = nodeToExpr(g);
+				if (expr.equals(NodeValue.makeNode(var))) {
+					expr = null;
 				}
 				groupByVars.add(var, expr);
 			}
@@ -862,67 +888,71 @@ public class QueryBuilder {
 		return ans;
 	}
 
-	public Expr bindToOp(Node n) {
-		if (GraphUtil.listObjects(graph, n, CommonNodes.functionNode).hasNext()) {
-			Node function = GraphUtil.listObjects(graph, n, CommonNodes.functionNode).next();
-			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, CommonNodes.argNode);
-			List<Node> argList = args.toList();
-			int nParams = argList.size();
-			int i = 0;
-			if (nParams == 0) {
-				return filterOperatorToExpr(function);
-			}
-			List<Expr> params = new ArrayList<>();
-			for (int k = 0; k < nParams; k++) {
-				params.add(null);
-			}
-			for (Node arg : argList) {
-				if (GraphUtil.listObjects(graph, arg, CommonNodes.valueNode).hasNext()) {
-					Node value = GraphUtil.listObjects(graph, arg, CommonNodes.valueNode).next();
-					Expr argString = argToExpr(value);
-					if (value.isBlank()) {
-						if (GraphUtil.listObjects(graph, value, CommonNodes.functionNode).hasNext()) {
-							argString = bindToOp(value);
-						} else {
-							vars.add(Var.alloc(value.getBlankNodeLabel()));
-							argString = NodeValue.makeNode(Var.alloc(value.getBlankNodeLabel()));
-						}
-					}
-
-					if (isOrderedFunction(function)) {
-						int order = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, arg, CommonNodes.orderNode).next()));
-						params.set(order, argString);
-					} else {
-						params.set(i, argString);
-					}
-				}
-				if (GraphUtil.listObjects(graph, arg, CommonNodes.functionNode).hasNext()) {
-					if (isOrderedFunction(function)) {
-						int order = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, arg, CommonNodes.orderNode).next()));
-						params.set(order, bindToOp(arg));
-					} else {
-						params.set(i, bindToOp(arg));
-					}
-				}
-				i++;
-			}
-			if (!isOrderedFunction(function)) {
-				params.sort(new ExprComparator());
-			}
-			if (nParams == 1) {
-				//return filterOperatorToString(function, bindToOp(argList.get(0)));
-				return filterOperatorToExpr(function, params.get(0));
-			}
-			return filterOperatorToExpr(function, params);
-		}
-		if (GraphUtil.listObjects(graph, n, CommonNodes.valueNode).hasNext()) {
-			Node v = GraphUtil.listObjects(graph, n, CommonNodes.valueNode).next();
-			return argToExpr(v);
-		}
-		else {
-			return argToExpr(n);
-		}
-	}
+//	public Expr bindToOp(Node n) {
+//		if (GraphUtil.listObjects(graph, n, CommonNodes.functionNode).hasNext()) {
+//			Node function = GraphUtil.listObjects(graph, n, CommonNodes.functionNode).next();
+//			if (isAggregateFunction(function)) {
+//				vars.add(Var.alloc(n.getBlankNodeLabel()));
+//				return NodeValue.makeNode(Var.alloc(n.getBlankNodeLabel()));
+//			}
+//			ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, CommonNodes.argNode);
+//			List<Node> argList = args.toList();
+//			int nParams = argList.size();
+//			int i = 0;
+//			if (nParams == 0) {
+//				return filterOperatorToExpr(function);
+//			}
+//			List<Expr> params = new ArrayList<>();
+//			for (int k = 0; k < nParams; k++) {
+//				params.add(null);
+//			}
+//			for (Node arg : argList) {
+//				if (GraphUtil.listObjects(graph, arg, CommonNodes.valueNode).hasNext()) {
+//					Node value = GraphUtil.listObjects(graph, arg, CommonNodes.valueNode).next();
+//					Expr argString = argToExpr(value);
+//					if (value.isBlank()) {
+//						if (GraphUtil.listObjects(graph, value, CommonNodes.functionNode).hasNext()) {
+//							argString = bindToOp(value);
+//						} else {
+//							vars.add(Var.alloc(value.getBlankNodeLabel()));
+//							argString = NodeValue.makeNode(Var.alloc(value.getBlankNodeLabel()));
+//						}
+//					}
+//
+//					if (isOrderedFunction(function)) {
+//						int order = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, arg, CommonNodes.orderNode).next()));
+//						params.set(order, argString);
+//					} else {
+//						params.set(i, argString);
+//					}
+//				}
+//				if (GraphUtil.listObjects(graph, arg, CommonNodes.functionNode).hasNext()) {
+//					if (isOrderedFunction(function)) {
+//						int order = Integer.parseInt(getCleanLiteral(GraphUtil.listObjects(graph, arg, CommonNodes.orderNode).next()));
+//						params.set(order, bindToOp(arg));
+//					} else {
+//						params.set(i, bindToOp(arg));
+//					}
+//				}
+//				i++;
+//			}
+//			if (!isOrderedFunction(function)) {
+//				params.sort(new ExprComparator());
+//			}
+//			if (nParams == 1) {
+//				//return filterOperatorToString(function, bindToOp(argList.get(0)));
+//				return filterOperatorToExpr(function, params.get(0));
+//			}
+//			return filterOperatorToExpr(function, params);
+//		}
+//		if (GraphUtil.listObjects(graph, n, CommonNodes.valueNode).hasNext()) {
+//			Node v = GraphUtil.listObjects(graph, n, CommonNodes.valueNode).next();
+//			return argToExpr(v);
+//		}
+//		else {
+//			return argToExpr(n);
+//		}
+//	}
 
 	public Expr argToExpr(Node value) {
 		Expr argString = null;
@@ -1052,7 +1082,7 @@ public class QueryBuilder {
 		return PathUtils.dfaToPath(dfa,n,predicates);
 	}
 
-	public Expr nodeToExpr(Node n) {
+	/*public Expr nodeToExpr(Node n) {
 		Expr e = null;
 		Node type = typeMap.get(n);
 		if (type != null) {
@@ -1086,6 +1116,10 @@ public class QueryBuilder {
 		else {
 			if (GraphUtil.listObjects(graph, n, CommonNodes.functionNode).hasNext()) { //If it's a function.
 				Node function = GraphUtil.listObjects(graph, n, CommonNodes.functionNode).next();
+				if (isAggregateFunction(function)) {
+					vars.add(Var.alloc(n.getBlankNodeLabel()));
+					return NodeValue.makeNode(Var.alloc(n.getBlankNodeLabel()));
+				}
 				ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, CommonNodes.argNode);
 				List<Node> argList = args.toList();
 				int nParams = argList.size();
@@ -1150,6 +1184,87 @@ public class QueryBuilder {
 				else {
 					return argToExpr(v);
 				}
+			}
+			else {
+				return argToExpr(n);
+			}
+		}
+		return e;
+	}*/
+
+	public Expr nodeToExpr(Node n) {
+		Expr e = null;
+		Node type = typeMap.get(n);
+		if (type != null) {
+			if (type.equals(CommonNodes.andNode)) {
+				ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, CommonNodes.argNode);
+				while (args.hasNext()) {
+					Node a = args.next();
+					if (e == null) {
+						e = nodeToExpr(a);
+					} else {
+						e = new E_LogicalAnd(e, nodeToExpr(a));
+					}
+				}
+			}
+			else if (type.equals(CommonNodes.orNode)) {
+				ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, CommonNodes.argNode);
+				while (args.hasNext()) {
+					Node a = args.next();
+					if (e == null) {
+						e = nodeToExpr(a);
+					} else {
+						e = new E_LogicalOr(e, nodeToExpr(a));
+					}
+				}
+			}
+			else if (type.equals(CommonNodes.notNode)) {
+				Node args = GraphUtil.listObjects(graph, n, CommonNodes.argNode).next();
+				e = new E_LogicalNot(nodeToExpr(args));
+			}
+		}
+		else {
+			if (GraphUtil.listObjects(graph, n, CommonNodes.functionNode).hasNext()) { //If it's a function.
+				Node function = GraphUtil.listObjects(graph, n, CommonNodes.functionNode).next();
+				if (isAggregateFunction(function)) {
+					vars.add(Var.alloc(n.getBlankNodeLabel()));
+					return NodeValue.makeNode(Var.alloc(n.getBlankNodeLabel()));
+				}
+				boolean isOrderedFunction = isOrderedFunction(function);
+				ExtendedIterator<Node> args = GraphUtil.listObjects(graph, n, CommonNodes.argNode);
+				List<Node> argList = args.toList();
+				int nParams = argList.size();
+				int i = 0;
+				if (nParams == 0) {
+					return filterOperatorToExpr(function);
+				}
+				if (nParams == 1) {
+					return filterOperatorToExpr(function, nodeToExpr(argList.get(0)));
+				}
+				List<Expr> params = new ArrayList<>();
+				for (int k = 0; k < nParams; k++) {
+					params.add(null);
+				}
+				for (Node arg : argList) {
+					if (isOrderedFunction) {
+						Node s = GraphUtil.listObjects(graph,arg,CommonNodes.orderNode).next();
+						String c = getCleanLiteral(s);
+						int order = Integer.parseInt(c);
+						params.set(order,nodeToExpr(arg));
+					}
+					else {
+						params.set(i,nodeToExpr(arg));
+					}
+					i++;
+				}
+				if (!isOrderedFunction) {
+					params.sort(new ExprComparator());
+				}
+				return filterOperatorToExpr(function, params);
+			}
+			if (GraphUtil.listObjects(graph, n, CommonNodes.valueNode).hasNext()) { //If it's a variable representing a function.
+				Node v = GraphUtil.listObjects(graph, n, CommonNodes.valueNode).next();
+				e = nodeToExpr(v);
 			}
 			else {
 				return argToExpr(n);
