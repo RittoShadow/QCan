@@ -7,6 +7,7 @@ import cl.uchile.dcc.qcan.transformers.UCQTransformer;
 import com.google.common.collect.Sets;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
+import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.op.*;
@@ -176,7 +177,14 @@ public class OpUtils {
             ans.addAll(varsContainedInExcept(((OpAssign) op).getSubOp(),exception));
         } else if (op instanceof OpTable) {
             ans.addAll(((OpTable) op).getTable().getVars());
-        } else if (op instanceof Op1) {
+        }
+        else if (op instanceof OpOrder) {
+            List<SortCondition> sortConditionList = ((OpOrder) op).getConditions();
+            for (SortCondition condition : sortConditionList) {
+                ans.addAll(condition.getExpression().getVarsMentioned());
+            }
+        }
+        else if (op instanceof Op1) {
             Op subOp = ((Op1) op).getSubOp();
             ans.addAll(varsContainedInExcept(subOp,exception));
         } else if (op instanceof Op2) {
@@ -279,6 +287,12 @@ public class OpUtils {
         else if (op instanceof OpTable) {
             ans.addAll(((OpTable) op).getTable().getVars());
         }
+        else if (op instanceof OpOrder) {
+            List<SortCondition> sortConditionList = ((OpOrder) op).getConditions();
+            for (SortCondition condition : sortConditionList) {
+                ans.addAll(condition.getExpression().getVarsMentioned());
+            }
+        }
         else if (op instanceof Op1) {
             Op subOp = ((Op1) op).getSubOp();
             ans.addAll(varsContainedIn(subOp));
@@ -370,6 +384,12 @@ public class OpUtils {
         }
         else if (op instanceof OpTable) {
             ans.addAll(((OpTable) op).getTable().getVars());
+        }
+        else if (op instanceof OpOrder) {
+            List<SortCondition> sortConditionList = ((OpOrder) op).getConditions();
+            for (SortCondition condition : sortConditionList) {
+                ans.addAll(condition.getExpression().getVarsMentioned());
+            }
         }
         else if (op instanceof Op1) {
             Op subOp = ((Op1) op).getSubOp();

@@ -563,51 +563,48 @@ public class PGraph {
 		ExtendedIterator<Triple> transitions = GraphUtil.findAll(dfa);
 		while (transitions.hasNext()) {
 			Triple t = transitions.next();
-			if (!t.getPredicate().equals(typeNode)) {
-				Pair<Node,Node> pair = new Pair<>(t.getSubject(),t.getObject());
-				List<Node> transitionList = GraphUtil.listPredicates(dfa, pair.getLeft(), pair.getRight()).toList();
-				if (!transitionTable.containsKey(pair)) {
-					if (transitionList.size() > 1) {
-						Path newPath = null;
-						List<String> pathList = new ArrayList<>();
-						for (Node path : transitionList) {
-							pathList.add(path.toString());
-						}
-						Collections.sort(pathList);
-						for (String path : pathList) {
-							if (path.startsWith("\"^")) {
-								if (newPath == null) {
-									newPath = PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(path.substring(2, path.length() - 1))));
-								}
-								else {
-									newPath = PathFactory.pathAlt(newPath, PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(path.substring(2, path.length() - 1)))));
-								}
+			Pair<Node,Node> pair = new Pair<>(t.getSubject(),t.getObject());
+			List<Node> transitionList = GraphUtil.listPredicates(dfa, pair.getLeft(), pair.getRight()).toList();
+			if (!transitionTable.containsKey(pair)) {
+				if (transitionList.size() > 1) {
+					Path newPath = null;
+					List<String> pathList = new ArrayList<>();
+					for (Node path : transitionList) {
+						pathList.add(path.toString());
+					}
+					Collections.sort(pathList);
+					for (String path : pathList) {
+						if (path.startsWith("\"^")) {
+							if (newPath == null) {
+								newPath = PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(path.substring(2, path.length() - 1))));
 							}
 							else {
-								if (newPath == null) {
-									newPath = PathFactory.pathLink(NodeFactory.createURI(path));
-								}
-								else {
-									newPath = PathFactory.pathAlt(newPath, PathFactory.pathLink(NodeFactory.createURI(path)));
-								}
+								newPath = PathFactory.pathAlt(newPath, PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(path.substring(2, path.length() - 1)))));
 							}
 						}
-						transitionTable.put(pair, newPath);
+						else {
+							if (newPath == null) {
+								newPath = PathFactory.pathLink(NodeFactory.createURI(path));
+							}
+							else {
+								newPath = PathFactory.pathAlt(newPath, PathFactory.pathLink(NodeFactory.createURI(path)));
+							}
+						}
+					}
+					transitionTable.put(pair, newPath);
+				}
+				else {
+					if (t.getPredicate().toString().startsWith("\"^")) {
+						String u = t.getPredicate().toString();
+						u = u.substring(2,u.length()-1);
+						transitionTable.put(pair, PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(u))));
 					}
 					else {
-						if (t.getPredicate().toString().startsWith("\"^")) {
-							String u = t.getPredicate().toString();
-							u = u.substring(2,u.length()-1);
-							transitionTable.put(pair, PathFactory.pathInverse(PathFactory.pathLink(NodeFactory.createURI(u))));
-						}
-						else {
-							transitionTable.put(pair, PathFactory.pathLink(t.getPredicate()));
-						}
+						transitionTable.put(pair, PathFactory.pathLink(t.getPredicate()));
 					}
 				}
 			}
 			if (t.getPredicate().equals(epsilon)) {
-				Pair<Node,Node> pair = new Pair<>(t.getSubject(),t.getObject());
 				transitionTable.put(pair, PathFactory.pathLink(epsilon));
 			}
 		}
@@ -652,9 +649,17 @@ public class PGraph {
 		for (Node p : predicates) {
 			if (GraphUtil.listObjects(g, current, p).hasNext()) {
 				Node next = GraphUtil.listObjects(g, current, p).next();
-				if (!ordered.contains(next)) {
-					ordered.add(next);
-					orderedStates(next, g, predicates, ordered);
+				if (p.equals(typeNode)) {
+					if (!ordered.contains(next) & !next.equals(finalNode)) {
+						ordered.add(next);
+						orderedStates(next, g, predicates, ordered);
+					}
+				}
+				else {
+					if (!ordered.contains(next)) {
+						ordered.add(next);
+						orderedStates(next, g, predicates, ordered);
+					}
 				}
 			}
 		}

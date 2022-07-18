@@ -7,6 +7,7 @@ import cl.uchile.dcc.qcan.generate.UCQGeneratorTest;
 import cl.uchile.dcc.qcan.generate.WellDesignedPatternGenerator;
 import cl.uchile.dcc.qcan.parsers.BGPParser;
 import cl.uchile.dcc.qcan.paths.RPQMinimiser;
+import cl.uchile.dcc.qcan.tools.URLtoUTFParser;
 
 import java.io.IOException;
 
@@ -42,6 +43,9 @@ public class Launcher {
             }
             else if (exec.equals("rpq")) {
                 RPQMinimiser.main(args1);
+            }
+            else if (exec.equals("utf8")) {
+                URLtoUTFParser.main(args1);
             }
             else if (exec.equals("bgp")) {
                 BGPParser.main(args1);

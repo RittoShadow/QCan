@@ -2,14 +2,24 @@ package cl.uchile.dcc.qcan.main;
 
 import cl.uchile.dcc.blabel.label.GraphColouring;
 import org.apache.commons.cli.*;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.zip.GZIPOutputStream;
 
 public class EasyCanonicalisation {
 
     public boolean rewrite = true;
     public boolean minimisation = true;
     public boolean canonicalisation = true;
+    public boolean gZipped = false;
 
     public EasyCanonicalisation() {
 
@@ -21,18 +31,62 @@ public class EasyCanonicalisation {
         System.out.println(out);
     }
 
-    public void canonicaliseFile(File in, File out) throws IOException, GraphColouring.HashCollisionException, InterruptedException {
+    public void canonicaliseFile(File in, File out) throws GraphColouring.HashCollisionException, InterruptedException, IOException {
+        canonicaliseFile(in,out,false);
+    }
+
+    public void canonicaliseFile(File in, File out, boolean distinct) throws IOException, GraphColouring.HashCollisionException, InterruptedException {
         String s;
-        FileReader fr = new FileReader(in);
-        BufferedReader br = new BufferedReader(fr);
-        FileWriter fw = new FileWriter(out);
-        BufferedWriter bw = new BufferedWriter(fw);
+        BufferedReader br;
+        BufferedWriter bw;
+        if (gZipped) {
+            FileInputStream fileInputStream = new FileInputStream(in);
+            GzipCompressorInputStream gzipInputStream = new GzipCompressorInputStream(fileInputStream);
+            TarArchiveInputStream tarArchiveInputStream = new TarArchiveInputStream(gzipInputStream);
+            TarArchiveEntry tarArchiveEntry = null;
+            if ((tarArchiveEntry = tarArchiveInputStream.getNextTarEntry()) != null) {
+                br = new BufferedReader(new InputStreamReader(tarArchiveInputStream));
+            }
+            else {
+                System.exit(-1);
+            }
+            br = new BufferedReader(new FileReader(tarArchiveEntry.getFile()));
+            OutputStream os = Files.newOutputStream(out.toPath(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+            GZIPOutputStream gzip = new GZIPOutputStream(os);
+            OutputStreamWriter ow = new OutputStreamWriter(gzip, StandardCharsets.UTF_8);
+            bw = new BufferedWriter(ow);
+        }
+        else {
+            FileReader fr = new FileReader(in);
+            br = new BufferedReader(fr);
+            FileWriter fw = new FileWriter(out);
+            bw = new BufferedWriter(fw);
+        }
+
+
+        Set<String> distinctQueries = new TreeSet<>();
         while ((s = br.readLine()) != null) {
-            SingleQuery sq = new SingleQuery(s, canonicalisation, rewrite, minimisation, true, false);
-            String q = sq.getQuery();
+            String q = "";
+            try {
+                SingleQuery sq = new SingleQuery(s, canonicalisation, rewrite, minimisation, true, false);
+                q = sq.getQuery();
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                System.err.println("Failed at: \n" + s);
+            }
             q = q.replace("\n"," ");
-            bw.append(q);
-            bw.newLine();
+            if (distinct) {
+                if (!distinctQueries.contains(q)) {
+                    distinctQueries.add(q);
+                    bw.append(q);
+                    bw.newLine();
+                }
+            }
+            else {
+                bw.append(q);
+                bw.newLine();
+            }
         }
         bw.close();
     }
@@ -45,6 +99,8 @@ public class EasyCanonicalisation {
         Option option_Q = new Option("q", true, "The query to canonicalise.");
         Option option_M = new Option("m", false, "Set to enable minimisation/leaning.");
         Option option_O = new Option("o",true,"Output file");
+        Option option_D = new Option("d",false,"Set to avoid writing duplicate queries in output file.");
+        Option option_G = new Option("g",false,"Set if input is gzip file. Results will also be zipped.");
         option_F.setArgName("filename");
         option_Q.setArgName("query");
         option_O.setArgName("output");
@@ -53,17 +109,21 @@ public class EasyCanonicalisation {
         options.addOption(option_Q);
         options.addOption(option_M);
         options.addOption(option_O);
+        options.addOption(option_D);
+        options.addOption(option_G);
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp("benchmark", header, options, footer, true);
+        formatter.printHelp("easy", header, options, footer, true);
         try {
             commandLine = parser.parse(options,args);
             boolean minimisation = commandLine.hasOption("m");
             EasyCanonicalisation ec = new EasyCanonicalisation();
             ec.minimisation = minimisation;
+            ec.gZipped = commandLine.hasOption("g");
             if (commandLine.hasOption("f")) {
                 String filename = commandLine.getOptionValue("f");
                 String output = "";
+                boolean distinct = commandLine.hasOption("d");
                 File f = new File(filename);
                 if (commandLine.hasOption("o")) {
                     output = commandLine.getOptionValue("o");
@@ -76,7 +136,7 @@ public class EasyCanonicalisation {
                 if (!out.exists()) {
                     out.createNewFile();
                 }
-                ec.canonicaliseFile(f,out);
+                ec.canonicaliseFile(f,out,distinct);
             }
             else if (commandLine.hasOption("q")) {
                 ec.canonicaliseQuery(commandLine.getOptionValue("q"));

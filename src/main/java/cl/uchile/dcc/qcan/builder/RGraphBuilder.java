@@ -519,6 +519,10 @@ public class RGraphBuilder implements OpVisitor {
 		return graphStack.peek();
 	}
 
+	public RGraph getResultWithoutProjection() {
+		return graphStack.peek();
+	}
+
 //	public Op transitiveClosure(Op op) {
 //		if (op instanceof OpBGP) {
 //

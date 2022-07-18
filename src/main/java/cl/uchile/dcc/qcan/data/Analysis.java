@@ -2,6 +2,7 @@ package cl.uchile.dcc.qcan.data;
 
 import com.google.common.primitives.Doubles;
 import org.apache.commons.cli.*;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.jena.atlas.lib.Pair;
 
 import java.io.*;
@@ -35,9 +36,21 @@ public class Analysis {
 	private int paths = 0;
 	private int values = 0;
 
-	public Analysis(String s) throws FileNotFoundException{
+	public Analysis(String s) throws IOException {
+		this(s,false);
+	}
+
+	public Analysis(String s, boolean gZipped) throws IOException {
 		this.file = new File(s);
-		br = new BufferedReader(new FileReader(this.file));
+		if (gZipped) {
+			FileInputStream fileInputStream = new FileInputStream(this.file);
+			GzipCompressorInputStream gzipInputStream = new GzipCompressorInputStream(fileInputStream);
+			br = new BufferedReader(new InputStreamReader(gzipInputStream));
+		}
+		else {
+			br = new BufferedReader(new FileReader(this.file));
+		}
+
 	}
 	
 	public void read() throws IOException{
@@ -677,6 +690,7 @@ public class Analysis {
 		Option option_C = new Option("f", false, "Show summary of results partitioned by features.");
 		Option option_N = new Option("s", false, "Show summary of results partitioned by sets of features");
 		Option option_X = new Option("x", true, "Path to file containing results.");
+		Option option_G = new Option("g",false,"Set if file is gzipped.");
 		Options options = new Options();
 		CommandLineParser parser = new DefaultParser();
 
@@ -684,6 +698,7 @@ public class Analysis {
 		options.addOption(option_W);
 		options.addOption(option_N);
 		options.addOption(option_X);
+		options.addOption(option_G);
 
 		String header = "";
 		String footer = "";
@@ -693,7 +708,7 @@ public class Analysis {
 			commandLine = parser.parse(options, args);
 			if (commandLine.hasOption("x")){
 				String file = commandLine.getOptionValue("x");
-				Analysis analysis = new Analysis(file);
+				Analysis analysis = new Analysis(file,commandLine.hasOption("g"));
 				if (commandLine.hasOption("d")) {
 					analysis.displayInfo();
 				}

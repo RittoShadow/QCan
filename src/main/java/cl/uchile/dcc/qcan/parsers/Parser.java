@@ -2,6 +2,7 @@ package cl.uchile.dcc.qcan.parsers;
 
 import cl.uchile.dcc.qcan.data.FeatureCounter;
 import cl.uchile.dcc.qcan.main.SingleQuery;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.jena.ext.com.google.common.collect.HashMultiset;
 import org.apache.jena.ext.com.google.common.collect.Multiset;
 import org.apache.jena.ext.com.google.common.collect.TreeMultiset;
@@ -14,9 +15,13 @@ import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.OpWalker;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.zip.GZIPOutputStream;
 
 public abstract class Parser {
 
@@ -77,6 +82,76 @@ public abstract class Parser {
 					break;
 				}
 				if (i % 1000 == 0){
+					System.out.println(i + " queries read.");
+				}
+				if (i < offset){
+					i++;
+					continue;
+				}
+				try{
+					if (i == 0){
+						@SuppressWarnings("unused")
+						SingleQuery q = new SingleQuery(s, enableCanonical, enableRewrite, enableLeaning, paths, verbose);
+					}
+					this.parse(s);
+				}
+				catch (UnsupportedOperationException e){
+					unsupportedQueries++;
+					Query q = QueryFactory.create(s);
+					canonQueries.add(q.toString());
+					unsupportedQueriesList.add(e.getMessage() + ": " +s);
+				}
+				catch(QueryParseException e){
+					badSyntaxQueries++;
+					unsupportedQueriesList.add("Bad syntax: "+s);
+				}
+				catch (Exception e) {
+					otherUnspecifiedExceptions++;
+					unsupportedQueriesList.add(s + ":" +e.getMessage());
+				}
+				totalQueries++;
+				i++;
+			}
+			this.totalTime = System.currentTimeMillis() - t;
+			bw.write(getQueryInfo());
+			bw.close();
+			bf.close();
+			this.outputUnsupportedQueries();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void readGZFile(File f, File out, int upTo, int offset, boolean enableLeaning, boolean enableCanon, boolean enableRewrite, boolean paths) throws IOException{
+		String s;
+		int i = 0;
+		this.pathNormalisation = paths;
+		this.enableLeaning(enableLeaning);
+		this.enableCanonicalisation(enableCanon);
+		this.enableRewrite(enableRewrite);
+		try {
+			FileInputStream fileInputStream = new FileInputStream(f);
+			GzipCompressorInputStream gzipInputStream = new GzipCompressorInputStream(fileInputStream);
+//			TarArchiveInputStream tarArchiveInputStream = new TarArchiveInputStream(gzipInputStream);
+//			TarArchiveEntry tarArchiveEntry = null;
+//			if ((tarArchiveEntry = tarArchiveInputStream.getNextTarEntry()) != null) {
+//				bf = new BufferedReader(new InputStreamReader(tarArchiveInputStream));
+//			}
+//			else {
+//				System.exit(-1);
+//			}
+			bf = new BufferedReader(new InputStreamReader(gzipInputStream));
+			OutputStream os = Files.newOutputStream(out.toPath(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+			GZIPOutputStream gzip = new GZIPOutputStream(os);
+			OutputStreamWriter ow = new OutputStreamWriter(gzip, StandardCharsets.UTF_8);
+			bw = new BufferedWriter(ow);
+			long t = System.currentTimeMillis();
+			while ((s = bf.readLine())!=null){
+				if (i == upTo){
+					break;
+				}
+				if (i % 1000 == 0){
+					System.out.println(s);
 					System.out.println(i + " queries read.");
 				}
 				if (i < offset){
@@ -201,13 +276,26 @@ public abstract class Parser {
 	public void enableLeaning(boolean b){
 		this.enableLeaning = b;
 	}
+
+	public void getDistributionInfo(String filename) throws IOException {
+		getDistributionInfo(filename,false);
+	}
 	
-	public void getDistributionInfo(String filename) throws IOException{
+	public void getDistributionInfo(String filename, boolean gZipped) throws IOException{
 		int i = 0;
 		int max = 0;
 		File file = new File(resultPath + filename + "_dist"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
-		FileWriter fw = new FileWriter(file);
-		BufferedWriter bw = new BufferedWriter(fw);
+		BufferedWriter bw;
+		if (gZipped) {
+			OutputStream os = Files.newOutputStream(file.toPath(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+			GZIPOutputStream gzip = new GZIPOutputStream(os);
+			OutputStreamWriter ow = new OutputStreamWriter(gzip, StandardCharsets.UTF_8);
+			bw = new BufferedWriter(ow);
+		}
+		else {
+			FileWriter fw = new FileWriter(file);
+			bw = new BufferedWriter(fw);
+		}
 		bw.append("Distribution of canonicalised queries: \n");
 		bw.newLine();
 		for (Multiset.Entry<String> f : canonQueries.entrySet()){

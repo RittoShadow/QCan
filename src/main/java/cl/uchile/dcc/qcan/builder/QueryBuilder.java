@@ -964,7 +964,7 @@ public class QueryBuilder {
 		} else {
 			if (value.isLiteral()) {
 				if (value.getLiteralLexicalForm().replace("\"","").equals("*")) {
-					return NodeValue.makeString("*");
+					return null;
 				}
 				else {
 					String s = value.toString();

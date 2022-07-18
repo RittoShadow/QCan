@@ -4,12 +4,10 @@ import cl.uchile.dcc.qcan.builder.RGraphBuilder;
 import cl.uchile.dcc.qcan.main.RGraph;
 import cl.uchile.dcc.qcan.tools.BGPSort;
 import cl.uchile.dcc.qcan.tools.OpUtils;
-import org.apache.jena.graph.GraphUtil;
-import org.apache.jena.graph.Node;
-import org.apache.jena.graph.NodeFactory;
-import org.apache.jena.graph.Triple;
+import org.apache.jena.graph.*;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.Transformer;
+import org.apache.jena.sparql.algebra.op.OpFilter;
 import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
 import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
 import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
@@ -119,13 +117,21 @@ public class FilterVisitor implements ExprVisitor {
 
 	@Override
 	public void visit(ExprFunctionOp funcOp) {
-		Op op2 = OpUtils.UCQNormalisation(funcOp.getGraphPattern());
+		Op op2 = funcOp.getGraphPattern();
+		Node previous = null;
+		if (op2 instanceof OpFilter) {
+			previous = nodeStack.pop();
+			GraphExtract graphExtract = new GraphExtract(TripleBoundary.stopNowhere);
+			Graph subGraph = graphExtract.extract(previous,filterGraph.graph);
+			GraphUtil.deleteFrom(filterGraph.graph,subGraph);
+		}
+		op2 = OpUtils.UCQNormalisation(op2);
 		op2 = Transformer.transform(new TransformSimplify(), op2);
 		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
 		op2 = Transformer.transform(new TransformExtendCombine(), op2);
 		op2 = Transformer.transform(new BGPSort(), op2);
 		RGraphBuilder rb = new RGraphBuilder(op2);
-		RGraph r = rb.getResult();
+		RGraph r = rb.getResultWithoutProjection();
 		GraphUtil.addInto(filterGraph.graph, r.graph);
 		nodeStack.add(filterGraph.filterFunction(funcOp.getFunctionSymbol().getSymbol(),r.root));
 	}

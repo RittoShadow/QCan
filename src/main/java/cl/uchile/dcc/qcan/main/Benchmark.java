@@ -1,8 +1,8 @@
 package cl.uchile.dcc.qcan.main;
 
-import org.apache.commons.cli.*;
 import cl.uchile.dcc.qcan.parsers.JenaParser;
 import cl.uchile.dcc.qcan.parsers.QueryParser;
+import org.apache.commons.cli.*;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -19,6 +19,7 @@ public class Benchmark {
 	public boolean enableRewrite = false;
 	public boolean enableTrimming = false;
 	public boolean pathNormalisation = false;
+	public boolean gZipped = false;
 	
 	public Benchmark(String path) {
 		f = new File(path);
@@ -46,7 +47,7 @@ public class Benchmark {
 		File out;
 		String filename = f.getName();
 		if (filename.contains(".")) {
-			filename = filename.substring(0,filename.lastIndexOf("."));
+			filename = filename.substring(0,filename.indexOf("."));
 		}
 		if (enableTrimming){
 			out = new File("resultFiles/jena/" + filename + "_labelOnly_results"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
@@ -56,7 +57,7 @@ public class Benchmark {
 			jp = new JenaParser();
 			jp.read(f,out,upTo,offset);
 			if (printDist){
-				jp.getDistributionInfo(filename);
+				jp.getDistributionInfo(filename,gZipped);
 			}
 		}
 		else{
@@ -74,9 +75,14 @@ public class Benchmark {
 				out.createNewFile();
 			}
 			pq = new QueryParser();
-			pq.read(f, out, upTo, offset, enableLeaning, enableCanonicalisation, enableRewrite, pathNormalisation);
+			if (gZipped) {
+				pq.readGZFile(f, out, upTo, offset, enableLeaning, enableCanonicalisation, enableRewrite, pathNormalisation);
+			}
+			else {
+				pq.read(f, out, upTo, offset, enableLeaning, enableCanonicalisation, enableRewrite, pathNormalisation);
+			}
 			if (printDist){
-				pq.getDistributionInfo(filename);
+				pq.getDistributionInfo(filename,gZipped);
 			}
 		}
 //		writeToFile("resultFiles/canon"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log", thirdOutput);
@@ -119,6 +125,7 @@ public class Benchmark {
 	    Option option_J = new Option("j", false, "Set to enable the Jena parser. If set as well as -c, it overrides the option.");
 	    Option option_P = new Option("p", false, "Set to enable path normalisation.");
 	    Option option_R = new Option("r",false,"Set to rewrite queries.");
+	    Option option_G = new Option("g",false,"Set if input is gzip file. Results will also be zipped.");
 	    Options options = new Options();
 	    CommandLineParser parser = new DefaultParser();
 
@@ -132,6 +139,7 @@ public class Benchmark {
 	    options.addOption(option_P);
 	    options.addOption(option_R);
 	    options.addOption(option_OFF);
+	    options.addOption(option_G);
 
 	    String header = "";
 	    String footer = "";
@@ -177,6 +185,7 @@ public class Benchmark {
 	        	else{
 	        		b = new Benchmark(file, enableLeaning, enableCanonicalisation, enableRewrite, pathNormalisation);
 	        	}
+	        	b.gZipped = commandLine.hasOption("g");
 	    		b.execute(upTo, offset, commandLine.hasOption("d"));
 	    		System.exit(0);
 	        }

@@ -1653,8 +1653,8 @@ public class RGraph {
             result.remove(e);
         }
         time = System.nanoTime() - time;
-        System.out.println("Containment checks: " + time + " ns");
-        System.out.println("Number of containment checks: " + numberOfChecks);
+        //System.out.println("Containment checks: " + time + " ns");
+        //System.out.println("Number of containment checks: " + numberOfChecks);
         return result;
     }
 
