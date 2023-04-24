@@ -93,6 +93,14 @@ For example, assuming if we want to canonicalise and minimise a text file "queri
 output the results to "canonicalisedQueries.txt":
 
 > java -jar qcan-1.1-jar-with-dependencies.jar easy -f queries.txt -o canonicalisedQueries.txt -m
+    
+If we want to do the same but remove duplicate queries in the output:
+    
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -f queries.txt -o canonicalisedQueries.txt -m -d
+
+If want to remove duplicate queries from a file based on their canonicalised version, but keep the original query syntax in the output:
+    
+> java -jar qcan-1.1-jar-with-dependencies.jar easy -f queries.txt -o canonicalisedQueries.txt -m -d -k
 
 OR you can pass a single query as an argument:
 
@@ -105,6 +113,8 @@ e.g.
 
 Options:
 * -m to enable minimisation/leaning
+* -d to remove duplicates based on canonicalised query
+* -k to keep original query syntax in the output rather than outputting canonicalised queries (only makes sense with -d to remove duplicates; keeps the first non-duplicated query encountered).
 
 ### UCQ Generator Test
 
