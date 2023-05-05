@@ -132,7 +132,8 @@ public class FilterVisitor implements ExprVisitor {
 		op2 = Transformer.transform(new BGPSort(), op2);
 		RGraphBuilder rb = new RGraphBuilder(op2);
 		RGraph r = rb.getResultWithoutProjection();
-		GraphUtil.addInto(filterGraph.graph, r.graph);
+		//GraphUtil.addInto(filterGraph.graph, r.graph);
+		filterGraph.merge(r);
 		nodeStack.add(filterGraph.filterFunction(funcOp.getFunctionSymbol().getSymbol(),r.root));
 	}
 

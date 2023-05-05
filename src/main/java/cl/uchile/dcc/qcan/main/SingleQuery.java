@@ -79,6 +79,7 @@ public class SingleQuery {
 			canonGraph = this.graph;
 			minimisationTime = graphTime;
 		}
+		buildQuery();
 	}
 
 	public SingleQuery(String q, boolean canon, boolean rewrite, boolean minimise, boolean pathNormalisation, boolean verbose) throws HashCollisionException, InterruptedException {
@@ -96,7 +97,7 @@ public class SingleQuery {
 			canonGraph = this.graph;
 			minimisationTime = graphTime;
 		}
-
+		buildQuery();
 	}
 	
 	public SingleQuery(Op op) throws InterruptedException, HashCollisionException {
@@ -260,8 +261,8 @@ public class SingleQuery {
 	}
 	
 	public static void main(String[] args) throws InterruptedException, HashCollisionException, IOException {
-		String q = "SELECT DISTINCT ?var1  ?var1Label  WHERE {   ?var1  <http://www.wikidata.org/prop/direct/P31>  <http://www.wikidata.org/entity/Q6256> .   ?var1  <http://www.wikidata.org/prop/P1081>  ?var2 .   ?var2  <http://www.wikidata.org/prop/statement/P1081>  ?var3 .   ?var2  <http://www.wikidata.org/prop/qualifier/P585>  ?var4 .  FILTER (  (  NOT EXISTS  {    ?var1 ( <http://www.wikidata.org/prop/P1081> / <http://www.wikidata.org/prop/qualifier/P585> ) ?var5 .  FILTER (   ( (  ?var5  >  ?var4  ) )  ) .  }  )  ) .  FILTER (  (  EXISTS  {    ?var1  <http://www.wikidata.org/prop/P1081>  ?var6 .    ?var6  <http://www.wikidata.org/prop/statement/P1081>  ?var7 .    ?var6  <http://www.wikidata.org/prop/qualifier/P585>  ?var8 .  FILTER (   ( (  ?var7  >  ?var3  ) )  ) .  }  )  ) .  SERVICE  <http://wikiba.se/ontology#label>   {     <http://www.bigdata.com/rdf#serviceParam>  <http://wikiba.se/ontology#language>  \"en\".   } }\n";
-		SingleQuery sq = new SingleQuery(q,true,true, true,true,false);
+		String q = "SELECT  ?var1 ?var2 WHERE   { VALUES ?var2 { \"string1\" \"string2\" \"string3\" \"string4\" \"string5\" \"string6\" \"string7\" \"string8\" \"string9\" \"string10\" \"string11\" \"string12\" \"string13\" \"string14\" \"string15\" \"string16\" \"string17\" \"string18\" \"string19\" \"string20\" \"string21\" \"string22\" \"string23\" \"string24\" \"string25\" \"string26\" \"string27\" \"string28\" \"string29\" \"string30\" }     ?var1  <http://www.wikidata.org/prop/direct/P434>  ?var2   }";
+		SingleQuery sq = new SingleQuery(q,true,true, false,true,false);
 		sq.getCanonicalGraph().print();
 		String query1 = sq.getQuery();
 		System.out.println(query1);

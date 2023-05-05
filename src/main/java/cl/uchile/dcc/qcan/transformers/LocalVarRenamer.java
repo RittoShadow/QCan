@@ -1,7 +1,6 @@
 package cl.uchile.dcc.qcan.transformers;
 
 import cl.uchile.dcc.qcan.tools.OpUtils;
-import cl.uchile.dcc.qcan.visitors.OpRenamer;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.TransformCopy;
 import org.apache.jena.sparql.algebra.op.OpFilter;

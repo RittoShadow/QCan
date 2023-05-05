@@ -1,15 +1,22 @@
 package cl.uchile.dcc.qcan.generate;
 
 import cl.uchile.dcc.blabel.label.GraphColouring.HashCollisionException;
+import cl.uchile.dcc.qcan.builder.RGraphBuilder;
 import cl.uchile.dcc.qcan.main.RGraph;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
+import org.apache.jena.sparql.algebra.Op;
+import org.apache.jena.sparql.algebra.op.OpBGP;
+import org.apache.jena.sparql.algebra.op.OpDistinct;
+import org.apache.jena.sparql.algebra.op.OpProject;
+import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.Var;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Collections;
 
 public class BGPGenerator extends Generator {
 	protected Node predicate;
@@ -41,18 +48,26 @@ public class BGPGenerator extends Generator {
 	}
 	
 	public RGraph generateGraph(){
-		RGraph ans = new RGraph(this.triples,this.vars);
-		ans.project(vars.subList(0, 1));
-		ans.setDistinctNode(true);
-		ans.turnDistinctOn();
+		BasicPattern bp = new BasicPattern();
+		for (Triple triple : triples) {
+			bp.add(triple);
+		}
+		Op op = new OpBGP(bp);
+		Collections.shuffle(vars);
+		op = OpDistinct.create(new OpProject(op,Collections.singletonList(vars.get(0))));
+		RGraphBuilder rGraphBuilder = new RGraphBuilder(op);
+		RGraph ans = rGraphBuilder.getResult();
+//		ans.project(Utils.randomSample(vars));
+//		ans.setDistinctNode(true);
+//		ans.turnDistinctOn();
 		return ans;
 	}
 	
-	public void printStats() throws InterruptedException, HashCollisionException, IOException{
+	public void printStats(String string) throws InterruptedException, HashCollisionException, IOException{
 		int initialNodes, finalNodes, initialVars, finalVars, initialTriples, finalTriples;
 		generateTriples();
 		RGraph e = generateGraph();	
-		String output = "";
+		String output = string + "\t";
 		initialNodes = e.getNumberOfNodes();
 		initialVars = e.getNumberOfVars();
 		initialTriples = e.getNumberOfTriples();
@@ -72,9 +87,16 @@ public class BGPGenerator extends Generator {
 		System.out.println(output);
 	}
 	
-	public static void main(String[] args) throws IOException, InterruptedException, HashCollisionException{
-		BGPGenerator g = new BGPGenerator(new File("eval/lattice/lattice-4"));
-		g.printStats();
+	public static void main(String[] args){
+		try {
+			File file = new File(args[0]);
+			BGPGenerator g = new BGPGenerator(file);
+			g.printStats(file.getName());
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+
 	}
 
 }

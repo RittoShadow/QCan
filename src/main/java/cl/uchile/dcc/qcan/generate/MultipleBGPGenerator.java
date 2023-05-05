@@ -18,16 +18,16 @@ import java.util.Calendar;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class MultipleGenerator implements FileVisitor<Path> {
+public class MultipleBGPGenerator implements FileVisitor<Path> {
 	
 	Path startingFile;
 	public File file;
 	public FileWriter fw;
 	public BufferedWriter bw;
 	private long timeout = 60*10*1000;
-	Queue<String> queue = new LinkedBlockingQueue<String>();
+	Queue<String> queue = new LinkedBlockingQueue<>();
 	
-	public MultipleGenerator(Path p) throws IOException{
+	public MultipleBGPGenerator(Path p) throws IOException{
 		this.startingFile = p;	
 		this.file = new File("resultFiles/leaning/result"+new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime())+".log");
 		if (!this.file.exists()){
@@ -53,41 +53,40 @@ public class MultipleGenerator implements FileVisitor<Path> {
 	@Override
 	public FileVisitResult visitFile(final Path file, BasicFileAttributes attrs) throws IOException {
 		System.out.println(file);
-		Thread slave = new Thread(new Runnable(){
-			@Override
-			public void run() {
-				int initialNodes, finalNodes, initialVars, finalVars, initialTriples, finalTriples;
-				BGPGenerator g;
-				try {
-					g = new BGPGenerator(file.toFile());
-					g.generateTriples();
-					RGraph e = g.generateGraph();
-					String output = "";
-					initialNodes = e.getNumberOfNodes();
-					initialVars = e.getNumberOfVars();
-					initialTriples = e.getNumberOfTriples();
-					long t = System.nanoTime();
-					RGraph a = e.getCanonicalForm(false);
-					t = System.nanoTime() - t;
-					finalNodes = a.getNumberOfNodes();
-					finalVars = a.getNumberOfVars();
-					finalTriples = a.getNumberOfTriples();
-					output += file.getFileName() + "\t";
-					output += t + "\t";
-					output += initialNodes + "\t";
-					output += finalNodes + "\t";
-					output += initialVars + "\t";
-					output += finalVars + "\t";
-					output += initialTriples +"\t";
-					output += finalTriples;
-					queue.add(output);
-				} catch (InterruptedException | HashCollisionException | IOException e2) {
-					System.err.println(e2.getMessage());
-				} catch (StackOverflowError e){
-					return;
-				}
+		Thread slave = new Thread(() -> {
+			int initialNodes, finalNodes, initialVars, finalVars, initialTriples, finalTriples;
+			BGPGenerator g;
+			try {
+				g = new BGPGenerator(file.toFile());
+				g.generateTriples();
+				RGraph e = g.generateGraph();
+				String output = "";
+				initialNodes = e.getNumberOfNodes();
+				initialVars = e.getNumberOfVars();
+				initialTriples = e.getNumberOfTriples();
+				long t = System.nanoTime();
+				RGraph a = e.getCanonicalForm(false);
+				t = System.nanoTime() - t;
+				finalNodes = a.getNumberOfNodes();
+				finalVars = a.getNumberOfVars();
+				finalTriples = a.getNumberOfTriples();
+				output += file.getFileName() + "\t";
+				output += t + "\t";
+				output += initialNodes + "\t";
+				output += finalNodes + "\t";
+				output += initialVars + "\t";
+				output += finalVars + "\t";
+				output += initialTriples +"\t";
+				output += finalTriples;
+				queue.add(output);
+			} catch (InterruptedException | HashCollisionException | IOException e2) {
+				System.err.println(e2.getMessage());
+			} catch (StackOverflowError e){
+				return;
 			}
-			
+			catch (OutOfMemoryError e) {
+				return;
+			}
 		});
 		slave.start();
 		try {
@@ -127,12 +126,13 @@ public class MultipleGenerator implements FileVisitor<Path> {
 	    try{
 		    commandLine = parser.parse(options, args);
 			Path p = new File(commandLine.getOptionValue("x")).toPath();
-			MultipleGenerator mg = new MultipleGenerator(p);
+			MultipleBGPGenerator mg = new MultipleBGPGenerator(p);
 			if (commandLine.hasOption("t")){
 				mg.setTimeout(Long.parseLong(commandLine.getOptionValue("t")));
 			}
 			mg.start();
 			mg.done();
+			System.exit(0);
 	    }
 	    catch (ParseException exception){
 	        System.out.print("Parse error: ");

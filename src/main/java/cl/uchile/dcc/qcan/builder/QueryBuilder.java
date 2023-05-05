@@ -4,7 +4,7 @@ import cl.uchile.dcc.qcan.main.RGraph;
 import cl.uchile.dcc.qcan.tools.CommonNodes;
 import cl.uchile.dcc.qcan.tools.OpUtils;
 import cl.uchile.dcc.qcan.tools.PathUtils;
-import cl.uchile.dcc.qcan.visitors.OpRenamer;
+import cl.uchile.dcc.qcan.transformers.OpRenamer;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.ext.com.google.common.collect.BiMap;
 import org.apache.jena.ext.com.google.common.collect.HashBiMap;
@@ -800,6 +800,7 @@ public class QueryBuilder {
 		Op ans = null;
 		Table t = TableFactory.create();
 		ExtendedIterator<Node> rows = GraphUtil.listObjects(graph, n, CommonNodes.argNode);
+		List<BindingMap> bindingMapList = new ArrayList<>();
 		while (rows.hasNext()) {
 			BindingMap b = BindingFactory.create();
 			Node row = rows.next();
@@ -813,8 +814,10 @@ public class QueryBuilder {
 			}
 			if (!b.isEmpty()) {
 				t.addBinding(b);
+				bindingMapList.add(b);
 			}
 		}
+		//SORT?
 		ans = OpTable.create(t);
 		if (t.isEmpty()) {
 			ans = OpTable.unit();
@@ -1221,6 +1224,9 @@ public class QueryBuilder {
 			else if (type.equals(CommonNodes.notNode)) {
 				Node args = GraphUtil.listObjects(graph, n, CommonNodes.argNode).next();
 				e = new E_LogicalNot(nodeToExpr(args));
+			}
+			else if (type.equals(CommonNodes.varNode)) {
+				return argToExpr(n);
 			}
 		}
 		else {

@@ -1,6 +1,5 @@
 package cl.uchile.dcc.qcan.transformers;
 
-import cl.uchile.dcc.qcan.visitors.OpRenamer;
 import cl.uchile.dcc.qcan.visitors.TopDownVisitor;
 import org.apache.jena.query.*;
 import org.apache.jena.sparql.algebra.Op;

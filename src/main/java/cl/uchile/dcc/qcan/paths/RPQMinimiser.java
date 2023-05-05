@@ -7,7 +7,7 @@ import cl.uchile.dcc.qcan.tools.CommonNodes;
 import cl.uchile.dcc.qcan.tools.OpUtils;
 import cl.uchile.dcc.qcan.tools.Utils;
 import cl.uchile.dcc.qcan.transformers.UCQTransformer;
-import cl.uchile.dcc.qcan.visitors.OpRenamer;
+import cl.uchile.dcc.qcan.transformers.OpRenamer;
 import cl.uchile.dcc.qcan.visitors.TopDownVisitor;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang3.StringUtils;

@@ -4,11 +4,8 @@ import cl.uchile.dcc.qcan.main.RGraph;
 import cl.uchile.dcc.qcan.op.OpWDLeftJoin;
 import cl.uchile.dcc.qcan.paths.PGraph;
 import cl.uchile.dcc.qcan.paths.PathTransform;
-import cl.uchile.dcc.qcan.tools.BGPSort;
 import cl.uchile.dcc.qcan.tools.OpUtils;
-import cl.uchile.dcc.qcan.transformers.*;
 import cl.uchile.dcc.qcan.visitors.FilterVisitor;
-import com.github.jsonldjava.shaded.com.google.common.collect.Sets;
 import org.apache.jena.atlas.lib.SetUtils;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
@@ -17,9 +14,6 @@ import org.apache.jena.query.QueryType;
 import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.*;
 import org.apache.jena.sparql.algebra.op.*;
-import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
-import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
-import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
 import org.apache.jena.sparql.algebra.walker.Walker;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
@@ -67,7 +61,7 @@ public class RGraphBuilder implements OpVisitor {
 	
 	public RGraphBuilder(Op op) {
 		this.op = op;
-		this.op = rewrite(this.op);
+		this.op = OpUtils.rewrite(this.op,Collections.emptyList()); //@TODO Empty list or not?
 		OpWalker.walk(this.op, this);
 	}
 	
@@ -91,7 +85,7 @@ public class RGraphBuilder implements OpVisitor {
 		op = Algebra.compile(query);
 		if (rewrite) {
 			long normalTime = System.nanoTime();
-			op = rewrite(op);
+			op = OpUtils.rewrite(op,projectionVars);
 			this.rewriteTime = System.nanoTime() - normalTime;
 		}
 		this.totalVars = OpUtils.varsContainedIn(op);
@@ -651,246 +645,25 @@ public class RGraphBuilder implements OpVisitor {
 //		}
 //		return op1;
 //	}
-	
-	public Op UCQNormalisation(Op op) {
-		Op op1 = op;
-		Op op2 = op;
-		do {
-			op1 = op2;
-			op2 = Transformer.transform(new FilterTransform(), op2);
-			op2 = Transformer.transform(new UCQTransformer(), op2);
-			op2 = Transformer.transform(new TransformPath(), op2);
-			op2 = Transformer.transform(new NotOneOfTransform(), op2);
-		}
-		while (!op1.equals(op2));
-		return op2;
-	}
 
-	public Op WellDesignedPatternNormalisation(Op op) {
-		Op op1 = op;
-		Op op2 = op;
-		do {
-			op1 = op2;
-			op2 = Transformer.transform(new WellDesignedTransformer(op),op2);
-		}
-		while (!op1.equals(op2));
-		return op2;
-	}
-
-	public boolean isWellDesigned(Op op) {
-		final boolean[] ans = {true};
-		OpWalker.walk(op, new OpVisitor() {
-			@Override
-			public void visit(OpBGP opBGP) {
-
-			}
-
-			@Override
-			public void visit(OpQuadPattern opQuadPattern) {
-
-			}
-
-			@Override
-			public void visit(OpQuadBlock opQuadBlock) {
-
-			}
-
-			@Override
-			public void visit(OpTriple opTriple) {
-
-			}
-
-			@Override
-			public void visit(OpQuad opQuad) {
-
-			}
-
-			@Override
-			public void visit(OpPath opPath) {
-
-			}
-
-			@Override
-			public void visit(OpFind opFind) {
-
-			}
-
-			@Override
-			public void visit(OpTable opTable) {
-
-			}
-
-			@Override
-			public void visit(OpNull opNull) {
-
-			}
-
-			@Override
-			public void visit(OpProcedure opProcedure) {
-
-			}
-
-			@Override
-			public void visit(OpPropFunc opPropFunc) {
-
-			}
-
-			@Override
-			public void visit(OpFilter opFilter) {
-				Set<Var> subVars = OpUtils.varsContainedIn(opFilter.getSubOp());
-				if (opFilter.getExprs() != null) {
-					if (opFilter.getExprs().getVarsMentioned() != null) {
-						Set<Var> filterVars = opFilter.getExprs().getVarsMentioned();
-						for (Var var : filterVars) {
-							if (!subVars.contains(var)) {
-								ans[0] = false;
-								break;
-							}
-						}
-					}
-				}
-			}
-
-			@Override
-			public void visit(OpGraph opGraph) {
-
-			}
-
-			@Override
-			public void visit(OpService opService) {
-
-			}
-
-			@Override
-			public void visit(OpDatasetNames opDatasetNames) {
-
-			}
-
-			@Override
-			public void visit(OpLabel opLabel) {
-
-			}
-
-			@Override
-			public void visit(OpAssign opAssign) {
-
-			}
-
-			@Override
-			public void visit(OpExtend opExtend) {
-
-			}
-
-			@Override
-			public void visit(OpJoin opJoin) {
-
-			}
-
-			@Override
-			public void visit(OpLeftJoin opLeftJoin) {
-				Set<Var> outerVars = OpUtils.varsContainedInExcept(op,opLeftJoin);
-				Set<Var> leftVars = OpUtils.varsContainedIn(opLeftJoin.getLeft());
-				Set<Var> rightVars = OpUtils.varsContainedIn(opLeftJoin.getRight());
-				Set<Var> intersection = Sets.intersection(outerVars,rightVars);
-				for (Var var : intersection) {
-					if (!leftVars.contains(var)) {
-						ans[0] = false;
-						break;
-					}
-				}
-			}
-
-			@Override
-			public void visit(OpUnion opUnion) {
-				ans[0] = false;
-			}
-
-			@Override
-			public void visit(OpDiff opDiff) {
-
-			}
-
-			@Override
-			public void visit(OpMinus opMinus) {
-
-			}
-
-			@Override
-			public void visit(OpConditional opConditional) {
-
-			}
-
-			@Override
-			public void visit(OpSequence opSequence) {
-
-			}
-
-			@Override
-			public void visit(OpDisjunction opDisjunction) {
-
-			}
-
-			@Override
-			public void visit(OpList opList) {
-
-			}
-
-			@Override
-			public void visit(OpOrder opOrder) {
-
-			}
-
-			@Override
-			public void visit(OpProject opProject) {
-
-			}
-
-			@Override
-			public void visit(OpReduced opReduced) {
-
-			}
-
-			@Override
-			public void visit(OpDistinct opDistinct) {
-
-			}
-
-			@Override
-			public void visit(OpSlice opSlice) {
-
-			}
-
-			@Override
-			public void visit(OpGroup opGroup) {
-
-			}
-
-			@Override
-			public void visit(OpTopN opTopN) {
-
-			}
-		});
-		return ans[0];
-	}
-
-	public Op rewrite(Op op) {
-//		op1 = transitiveClosure(op1);
-		Op op2 = op;
-		op2 = Transformer.transform(new RemoveUnboundVariables(),op2);
-		op2 = UCQNormalisation(op2);
-//		op2 = uC2RPQCollapse(op2);
-//		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
-//		op2 = Transformer.transform(new BGPCollapser(op2,this.projectionVars,false), op2); // transform BGPs
-		BranchRenamer br = new BranchRenamer();
-		op2 = br.visit(op2);
-		op2 = Transformer.transform(new LocalVarRenamer(this.projectionVars), op2);
-		op2 = WellDesignedPatternNormalisation(op2);
-		op2 = Transformer.transform(new RemoveUnsatisfiableBGPs(), op2);
-		op2 = Transformer.transform(new TransformSimplify(), op2);
-		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
-		op2 = Transformer.transform(new TransformExtendCombine(), op2);
-		op2 = Transformer.transform(new BGPSort(), op2);
-		return op2;
-	}
+//	public Op rewrite(Op op) {
+////		op1 = transitiveClosure(op1);
+//		Op op2 = op;
+//		op2 = Transformer.transform(new RemoveUnboundVariables(),op2);
+//		op2 = UCQNormalisation(op2);
+////		op2 = uC2RPQCollapse(op2);
+////		op2 = Transformer.transform(new BGPCollapser(op2, this.projectionVars, true), op2); // transform all sequences
+////		op2 = Transformer.transform(new BGPCollapser(op2,this.projectionVars,false), op2); // transform BGPs
+//		BranchRenamer br = new BranchRenamer();
+//		op2 = br.visit(op2);
+//		op2 = Transformer.transform(new LocalVarRenamer(this.projectionVars), op2);
+//		op2 = WellDesignedPatternNormalisation(op2);
+//		op2 = Transformer.transform(new RemoveUnsatisfiableBGPs(), op2);
+//		op2 = Transformer.transform(new TransformSimplify(), op2);
+//		op2 = Transformer.transform(new TransformMergeBGPs(), op2);
+//		op2 = Transformer.transform(new TransformExtendCombine(), op2);
+//		op2 = Transformer.transform(new BGPSort(), op2);
+//		return op2;
+//	}
 
 }

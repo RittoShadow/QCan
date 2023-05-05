@@ -58,4 +58,5 @@ public class CommonNodes {
     public static final Node epsilon = NodeFactory.createURI(URI + "epsilon");
     public static final Node finalNode = NodeFactory.createURI(URI + "final");
     public static final Node nullNode = NodeFactory.createURI(URI + "null");
+    public static final Node constantNode = NodeFactory.createURI(URI + "constant");
 }

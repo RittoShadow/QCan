@@ -1,9 +1,6 @@
 package cl.uchile.dcc.qcan.tools;
 
-import cl.uchile.dcc.qcan.transformers.FilterTransform;
-import cl.uchile.dcc.qcan.transformers.NotOneOfTransform;
-import cl.uchile.dcc.qcan.transformers.TransformPath;
-import cl.uchile.dcc.qcan.transformers.UCQTransformer;
+import cl.uchile.dcc.qcan.transformers.*;
 import com.google.common.collect.Sets;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
@@ -11,6 +8,9 @@ import org.apache.jena.query.SortCondition;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.op.*;
+import org.apache.jena.sparql.algebra.optimize.TransformExtendCombine;
+import org.apache.jena.sparql.algebra.optimize.TransformMergeBGPs;
+import org.apache.jena.sparql.algebra.optimize.TransformSimplify;
 import org.apache.jena.sparql.core.BasicPattern;
 import org.apache.jena.sparql.core.TriplePath;
 import org.apache.jena.sparql.core.Var;
@@ -20,6 +20,46 @@ import org.apache.jena.sparql.expr.ExprList;
 import java.util.*;
 
 public class OpUtils {
+
+    public static Op rewrite(Op op, Collection<Var> projectionVars) {
+        Op op2 = op;
+        op2 = Transformer.transform(new RemoveUnboundVariables(),op2);
+        op2 = UCQNormalisation(op2);
+        BranchRenamer br = new BranchRenamer();
+        op2 = br.visit(op2);
+        op2 = Transformer.transform(new LocalVarRenamer(projectionVars), op2);
+        op2 = WellDesignedPatternNormalisation(op2);
+        op2 = Transformer.transform(new RemoveUnsatisfiableBGPs(), op2);
+        op2 = Transformer.transform(new TransformSimplify(), op2);
+        op2 = Transformer.transform(new TransformMergeBGPs(), op2);
+        op2 = Transformer.transform(new TransformExtendCombine(), op2);
+        op2 = Transformer.transform(new BGPSort(), op2);
+        return op2;
+    }
+
+    public static Op rewrite(Op op) {
+        Op op2 = op;
+        op2 = Transformer.transform(new RemoveUnboundVariables(),op2);
+        op2 = UCQNormalisation(op2);
+        op2 = WellDesignedPatternNormalisation(op2);
+        op2 = Transformer.transform(new RemoveUnsatisfiableBGPs(), op2);
+        op2 = Transformer.transform(new TransformSimplify(), op2);
+        op2 = Transformer.transform(new TransformMergeBGPs(), op2);
+        op2 = Transformer.transform(new TransformExtendCombine(), op2);
+        op2 = Transformer.transform(new BGPSort(), op2);
+        return op2;
+    }
+
+    public static Op WellDesignedPatternNormalisation(Op op) {
+        Op op1 = op;
+        Op op2 = op;
+        do {
+            op1 = op2;
+            op2 = Transformer.transform(new WellDesignedTransformer(op),op2);
+        }
+        while (!op1.equals(op2));
+        return op2;
+    }
 
     public static Set<Var> safeVars(Op op) {
         Set<Var> ans = new HashSet<>();
@@ -181,8 +221,14 @@ public class OpUtils {
         else if (op instanceof OpOrder) {
             List<SortCondition> sortConditionList = ((OpOrder) op).getConditions();
             for (SortCondition condition : sortConditionList) {
-                ans.addAll(condition.getExpression().getVarsMentioned());
+                if (condition.getExpression().isVariable()) {
+                    ans.add(condition.getExpression().asVar());
+                }
+                else {
+                    ans.addAll(condition.getExpression().getVarsMentioned());
+                }
             }
+            ans.addAll(varsContainedInExcept(((OpOrder) op).getSubOp(),exception));
         }
         else if (op instanceof Op1) {
             Op subOp = ((Op1) op).getSubOp();
@@ -290,8 +336,15 @@ public class OpUtils {
         else if (op instanceof OpOrder) {
             List<SortCondition> sortConditionList = ((OpOrder) op).getConditions();
             for (SortCondition condition : sortConditionList) {
-                ans.addAll(condition.getExpression().getVarsMentioned());
+                if (condition.getExpression() != null) {
+                    if (condition.getExpression().isVariable()) {
+                        ans.add(condition.getExpression().asVar());
+                    } else {
+                        ans.addAll(condition.getExpression().getVarsMentioned());
+                    }
+                }
             }
+            ans.addAll(varsContainedIn(((OpOrder) op).getSubOp()));
         }
         else if (op instanceof Op1) {
             Op subOp = ((Op1) op).getSubOp();
@@ -388,8 +441,14 @@ public class OpUtils {
         else if (op instanceof OpOrder) {
             List<SortCondition> sortConditionList = ((OpOrder) op).getConditions();
             for (SortCondition condition : sortConditionList) {
-                ans.addAll(condition.getExpression().getVarsMentioned());
+                if (condition.getExpression().isVariable()) {
+                    ans.add(condition.getExpression().asVar());
+                }
+                else {
+                    ans.addAll(condition.getExpression().getVarsMentioned());
+                }
             }
+            ans.addAll(allVarsContainedIn(((OpOrder) op).getSubOp()));
         }
         else if (op instanceof Op1) {
             Op subOp = ((Op1) op).getSubOp();
@@ -410,7 +469,7 @@ public class OpUtils {
     }
 
     public static boolean isWellDesigned(Op op) {
-        return isWellDesigned(op,new HashSet<>());
+        return isWellDesigned(op,Collections.emptySet());
     }
 
     public static boolean isWellDesigned(Op op, Set<Var> outerVars) {

@@ -2,7 +2,8 @@ package cl.uchile.dcc.qcan.main;
 
 import cl.uchile.dcc.blabel.label.GraphColouring;
 import cl.uchile.dcc.qcan.data.Analysis;
-import cl.uchile.dcc.qcan.generate.MultipleGenerator;
+import cl.uchile.dcc.qcan.generate.BGPGenerator;
+import cl.uchile.dcc.qcan.generate.MultipleBGPGenerator;
 import cl.uchile.dcc.qcan.generate.UCQGeneratorTest;
 import cl.uchile.dcc.qcan.generate.WellDesignedPatternGenerator;
 import cl.uchile.dcc.qcan.parsers.BGPParser;
@@ -36,7 +37,7 @@ public class Launcher {
                 SingleQuery.main(args1);
             }
             else if (exec.equals("multi")) {
-                MultipleGenerator.main(args1);
+                MultipleBGPGenerator.main(args1);
             }
             else if (exec.equals("analysis")) {
                 Analysis.main(args1);
@@ -49,6 +50,12 @@ public class Launcher {
             }
             else if (exec.equals("bgp")) {
                 BGPParser.main(args1);
+            }
+            else if (exec.equals("synthetic")) {
+                MultipleBGPGenerator.main(args1);
+            }
+            else if (exec.equals("gen")) {
+                BGPGenerator.main(args1);
             }
         }
     }

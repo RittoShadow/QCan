@@ -38,7 +38,7 @@ public class BGPParser extends Parser {
 
     public static void main(String[] args) throws IOException {
         BGPParser bgpParser = new BGPParser();
-        String filename = "clean_SWDF.txt";
+        String filename = args[0];
         bgpParser.read(new File(filename),new File("bgp_" + filename),-1,true,true,true);
     }
 }

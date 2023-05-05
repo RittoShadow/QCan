@@ -1,4 +1,4 @@
-package cl.uchile.dcc.qcan.visitors;
+package cl.uchile.dcc.qcan.transformers;
 
 import org.apache.jena.atlas.lib.RandomLib;
 import org.apache.jena.graph.Node;
