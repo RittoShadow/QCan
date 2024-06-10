@@ -34,8 +34,12 @@ public class EasyCanonicalisation {
     public void canonicaliseFile(File in, File out) throws GraphColouring.HashCollisionException, InterruptedException, IOException {
         canonicaliseFile(in,out,false);
     }
-
+    
     public void canonicaliseFile(File in, File out, boolean distinct) throws IOException, GraphColouring.HashCollisionException, InterruptedException {
+    	canonicaliseFile(in,out,distinct,false);
+    }
+
+    public void canonicaliseFile(File in, File out, boolean distinct, boolean keep) throws IOException, GraphColouring.HashCollisionException, InterruptedException {
         String s;
         BufferedReader br;
         BufferedWriter bw;
@@ -76,16 +80,13 @@ public class EasyCanonicalisation {
                 System.err.println("Failed at: \n" + s);
             }
             q = q.replace("\n"," ");
-            if (distinct) {
-                if (!distinctQueries.contains(q)) {
-                    distinctQueries.add(q);
-                    bw.append(q);
-                    bw.newLine();
-                }
-            }
-            else {
-                bw.append(q);
-                bw.newLine();
+            if (!distinct || distinctQueries.add(q)) {
+            	if(keep) {
+            		bw.append(s);
+            	} else {
+            		bw.append(q);
+            	}
+            	bw.newLine();
             }
         }
         bw.close();
@@ -101,6 +102,7 @@ public class EasyCanonicalisation {
         Option option_O = new Option("o",true,"Output file");
         Option option_D = new Option("d",false,"Set to avoid writing duplicate queries in output file.");
         Option option_G = new Option("g",false,"Set if input is gzip file. Results will also be zipped.");
+        Option option_K = new Option("k",false,"Keep original query syntax");
         option_F.setArgName("filename");
         option_Q.setArgName("query");
         option_O.setArgName("output");
@@ -111,6 +113,7 @@ public class EasyCanonicalisation {
         options.addOption(option_O);
         options.addOption(option_D);
         options.addOption(option_G);
+        options.addOption(option_K);
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
         formatter.printHelp("easy", header, options, footer, true);
@@ -124,6 +127,7 @@ public class EasyCanonicalisation {
                 String filename = commandLine.getOptionValue("f");
                 String output = "";
                 boolean distinct = commandLine.hasOption("d");
+                boolean keep = commandLine.hasOption("k");
                 File f = new File(filename);
                 if (commandLine.hasOption("o")) {
                     output = commandLine.getOptionValue("o");
@@ -136,7 +140,7 @@ public class EasyCanonicalisation {
                 if (!out.exists()) {
                     out.createNewFile();
                 }
-                ec.canonicaliseFile(f,out,distinct);
+                ec.canonicaliseFile(f,out,distinct,keep);
             }
             else if (commandLine.hasOption("q")) {
                 ec.canonicaliseQuery(commandLine.getOptionValue("q"));
